@@ -1,0 +1,54 @@
+# Cashlytics Self-Hosting Docker Compose
+# 
+# Quick Start:
+# 1. Copy .env.example to .env
+# 2. Edit .env and set your secure passwords
+# 3. Run: docker compose -f docker-compose.selfhost.yml up -d
+# 4. Open http://localhost:3000
+
+services:
+  cashlytics:
+    image: ghcr.io/aaronjoeldev/cashlytics-ai:latest
+    container_name: cashlytics-app
+    ports:
+      - "3000:3000"
+    environment:
+      # Database connection (internal docker network)
+      - DATABASE_URL=postgresql://cashlytics:${POSTGRES_PASSWORD}@postgres:5432/cashlytics
+      # Public URL of your Cashlytics instance
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      # OpenAI API Key for AI Assistant (optional)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cashlytics-postgres
+    environment:
+      - POSTGRES_USER=cashlytics
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=cashlytics
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashlytics -d cashlytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # Uncomment to expose PostgreSQL port (not recommended for production)
+    # ports:
+    #   - "5432:5432"
+
+volumes:
+  postgres_data:
+    driver: local

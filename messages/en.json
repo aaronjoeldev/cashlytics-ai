@@ -1,0 +1,162 @@
+{
+  "common": {
+    "appName": "Cashlytics",
+    "search": "Search or enter command...",
+    "notifications": "Notifications",
+    "navigation": "Navigation",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "overview": "Overview",
+    "expenses": "Expenses",
+    "income": "Income",
+    "transfers": "Transfers",
+    "categories": "Categories",
+    "accounts": "Accounts",
+    "analytics": "Analytics",
+    "goals": "Goals",
+    "settings": "Settings",
+    "assistant": "AI Assistant"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back! Here's your financial overview.",
+    "totalAssets": "Total Assets",
+    "income": "Income",
+    "expenses": "Expenses",
+    "savingsRate": "Savings Rate",
+    "vsLastMonth": "vs. last month",
+    "monthly": "monthly",
+    "incomeVsExpenses": "Income vs. Expenses",
+    "expensesByCategory": "Expenses by Category",
+    "chartPlaceholder": "Chart component coming here",
+    "donutPlaceholder": "Donut chart coming here",
+    "recentTransactions": "Recent Transactions",
+    "noTransactions": "No transactions yet. Add your first expense or income!"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "description": "Manage your checking, savings, and ETF accounts.",
+    "allAccounts": "All Accounts",
+    "noAccounts": "No accounts yet. Create your first account!",
+    "types": {
+      "checking": "Checking Account",
+      "savings": "Savings Account",
+      "etf": "ETF Portfolio"
+    },
+    "addAccount": "Add Account",
+    "editAccount": "Edit Account",
+    "deleteAccount": "Delete Account",
+    "deleteConfirm": "Are you sure you want to delete this account? This action cannot be undone.",
+    "name": "Name",
+    "namePlaceholder": "e.g. Main Checking",
+    "type": "Account Type",
+    "balance": "Balance",
+    "currency": "Currency",
+    "created": "Created",
+    "actions": "Actions",
+    "saveSuccess": "Account saved successfully.",
+    "deleteSuccess": "Account deleted successfully.",
+    "error": "Something went wrong. Please try again.",
+    "accountName": "Account Name",
+    "accountNamePlaceholder": "e.g. Main Checking",
+    "accountType": "Account Type",
+    "initialBalance": "Initial Balance",
+    "totalBalance": "Total Balance",
+    "success": {
+      "created": "Account created.",
+      "updated": "Account updated.",
+      "deleted": "Account deleted."
+    },
+    "errors": {
+      "nameRequired": "Name required.",
+      "typeRequired": "Type required.",
+      "balanceInvalid": "Invalid balance.",
+      "createFailed": "Create failed.",
+      "updateFailed": "Update failed.",
+      "deleteFailed": "Delete failed."
+    }
+  },
+  "expenses": {
+    "title": "Expenses",
+    "description": "Manage your monthly expenses.",
+    "allExpenses": "All Expenses",
+    "noExpenses": "No expenses yet. Add your first expense!"
+  },
+  "income": {
+    "title": "Income",
+    "description": "Manage your income sources.",
+    "allIncome": "All Income",
+    "noIncome": "No income yet. Add your income!"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "description": "Detailed insights into your finances.",
+    "financialAnalytics": "Financial Analytics",
+    "noData": "Add income and expenses first to see analytics.",
+    "monthlyTrend": "Monthly Trend",
+    "monthlyTrendDescription": "Income, expenses and savings over time",
+    "incomeVsExpenses": "Income vs. Expenses",
+    "incomeVsExpensesDescription": "Comparison of the last 6 months",
+    "expensesByCategory": "Expenses by Category",
+    "expensesByCategoryDescription": "Distribution of expenses",
+    "kpiIncome": "Total Income",
+    "kpiIncomeDescription": "Income this month",
+    "kpiExpenses": "Total Expenses",
+    "kpiExpensesDescription": "Expenses this month",
+    "kpiSavings": "Money Saved",
+    "kpiSavingsDescription": "Savings this month",
+    "kpiSavingsRate": "Savings Rate",
+    "kpiSavingsRateDescription": "Percentage of income saved",
+    "income": "Income",
+    "expenses": "Expenses",
+    "savings": "Savings",
+    "noDataChart": "No data available for this period"
+  },
+  "assistant": {
+    "title": "AI Assistant",
+    "description": "Your personal finance advisor - powered by AI.",
+    "chatTitle": "Chat with the Assistant",
+    "placeholder": "Chat interface coming here. Ask questions like \"How much did I spend this month?\""
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your app settings.",
+    "general": "General Settings",
+    "placeholder": "Settings coming here.",
+    "language": "Language",
+    "currency": "Currency",
+    "theme": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System"
+  },
+  "currency": {
+    "EUR": "Euro",
+    "USD": "US Dollar",
+    "GBP": "British Pound",
+    "CHF": "Swiss Franc",
+    "DKK": "Danish Krone"
+  },
+  "recurrence": {
+    "once": "One-time",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "yearly": "Yearly",
+    "custom": "Custom"
+  }
+}

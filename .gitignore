@@ -9,9 +9,10 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+models
 # testing
 /coverage
+vectors.db
 
 # next.js
 /.next/
@@ -39,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# semantic release
+VERSION

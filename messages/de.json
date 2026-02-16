@@ -1,0 +1,162 @@
+{
+  "common": {
+    "appName": "Cashlytics",
+    "search": "Suchen oder Befehl eingeben...",
+    "notifications": "Benachrichtigungen",
+    "navigation": "Navigation",
+    "loading": "Laden...",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "add": "Hinzufügen",
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "yes": "Ja",
+    "no": "Nein"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "overview": "Übersicht",
+    "expenses": "Ausgaben",
+    "income": "Einnahmen",
+    "transfers": "Transfers",
+    "categories": "Kategorien",
+    "accounts": "Konten",
+    "analytics": "Analysen",
+    "goals": "Ziele",
+    "settings": "Einstellungen",
+    "assistant": "KI Assistent"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Willkommen zurück! Hier ist deine Finanzübersicht.",
+    "totalAssets": "Gesamtvermögen",
+    "income": "Einnahmen",
+    "expenses": "Ausgaben",
+    "savingsRate": "Sparrate",
+    "vsLastMonth": "vs. letzten Monat",
+    "monthly": "monatlich",
+    "incomeVsExpenses": "Einnahmen vs. Ausgaben",
+    "expensesByCategory": "Ausgaben nach Kategorie",
+    "chartPlaceholder": "Chart-Komponente kommt hier",
+    "donutPlaceholder": "Donut-Chart kommt hier",
+    "recentTransactions": "Letzte Transaktionen",
+    "noTransactions": "Noch keine Transaktionen vorhanden. Füge deine erste Ausgabe oder Einnahme hinzu!"
+  },
+  "accounts": {
+    "title": "Konten",
+    "description": "Verwalte deine Giro-, Spar- und ETF-Konten.",
+    "allAccounts": "Alle Konten",
+    "noAccounts": "Noch keine Konten vorhanden. Erstelle dein erstes Konto!",
+    "types": {
+      "checking": "Girokonto",
+      "savings": "Sparkonto",
+      "etf": "ETF Portfolio"
+    },
+    "addAccount": "Konto hinzufügen",
+    "editAccount": "Konto bearbeiten",
+    "deleteAccount": "Konto löschen",
+    "deleteConfirm": "Bist du sicher, dass du dieses Konto löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "name": "Name",
+    "namePlaceholder": "z.B. Girokonto Sparkasse",
+    "type": "Kontotyp",
+    "balance": "Kontostand",
+    "currency": "Währung",
+    "created": "Erstellt am",
+    "actions": "Aktionen",
+    "saveSuccess": "Konto wurde erfolgreich gespeichert.",
+    "deleteSuccess": "Konto wurde erfolgreich gelöscht.",
+    "error": "Ein Fehler ist aufgetreten. Bitte versuche es erneut.",
+    "accountName": "Kontoname",
+    "accountNamePlaceholder": "z.B. Girokonto Sparkasse",
+    "accountType": "Kontotyp",
+    "initialBalance": "Anfangssaldo",
+    "totalBalance": "Gesamtsaldo",
+    "success": {
+      "created": "Konto erstellt.",
+      "updated": "Konto aktualisiert.",
+      "deleted": "Konto gelöscht."
+    },
+    "errors": {
+      "nameRequired": "Name erforderlich.",
+      "typeRequired": "Typ erforderlich.",
+      "balanceInvalid": "Saldo ungültig.",
+      "createFailed": "Erstellen fehlgeschlagen.",
+      "updateFailed": "Aktualisieren fehlgeschlagen.",
+      "deleteFailed": "Löschen fehlgeschlagen."
+    }
+  },
+  "expenses": {
+    "title": "Ausgaben",
+    "description": "Verwalte deine monatlichen Ausgaben.",
+    "allExpenses": "Alle Ausgaben",
+    "noExpenses": "Noch keine Ausgaben vorhanden. Füge deine erste Ausgabe hinzu!"
+  },
+  "income": {
+    "title": "Einnahmen",
+    "description": "Verwalte deine Einkommensquellen.",
+    "allIncome": "Alle Einnahmen",
+    "noIncome": "Noch keine Einnahmen vorhanden. Füge dein Einkommen hinzu!"
+  },
+  "analytics": {
+    "title": "Analysen",
+    "description": "Detaillierte Einblicke in deine Finanzen.",
+    "financialAnalytics": "Finanzanalysen",
+    "noData": "Füge zuerst Einnahmen und Ausgaben hinzu, um Analysen zu sehen.",
+    "monthlyTrend": "Monatlicher Trend",
+    "monthlyTrendDescription": "Einnahmen, Ausgaben und Ersparnisse im Verlauf",
+    "incomeVsExpenses": "Einnahmen vs. Ausgaben",
+    "incomeVsExpensesDescription": "Vergleich der letzten 6 Monate",
+    "expensesByCategory": "Ausgaben nach Kategorie",
+    "expensesByCategoryDescription": "Verteilung der Ausgaben",
+    "kpiIncome": "Gesamteinnahmen",
+    "kpiIncomeDescription": "Einnahmen diesen Monat",
+    "kpiExpenses": "Gesamtausgaben",
+    "kpiExpensesDescription": "Ausgaben diesen Monat",
+    "kpiSavings": "Gespartes Geld",
+    "kpiSavingsDescription": "Ersparnisse diesen Monat",
+    "kpiSavingsRate": "Sparrate",
+    "kpiSavingsRateDescription": "Prozentsatz des Einkommens gespart",
+    "income": "Einnahmen",
+    "expenses": "Ausgaben",
+    "savings": "Ersparnisse",
+    "noDataChart": "Keine Daten für diesen Zeitraum vorhanden"
+  },
+  "assistant": {
+    "title": "KI Assistent",
+    "description": "Dein persönlicher Finanzberater - unterstützt durch KI.",
+    "chatTitle": "Chat mit dem Assistenten",
+    "placeholder": "Chat-Interface kommt hier. Stelle Fragen wie \"Wie viel habe ich diesen Monat ausgegeben?\""
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "description": "Verwalte deine App-Einstellungen.",
+    "general": "Allgemeine Einstellungen",
+    "placeholder": "Einstellungen kommen hier.",
+    "language": "Sprache",
+    "currency": "Währung",
+    "theme": "Erscheinungsbild",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel",
+    "themeSystem": "System"
+  },
+  "currency": {
+    "EUR": "Euro",
+    "USD": "US-Dollar",
+    "GBP": "Britisches Pfund",
+    "CHF": "Schweizer Franken",
+    "DKK": "Dänische Krone"
+  },
+  "recurrence": {
+    "once": "Einmalig",
+    "daily": "Täglich",
+    "weekly": "Wöchentlich",
+    "monthly": "Monatlich",
+    "quarterly": "Vierteljährlich",
+    "yearly": "Jährlich",
+    "custom": "Benutzerdefiniert"
+  }
+}

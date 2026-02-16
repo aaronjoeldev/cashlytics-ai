@@ -1,0 +1,57 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build output
+.next
+out
+build
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+DESIGN.MD
+START.MD
+prompt.md
+docs/
+
+# Database files
+*.db
+*.db-journal
+vectors.db
+
+# Test files
+coverage
+.nyc_output
+
+# Misc
+*.log
+*.tsbuildinfo
+.claude
+.eslintcache
