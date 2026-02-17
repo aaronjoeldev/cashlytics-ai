@@ -1,5 +1,5 @@
 # Cashlytics Self-Hosting Docker Compose
-# 
+#
 # Quick Start:
 # 1. Copy .env.example to .env
 # 2. Edit .env and set your secure passwords
@@ -8,7 +8,9 @@
 
 services:
   cashlytics:
-    image: ghcr.io/aaronjoeldev/cashlytics-ai:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: cashlytics-app
     ports:
       - "3000:3000"
