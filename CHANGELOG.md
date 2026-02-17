@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v1.0.0...v1.1.0) (2026-02-17)
+
+### ✨ Features
+
+* add drizzle migration to dockerfile ([358fa80](https://github.com/aaronjoeldev/cashlytics-ai/commit/358fa806eccffc28e34ec13388444d8a89f83a79))
+
 ## 1.0.0 (2026-02-16)
 
 ### ✨ Features
