@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v1.1.0...v1.2.0) (2026-02-17)
+
+### ✨ Features
+
+* add ability to upload files to expenses, improve ai agent ([0d685a7](https://github.com/aaronjoeldev/cashlytics-ai/commit/0d685a7664a7918104e6fba736aec8d560222a53))
+
 ## [1.1.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v1.0.0...v1.1.0) (2026-02-17)
 
 ### ✨ Features
