@@ -8,9 +8,7 @@
 
 services:
   cashlytics:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/aaronjoeldev/cashlytics-ai:latest
     container_name: cashlytics-app
     ports:
       - "3000:3000"
