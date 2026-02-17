@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v1.2.0...v1.3.0) (2026-02-17)
+
+### ✨ Features
+
+* add migration for documents table and info columns ([b7a0e1b](https://github.com/aaronjoeldev/cashlytics-ai/commit/b7a0e1b5420272b9471cd80375e65138081147c4))
+
 ## [1.2.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v1.1.0...v1.2.0) (2026-02-17)
 
 ### ✨ Features
