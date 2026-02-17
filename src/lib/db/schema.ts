@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, decimal, timestamp, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, decimal, timestamp, integer, pgEnum, boolean } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const accountTypeEnum = pgEnum('account_type', ['checking', 'savings', 'etf']);
@@ -35,6 +35,8 @@ export const expenses = pgTable('expenses', {
   recurrenceInterval: integer('recurrence_interval'),
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date'),
+  isSubscription: boolean('is_subscription').default(false).notNull(),
+  info: text('info'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -46,6 +48,7 @@ export const incomes = pgTable('incomes', {
   recurrenceType: incomeRecurrenceTypeEnum('recurrence_type').notNull(),
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date'),
+  info: text('info'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -56,6 +59,7 @@ export const dailyExpenses = pgTable('daily_expenses', {
   description: text('description').notNull(),
   amount: decimal('amount', { precision: 12, scale: 2 }).notNull(),
   date: timestamp('date').notNull(),
+  info: text('info'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -68,6 +72,17 @@ export const transfers = pgTable('transfers', {
   recurrenceType: transferRecurrenceTypeEnum('recurrence_type').notNull(),
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const documents = pgTable('documents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'cascade' }),
+  dailyExpenseId: uuid('daily_expense_id').references(() => dailyExpenses.id, { onDelete: 'cascade' }),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  size: integer('size').notNull(),
+  data: text('data').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -84,7 +99,7 @@ export const categoriesRelations = relations(categories, ({ many }) => ({
   dailyExpenses: many(dailyExpenses),
 }));
 
-export const expensesRelations = relations(expenses, ({ one }) => ({
+export const expensesRelations = relations(expenses, ({ one, many }) => ({
   account: one(accounts, {
     fields: [expenses.accountId],
     references: [accounts.id],
@@ -93,6 +108,7 @@ export const expensesRelations = relations(expenses, ({ one }) => ({
     fields: [expenses.categoryId],
     references: [categories.id],
   }),
+  documents: many(documents),
 }));
 
 export const incomesRelations = relations(incomes, ({ one }) => ({
@@ -102,7 +118,7 @@ export const incomesRelations = relations(incomes, ({ one }) => ({
   }),
 }));
 
-export const dailyExpensesRelations = relations(dailyExpenses, ({ one }) => ({
+export const dailyExpensesRelations = relations(dailyExpenses, ({ one, many }) => ({
   account: one(accounts, {
     fields: [dailyExpenses.accountId],
     references: [accounts.id],
@@ -111,6 +127,7 @@ export const dailyExpensesRelations = relations(dailyExpenses, ({ one }) => ({
     fields: [dailyExpenses.categoryId],
     references: [categories.id],
   }),
+  documents: many(documents),
 }));
 
 export const transfersRelations = relations(transfers, ({ one }) => ({
@@ -123,6 +140,17 @@ export const transfersRelations = relations(transfers, ({ one }) => ({
     fields: [transfers.targetAccountId],
     references: [accounts.id],
     relationName: 'targetAccount',
+  }),
+}));
+
+export const documentsRelations = relations(documents, ({ one }) => ({
+  expense: one(expenses, {
+    fields: [documents.expenseId],
+    references: [expenses.id],
+  }),
+  dailyExpense: one(dailyExpenses, {
+    fields: [documents.dailyExpenseId],
+    references: [dailyExpenses.id],
   }),
 }));
 

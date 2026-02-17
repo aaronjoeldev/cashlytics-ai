@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { accounts, incomes, expenses, dailyExpenses, categories } from '@/lib/db/schema';
-import { and, gte, lte, sql, desc } from 'drizzle-orm';
+import { and, gte, lte, sql, desc, eq } from 'drizzle-orm';
 import type { ApiResponse, Account, DailyExpenseWithDetails } from '@/types/database';
 
 function normalizeToMonthly(amount: number, recurrenceType: string, recurrenceInterval: number | null): number {
@@ -205,5 +205,152 @@ export async function getAccounts(): Promise<ApiResponse<Account[]>> {
   } catch (error) {
     console.error('Failed to fetch accounts:', error);
     return { success: false, error: 'Failed to fetch accounts' };
+  }
+}
+
+interface UpcomingPayment {
+  id: string;
+  name: string;
+  amount: number;
+  date: Date;
+  type: 'expense' | 'daily_expense';
+  category: {
+    name: string | null;
+    icon: string | null;
+    color: string | null;
+  } | null;
+  isSubscription: boolean;
+}
+
+function getNextPaymentDate(startDate: Date, recurrenceType: string, recurrenceInterval: number | null): Date {
+  const now = new Date();
+  const start = new Date(startDate);
+  
+  switch (recurrenceType) {
+    case 'daily': {
+      const next = new Date(now);
+      next.setDate(next.getDate() + 1);
+      next.setHours(0, 0, 0, 0);
+      return next;
+    }
+    case 'weekly': {
+      const daysUntilNext = (7 - ((now.getDay() - start.getDay() + 7) % 7)) % 7 || 7;
+      const next = new Date(now);
+      next.setDate(next.getDate() + daysUntilNext);
+      next.setHours(0, 0, 0, 0);
+      return next;
+    }
+    case 'monthly': {
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + 1);
+      }
+      return next;
+    }
+    case 'quarterly': {
+      const monthsToAdd = 3 - ((now.getMonth() - start.getMonth()) % 3);
+      const next = new Date(now.getFullYear(), now.getMonth() + monthsToAdd, start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + 3);
+      }
+      return next;
+    }
+    case 'yearly': {
+      const next = new Date(now.getFullYear() + 1, start.getMonth(), start.getDate());
+      if (next <= now) {
+        next.setFullYear(next.getFullYear() + 1);
+      }
+      return next;
+    }
+    case 'custom': {
+      if (!recurrenceInterval) return start;
+      const monthsToAdd = recurrenceInterval - ((now.getMonth() - start.getMonth()) % recurrenceInterval);
+      const next = new Date(now.getFullYear(), now.getMonth() + monthsToAdd, start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + recurrenceInterval);
+      }
+      return next;
+    }
+    default:
+      return start;
+  }
+}
+
+export async function getUpcomingPayments(days: number = 14): Promise<ApiResponse<UpcomingPayment[]>> {
+  try {
+    const now = new Date();
+    const endDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    
+    const payments: UpcomingPayment[] = [];
+    
+    const activeExpenses = await db
+      .select({
+        expense: expenses,
+        category: categories,
+      })
+      .from(expenses)
+      .leftJoin(categories, eq(expenses.categoryId, categories.id))
+      .where(sql`${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${now.toISOString()}`);
+
+    for (const item of activeExpenses) {
+      if (item.expense.recurrenceType === 'once') continue;
+      
+      const nextDate = getNextPaymentDate(
+        item.expense.startDate,
+        item.expense.recurrenceType,
+        item.expense.recurrenceInterval
+      );
+      
+      if (nextDate >= now && nextDate <= endDate) {
+        payments.push({
+          id: item.expense.id,
+          name: item.expense.name,
+          amount: parseFloat(item.expense.amount),
+          date: nextDate,
+          type: 'expense',
+          category: item.category ? {
+            name: item.category.name,
+            icon: item.category.icon,
+            color: item.category.color,
+          } : null,
+          isSubscription: item.expense.isSubscription ?? false,
+        });
+      }
+    }
+    
+    const upcomingDailyExpenses = await db
+      .select({
+        dailyExpense: dailyExpenses,
+        category: categories,
+      })
+      .from(dailyExpenses)
+      .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
+      .where(and(
+        gte(dailyExpenses.date, now),
+        lte(dailyExpenses.date, endDate)
+      ));
+
+    for (const item of upcomingDailyExpenses) {
+      payments.push({
+        id: item.dailyExpense.id,
+        name: item.dailyExpense.description,
+        amount: parseFloat(item.dailyExpense.amount),
+        date: new Date(item.dailyExpense.date),
+        type: 'daily_expense',
+        category: item.category ? {
+          name: item.category.name,
+          icon: item.category.icon,
+          color: item.category.color,
+        } : null,
+        isSubscription: false,
+      });
+    }
+    
+    payments.sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    return { success: true, data: payments };
+  } catch (error) {
+    console.error('Failed to fetch upcoming payments:', error);
+    return { success: false, error: 'Failed to fetch upcoming payments' };
   }
 }

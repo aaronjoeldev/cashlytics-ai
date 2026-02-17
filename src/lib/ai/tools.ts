@@ -15,6 +15,7 @@ export const tools = {
       balance: z.string().optional().describe('Aktueller Kontostand als String, z.B. "1000.00"'),
       currency: z.string().optional().describe('Währung, Standard ist EUR'),
     }),
+    needsApproval: true,
     execute: async ({ name, type, balance = '0', currency = 'EUR' }) => {
       return createAccount({ name, type, balance, currency });
     },
@@ -36,6 +37,7 @@ export const tools = {
       type: z.enum(['checking', 'savings', 'etf']).optional().describe('Neuer Kontotyp'),
       balance: z.string().optional().describe('Neuer Kontostand'),
     }),
+    needsApproval: true,
     execute: async ({ id, name, type, balance }) => {
       const data: { name?: string; type?: 'checking' | 'savings' | 'etf'; balance?: string } = {};
       if (name !== undefined) data.name = name;
@@ -50,6 +52,7 @@ export const tools = {
     inputSchema: z.object({
       id: z.uuid().describe('ID des zu löschenden Kontos'),
     }),
+    needsApproval: true,
     execute: async ({ id }) => {
       return deleteAccount(id);
     },
@@ -67,6 +70,7 @@ export const tools = {
       startDate: z.string().describe('Startdatum im ISO-Format, z.B. "2024-01-01"'),
       endDate: z.string().optional().nullable().describe('Enddatum im ISO-Format, optional'),
     }),
+    needsApproval: true,
     execute: async ({ accountId, categoryId, name, amount, recurrenceType, recurrenceInterval, startDate, endDate }) => {
       return createExpense({
         accountId,
@@ -110,6 +114,7 @@ export const tools = {
       recurrenceType: z.enum(['once', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom']).optional(),
       endDate: z.string().optional().nullable().describe('Neues Enddatum'),
     }),
+    needsApproval: true,
     execute: async ({ id, name, amount, recurrenceType, endDate }) => {
       const updateData: Record<string, unknown> = {};
       if (name !== undefined) updateData.name = name;
@@ -125,6 +130,7 @@ export const tools = {
     inputSchema: z.object({
       id: z.uuid().describe('ID der zu löschenden Ausgabe'),
     }),
+    needsApproval: true,
     execute: async ({ id }) => {
       return deleteExpense(id);
     },
@@ -139,6 +145,7 @@ export const tools = {
       amount: z.number().positive().describe('Betrag als Zahl'),
       date: z.string().describe('Datum im ISO-Format, z.B. "2024-01-15"'),
     }),
+    needsApproval: true,
     execute: async ({ accountId, categoryId, description, amount, date }) => {
       return createDailyExpense({
         accountId,
@@ -175,6 +182,7 @@ export const tools = {
     inputSchema: z.object({
       id: z.uuid().describe('ID der zu löschenden Ausgabe'),
     }),
+    needsApproval: true,
     execute: async ({ id }) => {
       return deleteDailyExpense(id);
     },
@@ -189,6 +197,7 @@ export const tools = {
       recurrenceType: z.enum(['once', 'monthly', 'yearly']).describe('Wiederholungstyp'),
       startDate: z.string().describe('Startdatum im ISO-Format'),
     }),
+    needsApproval: true,
     execute: async ({ accountId, source, amount, recurrenceType, startDate }) => {
       return createIncome({
         accountId,
@@ -224,6 +233,7 @@ export const tools = {
       amount: z.number().positive().optional().describe('Neuer Betrag'),
       recurrenceType: z.enum(['once', 'monthly', 'yearly']).optional(),
     }),
+    needsApproval: true,
     execute: async ({ id, source, amount, recurrenceType }) => {
       const updateData: Record<string, unknown> = {};
       if (source !== undefined) updateData.source = source;
@@ -238,6 +248,7 @@ export const tools = {
     inputSchema: z.object({
       id: z.uuid().describe('ID der zu löschenden Einnahme'),
     }),
+    needsApproval: true,
     execute: async ({ id }) => {
       return deleteIncome(id);
     },
@@ -258,6 +269,7 @@ export const tools = {
       icon: z.string().optional().describe('Emoji-Icon, z.B. "🏠"'),
       color: z.string().optional().describe('Farbe als Hex-Code, z.B. "#3b82f6"'),
     }),
+    needsApproval: true,
     execute: async ({ name, icon, color }) => {
       return createCategory({ name, icon, color });
     },

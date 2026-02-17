@@ -10,6 +10,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Calendar,
+  CreditCard,
 } from 'lucide-react';
 import { useSettings } from '@/lib/settings-context';
 import type { DailyExpenseWithDetails } from '@/types/database';
@@ -32,14 +34,41 @@ interface CategoryBreakdown {
   percentage: number;
 }
 
+interface UpcomingPayment {
+  id: string;
+  name: string;
+  amount: number;
+  date: Date;
+  type: 'expense' | 'daily_expense';
+  category: {
+    name: string | null;
+    icon: string | null;
+    color: string | null;
+  } | null;
+  isSubscription: boolean;
+}
+
 interface DashboardClientProps {
   stats: DashboardStats;
   categoryBreakdown: CategoryBreakdown[];
   recentTransactions: DailyExpenseWithDetails[];
+  upcomingPayments: UpcomingPayment[];
 }
 
 function formatDate(date: Date | string) {
   return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(date));
+}
+
+function formatRelativeDate(date: Date): string {
+  const now = new Date();
+  const diffTime = date.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Heute';
+  if (diffDays === 1) return 'Morgen';
+  if (diffDays <= 7) return `In ${diffDays} Tagen`;
+  
+  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(date);
 }
 
 interface KpiCardProps {
@@ -114,10 +143,12 @@ export function DashboardClient({
   stats,
   categoryBreakdown,
   recentTransactions,
+  upcomingPayments,
 }: DashboardClientProps) {
   const { formatCurrency } = useSettings();
   const hasExpenses = categoryBreakdown.length > 0;
   const hasTransactions = recentTransactions.length > 0;
+  const hasUpcoming = upcomingPayments.length > 0;
 
   const today = new Date().toLocaleDateString('de-DE', {
     weekday: 'long',
@@ -214,6 +245,66 @@ export function DashboardClient({
           }
         />
       </div>
+
+      {/* Upcoming Payments */}
+      {hasUpcoming && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5">
+                  <Calendar className="h-4 w-4 text-blue-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base" style={{ fontFamily: 'var(--font-syne)' }}>
+                    Nächste Zahlungen
+                  </CardTitle>
+                  <CardDescription className="mt-0.5 text-xs">
+                    Die nächsten 14 Tage
+                  </CardDescription>
+                </div>
+              </div>
+              <span className="text-xs font-medium text-muted-foreground/50 bg-white/5 dark:bg-white/[0.04] border border-border/50 dark:border-white/[0.06] rounded-lg px-2 py-1">
+                {upcomingPayments.length} anstehend
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {upcomingPayments.slice(0, 6).map((payment, i) => (
+                <div
+                  key={`${payment.id}-${i}`}
+                  className="group flex items-center gap-3 p-3 rounded-xl hover:bg-white/4 dark:hover:bg-white/[0.04] transition-all duration-200 border border-transparent hover:border-border/40 dark:hover:border-white/[0.05]"
+                >
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{
+                      background: payment.category?.color
+                        ? `linear-gradient(135deg, ${payment.category.color}28, ${payment.category.color}0e)`
+                        : 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))',
+                    }}
+                  >
+                    <span className="text-base">
+                      {payment.isSubscription ? '💳' : payment.category?.icon || '💸'}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground/90 truncate" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                      {payment.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground/50 mt-0.5" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                      {formatRelativeDate(new Date(payment.date))}
+                    </p>
+                  </div>
+                  <span className="font-semibold text-sm text-red-500 dark:text-red-400 shrink-0" style={{ fontFamily: 'var(--font-syne)' }}>
+                    −{formatCurrency(payment.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Bottom panels */}
       <div className="grid gap-5 md:grid-cols-2">

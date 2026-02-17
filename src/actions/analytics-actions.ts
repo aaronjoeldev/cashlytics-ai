@@ -507,3 +507,313 @@ export async function getSavingsProgress(): Promise<ApiResponse<SavingsProgress>
     return { success: false, error: 'Sparfortschritt konnte nicht geladen werden.' };
   }
 }
+
+export async function getSubscriptions(): Promise<
+  ApiResponse<Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>>
+> {
+  try {
+    const expensesResult = await db
+      .select({
+        expense: expenses,
+        category: categories,
+        account: accounts,
+      })
+      .from(expenses)
+      .leftJoin(categories, eq(expenses.categoryId, categories.id))
+      .leftJoin(accounts, eq(expenses.accountId, accounts.id))
+      .where(eq(expenses.isSubscription, true));
+
+    const subscriptions = expensesResult.map((r) => {
+      const expenseWithDetails: ExpenseWithDetails = {
+        ...r.expense,
+        category: r.category,
+        account: r.account,
+      };
+
+      const monthlyAmount = normalizeToMonthly(
+        parseFloat(r.expense.amount),
+        r.expense.recurrenceType,
+        r.expense.recurrenceInterval
+      );
+
+      return {
+        expense: expenseWithDetails,
+        monthlyAmount,
+      };
+    });
+
+    return { success: true, data: subscriptions };
+  } catch (error) {
+    console.error('Failed to fetch subscriptions:', error);
+    return { success: false, error: 'Abonnements konnten nicht geladen werden.' };
+  }
+}
+
+export interface CalendarPayment {
+  id: string;
+  name: string;
+  amount: number;
+  type: 'expense' | 'daily_expense' | 'income';
+  category: {
+    name: string | null;
+    icon: string | null;
+    color: string | null;
+  } | null;
+  isSubscription: boolean;
+}
+
+export interface CalendarDay {
+  date: Date;
+  dayOfMonth: number;
+  isToday: boolean;
+  isCurrentMonth: boolean;
+  payments: CalendarPayment[];
+}
+
+function getPaymentDatesInMonth(
+  startDate: Date,
+  recurrenceType: string,
+  recurrenceInterval: number | null,
+  monthStart: Date,
+  monthEnd: Date
+): Date[] {
+  const dates: Date[] = [];
+  const start = new Date(startDate);
+  
+  switch (recurrenceType) {
+    case 'daily': {
+      for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+        if (d >= start) {
+          dates.push(new Date(d));
+        }
+      }
+      break;
+    }
+    case 'weekly': {
+      const startDay = start.getDay();
+      for (let d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+        if (d >= start && d.getDay() === startDay) {
+          dates.push(new Date(d));
+        }
+      }
+      break;
+    }
+    case 'monthly': {
+      const paymentDay = Math.min(start.getDate(), 28);
+      const paymentDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), paymentDay);
+      if (paymentDate >= start && paymentDate >= monthStart && paymentDate <= monthEnd) {
+        dates.push(paymentDate);
+      }
+      break;
+    }
+    case 'quarterly': {
+      const monthDiff = (monthStart.getMonth() - start.getMonth() + 12) % 3;
+      if (monthDiff === 0) {
+        const paymentDay = Math.min(start.getDate(), 28);
+        const paymentDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), paymentDay);
+        if (paymentDate >= start && paymentDate >= monthStart && paymentDate <= monthEnd) {
+          dates.push(paymentDate);
+        }
+      }
+      break;
+    }
+    case 'yearly': {
+      if (monthStart.getMonth() === start.getMonth()) {
+        const paymentDay = Math.min(start.getDate(), 28);
+        const paymentDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), paymentDay);
+        if (paymentDate >= start && paymentDate >= monthStart && paymentDate <= monthEnd) {
+          dates.push(paymentDate);
+        }
+      }
+      break;
+    }
+    case 'custom': {
+      if (recurrenceInterval) {
+        const monthsDiff = (monthStart.getFullYear() - start.getFullYear()) * 12 + (monthStart.getMonth() - start.getMonth());
+        if (monthsDiff >= 0 && monthsDiff % recurrenceInterval === 0) {
+          const paymentDay = Math.min(start.getDate(), 28);
+          const paymentDate = new Date(monthStart.getFullYear(), monthStart.getMonth(), paymentDay);
+          if (paymentDate >= start && paymentDate >= monthStart && paymentDate <= monthEnd) {
+            dates.push(paymentDate);
+          }
+        }
+      }
+      break;
+    }
+    case 'once': {
+      if (start >= monthStart && start <= monthEnd) {
+        dates.push(start);
+      }
+      break;
+    }
+  }
+  
+  return dates;
+}
+
+export async function getMonthlyPaymentsCalendar(
+  year: number,
+  month: number
+): Promise<ApiResponse<CalendarDay[]>> {
+  try {
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0, 23, 59, 59);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const firstDayOfMonth = monthStart.getDay();
+    const startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+    const calendarStart = new Date(monthStart);
+    calendarStart.setDate(calendarStart.getDate() - startOffset);
+    
+    const daysInCalendar = 42;
+    const calendarDays: CalendarDay[] = [];
+    
+    const [expensesResult, dailyExpensesResult, incomesResult] = await Promise.all([
+      db
+        .select({
+          expense: expenses,
+          category: categories,
+        })
+        .from(expenses)
+        .leftJoin(categories, eq(expenses.categoryId, categories.id))
+        .where(sql`${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${monthStart.toISOString()}`),
+      db
+        .select({
+          dailyExpense: dailyExpenses,
+          category: categories,
+        })
+        .from(dailyExpenses)
+        .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
+        .where(and(
+          gte(dailyExpenses.date, monthStart),
+          lte(dailyExpenses.date, monthEnd)
+        )),
+      db
+        .select({
+          income: incomes,
+        })
+        .from(incomes)
+        .where(lte(incomes.startDate, monthEnd)),
+    ]);
+    
+    for (let i = 0; i < daysInCalendar; i++) {
+      const currentDate = new Date(calendarStart);
+      currentDate.setDate(calendarStart.getDate() + i);
+      currentDate.setHours(0, 0, 0, 0);
+      
+      const dayOfMonth = currentDate.getDate();
+      const isCurrentMonth = currentDate.getMonth() === month - 1;
+      const isToday = currentDate.getTime() === today.getTime();
+      
+      const payments: CalendarPayment[] = [];
+      
+      if (isCurrentMonth) {
+        for (const item of expensesResult) {
+          const expenseStart = new Date(item.expense.startDate);
+          if (expenseStart > monthEnd) continue;
+          
+          const paymentDates = getPaymentDatesInMonth(
+            expenseStart,
+            item.expense.recurrenceType,
+            item.expense.recurrenceInterval,
+            monthStart,
+            monthEnd
+          );
+          
+          for (const paymentDate of paymentDates) {
+            if (paymentDate.toDateString() === currentDate.toDateString()) {
+              payments.push({
+                id: item.expense.id,
+                name: item.expense.name,
+                amount: parseFloat(item.expense.amount),
+                type: 'expense',
+                category: item.category ? {
+                  name: item.category.name,
+                  icon: item.category.icon,
+                  color: item.category.color,
+                } : null,
+                isSubscription: item.expense.isSubscription ?? false,
+              });
+            }
+          }
+        }
+        
+        for (const item of dailyExpensesResult) {
+          const expDate = new Date(item.dailyExpense.date);
+          expDate.setHours(0, 0, 0, 0);
+          
+          if (expDate.toDateString() === currentDate.toDateString()) {
+            payments.push({
+              id: item.dailyExpense.id,
+              name: item.dailyExpense.description,
+              amount: parseFloat(item.dailyExpense.amount),
+              type: 'daily_expense',
+              category: item.category ? {
+                name: item.category.name,
+                icon: item.category.icon,
+                color: item.category.color,
+              } : null,
+              isSubscription: false,
+            });
+          }
+        }
+        
+        for (const item of incomesResult) {
+          const incomeStart = new Date(item.income.startDate);
+          
+          if (item.income.recurrenceType === 'once') {
+            if (incomeStart.toDateString() === currentDate.toDateString()) {
+              payments.push({
+                id: item.income.id,
+                name: item.income.source,
+                amount: parseFloat(item.income.amount),
+                type: 'income',
+                category: null,
+                isSubscription: false,
+              });
+            }
+          } else if (item.income.recurrenceType === 'monthly') {
+            const paymentDay = Math.min(incomeStart.getDate(), 28);
+            if (dayOfMonth === paymentDay && incomeStart <= currentDate) {
+              payments.push({
+                id: item.income.id,
+                name: item.income.source,
+                amount: parseFloat(item.income.amount),
+                type: 'income',
+                category: null,
+                isSubscription: false,
+              });
+            }
+          } else if (item.income.recurrenceType === 'yearly') {
+            if (currentDate.getMonth() === incomeStart.getMonth() && 
+                dayOfMonth === Math.min(incomeStart.getDate(), 28) &&
+                incomeStart <= currentDate) {
+              payments.push({
+                id: item.income.id,
+                name: item.income.source,
+                amount: parseFloat(item.income.amount),
+                type: 'income',
+                category: null,
+                isSubscription: false,
+              });
+            }
+          }
+        }
+      }
+      
+      calendarDays.push({
+        date: currentDate,
+        dayOfMonth,
+        isToday,
+        isCurrentMonth,
+        payments,
+      });
+    }
+    
+    return { success: true, data: calendarDays };
+  } catch (error) {
+    console.error('Failed to fetch monthly payments calendar:', error);
+    return { success: false, error: 'Monatskalender konnte nicht geladen werden.' };
+  }
+}

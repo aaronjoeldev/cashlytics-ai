@@ -4,10 +4,13 @@ import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { User, Bot } from 'lucide-react';
 import type { UIMessage } from 'ai';
-import { isTextUIPart } from 'ai';
+import { isTextUIPart, isToolUIPart, getToolName } from 'ai';
+import { ToolConfirmationCard } from '@/components/molecules/tool-confirmation-card';
 
 interface ChatMessageProps {
   message: UIMessage;
+  onApprove?: (approvalId: string) => void;
+  onDeny?: (approvalId: string) => void;
 }
 
 interface ChatMessageSimpleProps {
@@ -22,7 +25,7 @@ function getTextContent(message: UIMessage): string {
 
 function formatMarkdown(text: string): React.ReactNode {
   const lines = text.split('\n');
-  
+
   return lines.map((line, lineIndex) => {
     if (line.startsWith('• ') || line.startsWith('- ')) {
       return (
@@ -32,7 +35,7 @@ function formatMarkdown(text: string): React.ReactNode {
         </div>
       );
     }
-    
+
     if (line.startsWith('**') && line.endsWith('**')) {
       return (
         <p key={lineIndex} className="font-semibold">
@@ -40,7 +43,7 @@ function formatMarkdown(text: string): React.ReactNode {
         </p>
       );
     }
-    
+
     return <p key={lineIndex}>{formatInlineMarkdown(line)}</p>;
   });
 }
@@ -49,10 +52,10 @@ function formatInlineMarkdown(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
-  
+
   while (remaining.length > 0) {
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-    
+
     if (boldMatch && boldMatch.index !== undefined) {
       if (boldMatch.index > 0) {
         parts.push(remaining.slice(0, boldMatch.index));
@@ -68,13 +71,46 @@ function formatInlineMarkdown(text: string): React.ReactNode {
       break;
     }
   }
-  
+
   return parts;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onApprove, onDeny }: ChatMessageProps) {
   const isUser = message.role === 'user';
-  const content = getTextContent(message);
+  const textContent = getTextContent(message);
+
+  // Collect all renderable parts
+  const textPart = textContent ? (
+    <Card
+      className={cn(
+        'rounded-2xl px-4 py-2.5 text-sm shadow-sm',
+        isUser
+          ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 rounded-tr-md'
+          : 'bg-card rounded-tl-md'
+      )}
+    >
+      <div className="whitespace-pre-wrap break-words leading-relaxed">
+        {isUser ? textContent : formatMarkdown(textContent)}
+      </div>
+    </Card>
+  ) : null;
+
+  // Tool confirmation cards for pending approvals
+  const toolParts = message.parts
+    .filter(isToolUIPart)
+    .filter((part) => part.state === 'approval-requested' && part.approval?.id != null)
+    .map((part) => (
+      <ToolConfirmationCard
+        key={part.toolCallId}
+        toolName={getToolName(part)}
+        args={(part.input as Record<string, unknown>) ?? {}}
+        approvalId={part.approval!.id}
+        onApprove={onApprove}
+        onDeny={onDeny}
+      />
+    ));
+
+  if (!textPart && toolParts.length === 0) return null;
 
   return (
     <div
@@ -91,22 +127,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       <div
         className={cn(
-          'max-w-[80%] space-y-1',
-          isUser ? 'flex items-end' : 'flex items-start'
+          'max-w-[80%] space-y-2',
+          isUser ? 'flex items-end flex-col' : 'flex items-start flex-col'
         )}
       >
-        <Card
-          className={cn(
-            'rounded-2xl px-4 py-2.5 text-sm shadow-sm',
-            isUser
-              ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 rounded-tr-md'
-              : 'bg-card rounded-tl-md'
-          )}
-        >
-          <div className="whitespace-pre-wrap break-words leading-relaxed">
-            {isUser ? content : formatMarkdown(content)}
-          </div>
-        </Card>
+        {textPart}
+        {toolParts}
       </div>
     </div>
   );

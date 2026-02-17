@@ -46,10 +46,24 @@ export function ChatInterface() {
     sendMessage,
     status,
     error,
+    addToolApprovalResponse,
   } = useConversations();
+
+  const handleToolApprove = (approvalId: string) => {
+    addToolApprovalResponse({ id: approvalId, approved: true });
+  };
+
+  const handleToolDeny = (approvalId: string) => {
+    addToolApprovalResponse({ id: approvalId, approved: false });
+  };
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
+
+  const lastAssistantIndex = messages.reduce(
+    (lastIdx, msg, idx) => (msg.role === 'assistant' ? idx : lastIdx),
+    -1
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,8 +114,13 @@ export function ChatInterface() {
             {!hasMessages && !isLoading && (
               <ChatMessage key="welcome" message={WELCOME_MESSAGE} />
             )}
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+            {messages.map((message, index) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                onApprove={index === lastAssistantIndex ? handleToolApprove : undefined}
+                onDeny={index === lastAssistantIndex ? handleToolDeny : undefined}
+              />
             ))}
             {isLoading && <ChatMessageLoading />}
             <div ref={messagesEndRef} />

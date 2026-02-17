@@ -1,11 +1,12 @@
-import { getDashboardStats, getCategoryBreakdown, getRecentTransactions } from '@/actions/dashboard-actions';
+import { getDashboardStats, getCategoryBreakdown, getRecentTransactions, getUpcomingPayments } from '@/actions/dashboard-actions';
 import { DashboardClient } from './client';
 
 export default async function DashboardPage() {
-  const [statsResult, breakdownResult, transactionsResult] = await Promise.all([
+  const [statsResult, breakdownResult, transactionsResult, upcomingResult] = await Promise.all([
     getDashboardStats(),
     getCategoryBreakdown(),
     getRecentTransactions(5),
+    getUpcomingPayments(14),
   ]);
 
   const stats = statsResult.success ? statsResult.data : {
@@ -19,12 +20,14 @@ export default async function DashboardPage() {
 
   const breakdown = breakdownResult.success ? breakdownResult.data : [];
   const transactions = transactionsResult.success ? transactionsResult.data : [];
+  const upcomingPayments = upcomingResult.success ? upcomingResult.data : [];
 
   return (
     <DashboardClient
       stats={stats}
       categoryBreakdown={breakdown}
       recentTransactions={transactions}
+      upcomingPayments={upcomingPayments}
     />
   );
 }

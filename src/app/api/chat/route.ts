@@ -28,6 +28,18 @@ Rufe NIEMALS Tools für nicht-finanzielle Anfragen auf.
 - Täglich/Einmalig (Einkaufen, Tanken, Restaurant, einmalige Zahlungen) → createDailyExpense
 - Wirklich wiederkehrend (Miete, Abo, Versicherung, Gehalt) → createExpense mit recurrenceType
 
+## KATEGORIEN-PFLICHT
+
+Für ALLE Ausgaben (createDailyExpense und createExpense) MUSS eine Kategorie vergeben werden.
+
+Vorgehensweise wenn der Benutzer keine Kategorie nennt:
+1. Wähle die passendste Kategorie aus dem Kontext basierend auf der Beschreibung (z.B. "Tanken" → "Auto", "REWE" → "Lebensmittel")
+2. Frage den Benutzer ZUERST per Text: "Soll ich das unter der Kategorie **[Kategoriename]** einordnen?" – BEVOR du das Tool aufrufst
+3. Erst wenn der Benutzer zustimmt oder eine andere Kategorie wählt, rufe das Tool mit der bestätigten categoryId auf
+4. Falls keine passende Kategorie im Kontext vorhanden ist: Frage ob du eine neue Kategorie anlegen soll, und rufe zuerst createCategory auf
+
+Für Einnahmen (createIncome) ist keine Kategorie nötig – die Quelle (source) reicht aus.
+
 ## ⚠️ KRITISCH: AUSGABEN ERSTELLEN
 
 Nutze die Konto-IDs und Kategorie-IDs aus dem KONTEXT-ABSCHNITT unten direkt.
@@ -37,9 +49,9 @@ Wenn eine passende Kategorie im Kontext vorhanden ist → direkt verwenden.
 Wenn keine passende Kategorie vorhanden ist → createCategory aufrufen, dann weiter.
 
 BEISPIEL für "Ich habe 30€ getankt":
-→ Passendes Konto aus Kontext nehmen (z.B. Girokonto, id: "abc-123")
-→ Passende Kategorie aus Kontext nehmen (z.B. Auto/Transport)
-→ createDailyExpense({ accountId: "abc-123", categoryId: "cat-456", description: "Tanken", amount: 30, date: "HEUTE" })
+→ Passende Kategorie aus Kontext ermitteln (z.B. "Auto/Transport")
+→ Benutzer fragen: "Soll ich das unter der Kategorie **Auto/Transport** einordnen?"
+→ Nach Bestätigung: createDailyExpense({ accountId: "abc-123", categoryId: "cat-456", description: "Tanken", amount: 30, date: "HEUTE" })
 
 ## DATUM-REGELN
 
@@ -58,8 +70,10 @@ BEISPIEL für "Ich habe 30€ getankt":
 
 1. Sprache: Deutsch, kurz und prägnant
 2. Fehler: Freundlich erklären, Alternativen anbieten
-3. Proaktiv: Bei Ausgaben-Erwähnung sofort erstellen
-4. Nach Anlegen: Kurz bestätigen was erstellt wurde`;
+3. Proaktiv: Bei Ausgaben-Erwähnung sofort das passende Tool aufrufen und dem Benutzer zur Bestätigung vorlegen
+4. Bestätigung: Alle Schreib-Operationen (erstellen, ändern, löschen) erfordern eine Bestätigung durch den Benutzer – rufe das Tool auf und warte auf die Genehmigung
+5. Nach Genehmigung: Kurz bestätigen was durchgeführt wurde
+6. Bei Ablehnung: Akzeptiere die Entscheidung und biete ggf. Alternativen an`;
 
 async function buildSystemPrompt(): Promise<string> {
   const today = new Date();
@@ -131,7 +145,7 @@ export async function POST(req: Request) {
     const result = streamText({
       model: openai('gpt-4o'),
       system: systemPrompt,
-      messages: await convertToModelMessages(messages),
+      messages: await convertToModelMessages(messages, { ignoreIncompleteToolCalls: true }),
       tools,
       stopWhen: stepCountIs(10),
       toolChoice: 'auto',

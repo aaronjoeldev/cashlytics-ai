@@ -17,6 +17,8 @@ export const expenseSchema = z.object({
   recurrenceInterval: z.number().optional(),
   startDate: z.date({ message: 'Startdatum ist erforderlich' }),
   endDate: z.any().optional().nullable(),
+  isSubscription: z.boolean(),
+  info: z.string().optional(),
 });
 
 export const dailyExpenseSchema = z.object({
@@ -28,6 +30,7 @@ export const dailyExpenseSchema = z.object({
     'Betrag muss positiv sein'
   ),
   date: z.date({ message: 'Datum ist erforderlich' }),
+  info: z.string().optional(),
 });
 
 export const incomeSchema = z.object({
@@ -40,6 +43,7 @@ export const incomeSchema = z.object({
   recurrenceType: z.enum(incomeRecurrenceTypes),
   startDate: z.date({ message: 'Startdatum ist erforderlich' }),
   endDate: z.any().optional().nullable(),
+  info: z.string().optional(),
 });
 
 export const accountSchema = z.object({

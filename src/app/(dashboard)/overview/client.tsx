@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -13,9 +14,15 @@ import {
   PieChart,
   Wallet,
   PiggyBank,
+  CreditCard,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  X,
 } from 'lucide-react';
 import { useSettings } from '@/lib/settings-context';
 import type { MonthlyOverview, Forecast, CategoryBreakdown, ExpenseWithDetails } from '@/types/database';
+import type { CalendarDay, CalendarPayment } from '@/actions/analytics-actions';
 
 interface OverviewClientProps {
   month: number;
@@ -24,6 +31,8 @@ interface OverviewClientProps {
   forecast: Forecast | null;
   categoryBreakdown: CategoryBreakdown[];
   normalizedExpenses: Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>;
+  subscriptions: Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>;
+  calendarDays: CalendarDay[];
 }
 
 function getMonthName(month: number): string {
@@ -50,22 +59,43 @@ export function OverviewClient({
   forecast,
   categoryBreakdown,
   normalizedExpenses,
+  subscriptions,
+  calendarDays,
 }: OverviewClientProps) {
   const { formatCurrency } = useSettings();
+  const [calendarExpanded, setCalendarExpanded] = useState(true);
+  const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
+  
   const totalIncome = overview?.totalIncome ?? 0;
   const totalExpenses = overview?.totalExpenses ?? 0;
   const balance = overview?.balance ?? 0;
   const hasBreakdown = categoryBreakdown.length > 0;
   const hasExpenses = normalizedExpenses.length > 0;
   const hasForecast = forecast && forecast.monthlyDetails.length > 0;
+  const hasSubscriptions = subscriptions.length > 0;
 
   const totalNormalizedMonthly = normalizedExpenses.reduce((sum, e) => sum + e.monthlyAmount, 0);
+  const totalSubscriptionsMonthly = subscriptions.reduce((sum, s) => sum + s.monthlyAmount, 0);
 
-  // Split expenses: monthly fixed costs vs. periodic reserves
   const monthlyFixed = normalizedExpenses.filter(e => e.expense.recurrenceType === 'monthly');
   const periodicReserves = normalizedExpenses.filter(e => e.expense.recurrenceType !== 'monthly' && e.expense.recurrenceType !== 'once');
   const totalMonthlyFixed = monthlyFixed.reduce((sum, e) => sum + e.monthlyAmount, 0);
   const totalReserves = periodicReserves.reduce((sum, e) => sum + e.monthlyAmount, 0);
+
+  const handleDayClick = (day: CalendarDay) => {
+    if (day.payments.length > 0) {
+      setSelectedDay(day);
+    }
+  };
+
+  const formatDayDate = (date: Date): string => {
+    return new Intl.DateTimeFormat('de-DE', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long',
+      year: 'numeric'
+    }).format(date);
+  };
 
   return (
     <div className="space-y-6">
@@ -78,6 +108,198 @@ export function OverviewClient({
           {getMonthName(month)} {year} &mdash; Deine finanzielle Gesamtübersicht
         </p>
       </div>
+
+      {/* Monthly Calendar */}
+      <Card>
+        <CardHeader className="cursor-pointer" onClick={() => setCalendarExpanded(!calendarExpanded)}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl p-2">
+                <Calendar className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Zahlungskalender</CardTitle>
+                <CardDescription>{getMonthName(month)} {year}</CardDescription>
+              </div>
+            </div>
+            <button className="p-2 hover:bg-accent rounded-lg transition-colors">
+              {calendarExpanded ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+          </div>
+        </CardHeader>
+        {calendarExpanded && (
+          <CardContent>
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((day) => (
+                <div key={day} className="text-center text-xs font-medium text-muted-foreground/60 py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day, i) => {
+                const hasPayments = day.payments.length > 0;
+                
+                return (
+                  <div
+                    key={i}
+                    onClick={() => handleDayClick(day)}
+                    className={`
+                      relative min-h-[60px] p-1.5 rounded-lg border transition-all
+                      ${day.isCurrentMonth 
+                        ? 'bg-card border-border/50 dark:border-white/[0.06]' 
+                        : 'bg-muted/30 border-transparent'}
+                      ${day.isToday 
+                        ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' 
+                        : ''}
+                      ${hasPayments 
+                        ? 'cursor-pointer hover:border-primary/30 hover:bg-accent/30' 
+                        : ''}
+                      ${selectedDay?.date.toDateString() === day.date.toDateString() 
+                        ? 'border-primary bg-primary/5' 
+                        : ''}
+                    `}
+                  >
+                    <span className={`
+                      text-sm font-medium
+                      ${day.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/40'}
+                      ${day.isToday ? 'text-primary' : ''}
+                    `}>
+                      {day.dayOfMonth}
+                    </span>
+                    {hasPayments && (
+                      <div className="mt-1 space-y-0.5">
+                        {day.payments.slice(0, 2).map((payment, pi) => (
+                          <div
+                            key={pi}
+                            className={`
+                              text-[10px] px-1 py-0.5 rounded truncate
+                              ${payment.type === 'income' 
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+                                : 'bg-red-500/20 text-red-600 dark:text-red-400'}
+                            `}
+                          >
+                            {payment.name.slice(0, 8)}
+                          </div>
+                        ))}
+                        {day.payments.length > 2 && (
+                          <div className="text-[10px] text-muted-foreground px-1">
+                            +{day.payments.length - 2} mehr
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-emerald-500/20"></div>
+                <span className="text-xs text-muted-foreground">Einnahmen</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-red-500/20"></div>
+                <span className="text-xs text-muted-foreground">Ausgaben</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded ring-2 ring-primary"></div>
+                <span className="text-xs text-muted-foreground">Heute</span>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Selected Day Detail Overlay */}
+      {selectedDay && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedDay(null)}
+        >
+          <Card 
+            className="w-full max-w-md max-h-[80vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl p-2">
+                    <Calendar className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">
+                      {formatDayDate(selectedDay.date)}
+                    </CardTitle>
+                    <CardDescription>
+                      {selectedDay.payments.length} Zahlung{selectedDay.payments.length !== 1 ? 'en' : ''}
+                    </CardDescription>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedDay(null)}
+                  className="p-2 hover:bg-accent rounded-lg transition-colors"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {selectedDay.payments.map((payment, i) => (
+                  <div 
+                    key={i}
+                    className="flex items-center justify-between p-3 rounded-xl bg-accent/30 dark:bg-white/[0.03]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{
+                          background: payment.category?.color
+                            ? `linear-gradient(135deg, ${payment.category.color}28, ${payment.category.color}0e)`
+                            : payment.type === 'income'
+                              ? 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.05))'
+                              : 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))',
+                        }}
+                      >
+                        <span className="text-base">
+                          {payment.isSubscription ? '💳' : payment.category?.icon || (payment.type === 'income' ? '💰' : '💸')}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{payment.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {payment.category?.name || (payment.type === 'income' ? 'Einnahme' : 'Ausgabe')}
+                          {payment.isSubscription && ' · Abo'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`font-semibold text-sm ${payment.type === 'income' ? 'text-emerald-500' : 'text-red-500'}`}>
+                      {payment.type === 'income' ? '+' : '−'}{formatCurrency(payment.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Saldo des Tages</span>
+                  <span className={`font-bold ${
+                    selectedDay.payments.reduce((sum, p) => sum + (p.type === 'income' ? p.amount : -p.amount), 0) >= 0
+                      ? 'text-emerald-500'
+                      : 'text-red-500'
+                  }`}>
+                    {formatCurrency(selectedDay.payments.reduce((sum, p) => sum + (p.type === 'income' ? p.amount : -p.amount), 0))}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Monthly Balance KPIs */}
       <div className="grid gap-4 md:grid-cols-3 stagger-children">
@@ -127,6 +349,56 @@ export function OverviewClient({
           </CardContent>
         </Card>
       </div>
+
+      {/* Subscriptions Card */}
+      {hasSubscriptions && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 rounded-xl p-2">
+                  <CreditCard className="h-4 w-4 text-cyan-500" />
+                </div>
+                <div>
+                  <CardTitle>Laufende Abos</CardTitle>
+                  <CardDescription>
+                    {subscriptions.length} Abonnement{subscriptions.length !== 1 ? 's' : ''} &middot; Monatlich: <span className="font-semibold text-foreground">{formatCurrency(totalSubscriptionsMonthly)}</span>
+                  </CardDescription>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              {subscriptions
+                .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
+                .map((item) => (
+                  <div key={item.expense.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-accent/30 dark:hover:bg-white/5 transition-colors duration-200">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center"
+                        style={{
+                          background: item.expense.category?.color
+                            ? `linear-gradient(135deg, ${item.expense.category.color}33, ${item.expense.category.color}11)`
+                            : undefined,
+                        }}
+                      >
+                        <span className="text-base">{item.expense.category?.icon || '💳'}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{item.expense.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.expense.category?.name ?? 'Ohne Kategorie'} &middot; {getRecurrenceLabel(item.expense.recurrenceType, item.expense.recurrenceInterval)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums">{formatCurrency(item.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/Mo</span></span>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Category Breakdown */}

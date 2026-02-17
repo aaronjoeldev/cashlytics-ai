@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useChat } from '@ai-sdk/react';
+import { lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai';
 import { toast } from 'sonner';
 import {
   getConversations,
@@ -26,6 +27,7 @@ interface UseConversationsReturn {
   status: ReturnType<typeof useChat>['status'];
   error: ReturnType<typeof useChat>['error'];
   setMessages: ReturnType<typeof useChat>['setMessages'];
+  addToolApprovalResponse: ReturnType<typeof useChat>['addToolApprovalResponse'];
 }
 
 export function useConversations(): UseConversationsReturn {
@@ -36,18 +38,28 @@ export function useConversations(): UseConversationsReturn {
   const initializedRef = useRef(false);
 
   const chat = useChat({
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onFinish: async ({ message }) => {
       if (!activeConversationId) return;
 
+      // Skip saving when the message only contains pending tool approvals (no text,
+      // no completed results). This avoids triggering revalidatePath while the
+      // confirmation card is waiting for user input.
+      const hasText = message.parts.some((p) => p.type === 'text');
+      const hasPendingApproval = message.parts.some(
+        (p) => p.type.startsWith('tool-') && (p as { state?: string }).state === 'approval-requested'
+      );
+      if (!hasText && hasPendingApproval) return;
+
       const messagesLength = chat.messages.length;
-      const userMsg = messagesLength >= 2 
-        ? chat.messages[messagesLength - 2] 
+      const userMsg = messagesLength >= 2
+        ? chat.messages[messagesLength - 2]
         : chat.messages.find((m) => m.role === 'user');
-      
+
       if (userMsg?.role === 'user') {
         const userContent = userMsg.parts
           .filter((p) => p.type === 'text')
-          .map((p) => p.text)
+          .map((p) => (p as { type: 'text'; text: string }).text)
           .join('');
         await saveMessage(activeConversationId, 'user', userContent);
       }
@@ -63,7 +75,7 @@ export function useConversations(): UseConversationsReturn {
         if (firstUserMessage) {
           const content = firstUserMessage.parts
             .filter((p) => p.type === 'text')
-            .map((p) => p.text)
+            .map((p) => (p as { type: 'text'; text: string }).text)
             .join('');
           await updateConversationTitleFromFirstMessage(activeConversationId, content);
           setHasSetTitle(true);
@@ -163,5 +175,6 @@ export function useConversations(): UseConversationsReturn {
     status: chat.status,
     error: chat.error,
     setMessages: chat.setMessages,
+    addToolApprovalResponse: chat.addToolApprovalResponse,
   };
 }

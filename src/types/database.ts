@@ -1,5 +1,5 @@
 import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
-import { accounts, categories, expenses, incomes, dailyExpenses, transfers, conversations, messages } from '@/lib/db/schema';
+import { accounts, categories, expenses, incomes, dailyExpenses, transfers, conversations, messages, documents } from '@/lib/db/schema';
 
 export type Account = InferSelectModel<typeof accounts>;
 export type NewAccount = InferInsertModel<typeof accounts>;
@@ -18,6 +18,9 @@ export type NewDailyExpense = InferInsertModel<typeof dailyExpenses>;
 
 export type Transfer = InferSelectModel<typeof transfers>;
 export type NewTransfer = InferInsertModel<typeof transfers>;
+
+export type Document = InferSelectModel<typeof documents>;
+export type NewDocument = InferInsertModel<typeof documents>;
 
 export type Conversation = InferSelectModel<typeof conversations>;
 export type NewConversation = InferInsertModel<typeof conversations>;

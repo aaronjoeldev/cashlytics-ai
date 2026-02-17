@@ -58,6 +58,7 @@ export function IncomeForm({ accounts, onSuccess, editIncome, open: controlledOp
       recurrenceType: 'monthly',
       startDate: new Date(),
       endDate: null,
+      info: '',
     },
   });
 
@@ -70,6 +71,7 @@ export function IncomeForm({ accounts, onSuccess, editIncome, open: controlledOp
         recurrenceType: editIncome.recurrenceType as IncomeInput['recurrenceType'],
         startDate: new Date(editIncome.startDate),
         endDate: editIncome.endDate ? new Date(editIncome.endDate) : null,
+        info: editIncome.info || '',
       });
     } else {
       form.reset({
@@ -79,6 +81,7 @@ export function IncomeForm({ accounts, onSuccess, editIncome, open: controlledOp
         recurrenceType: 'monthly',
         startDate: new Date(),
         endDate: null,
+        info: '',
       });
     }
   }, [editIncome, form]);
@@ -98,6 +101,7 @@ export function IncomeForm({ accounts, onSuccess, editIncome, open: controlledOp
           recurrenceType: data.recurrenceType,
           startDate: data.startDate,
           endDate,
+          info: data.info,
         });
         if (result.success) {
           form.reset();
@@ -112,6 +116,7 @@ export function IncomeForm({ accounts, onSuccess, editIncome, open: controlledOp
           recurrenceType: data.recurrenceType,
           startDate: data.startDate,
           endDate,
+          info: data.info,
         });
         if (result.success) {
           form.reset();
@@ -195,6 +200,11 @@ export function IncomeForm({ accounts, onSuccess, editIncome, open: controlledOp
           <div className="space-y-2">
             <Label>Enddatum (optional)</Label>
             <Input type="date" {...form.register('endDate', { valueAsDate: true })} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Info / Notizen (optional)</Label>
+            <Input {...form.register('info')} placeholder="z.B. Arbeitgeber, Vertragsdetails..." />
           </div>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>

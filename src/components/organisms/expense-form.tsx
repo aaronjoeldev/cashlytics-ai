@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
 import { expenseSchema, dailyExpenseSchema, type ExpenseInput, type DailyExpenseInput, recurrenceTypes } from '@/lib/validations/transaction';
 import { createExpense, createDailyExpense, updateExpense, updateDailyExpense } from '@/actions/expense-actions';
 import { createCategory } from '@/actions/category-actions';
 import type { CategoryInput } from '@/lib/validations/category';
 import { EmojiPicker } from '@/components/molecules/emoji-picker';
+import { FileUpload } from '@/components/molecules/file-upload';
+import { DocumentList, type DocumentListRef } from '@/components/molecules/document-list';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,11 +63,19 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
   const [newCatIcon, setNewCatIcon] = useState('');
   const [newCatColor, setNewCatColor] = useState('#fbbf24');
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [createdExpenseId, setCreatedExpenseId] = useState<string | null>(null);
+  const [createdDailyExpenseId, setCreatedDailyExpenseId] = useState<string | null>(null);
+  const documentListRef = useRef<DocumentListRef>(null);
   
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
 
   const isEditMode = !!editExpense || !!editDailyExpense;
+  const showDocuments = isEditMode || createdExpenseId || createdDailyExpenseId;
+
+  const handleUploadComplete = () => {
+    documentListRef.current?.refresh();
+  };
 
   const periodicForm = useForm<ExpenseInput>({
     resolver: zodResolver(expenseSchema),
@@ -77,6 +87,8 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
       recurrenceType: 'monthly',
       startDate: new Date(),
       endDate: null,
+      isSubscription: false,
+      info: '',
     },
   });
 
@@ -88,6 +100,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
       description: '',
       amount: '',
       date: new Date(),
+      info: '',
     },
   });
 
@@ -103,6 +116,8 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
         recurrenceInterval: editExpense.recurrenceInterval || undefined,
         startDate: new Date(editExpense.startDate),
         endDate: editExpense.endDate ? new Date(editExpense.endDate) : null,
+        isSubscription: editExpense.isSubscription ?? false,
+        info: editExpense.info || '',
       });
     } else if (editDailyExpense) {
       setActiveTab('daily');
@@ -112,6 +127,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
         description: editDailyExpense.description,
         amount: editDailyExpense.amount,
         date: new Date(editDailyExpense.date),
+        info: editDailyExpense.info || '',
       });
     } else {
       periodicForm.reset({
@@ -122,6 +138,8 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
         recurrenceType: 'monthly',
         startDate: new Date(),
         endDate: null,
+        isSubscription: false,
+        info: '',
       });
       dailyForm.reset({
         accountId: '',
@@ -129,7 +147,10 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
         description: '',
         amount: '',
         date: new Date(),
+        info: '',
       });
+      setCreatedExpenseId(null);
+      setCreatedDailyExpenseId(null);
     }
   }, [editExpense, editDailyExpense, periodicForm, dailyForm]);
 
@@ -179,6 +200,8 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           recurrenceInterval: data.recurrenceInterval,
           startDate: data.startDate,
           endDate,
+          isSubscription: data.isSubscription,
+          info: data.info,
         });
         if (result.success) {
           periodicForm.reset();
@@ -195,10 +218,11 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           recurrenceInterval: data.recurrenceInterval,
           startDate: data.startDate,
           endDate,
+          isSubscription: data.isSubscription,
+          info: data.info,
         });
         if (result.success) {
-          periodicForm.reset();
-          setOpen(false);
+          setCreatedExpenseId(result.data.id);
           onSuccess?.({ type: 'periodic', item: result.data });
         }
       }
@@ -217,6 +241,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           description: data.description,
           amount: data.amount,
           date: data.date,
+          info: data.info,
         });
         if (result.success) {
           dailyForm.reset();
@@ -230,10 +255,10 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           description: data.description,
           amount: data.amount,
           date: data.date,
+          info: data.info,
         });
         if (result.success) {
-          dailyForm.reset();
-          setOpen(false);
+          setCreatedDailyExpenseId(result.data.id);
           onSuccess?.({ type: 'daily', item: result.data });
         }
       }
@@ -252,7 +277,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Ausgabe bearbeiten' : 'Neue Ausgabe'}</DialogTitle>
           <DialogDescription>{isEditMode ? 'Bearbeite die Ausgabe' : 'Wähle zwischen periodischen oder täglichen Ausgaben'}</DialogDescription>
@@ -297,6 +322,20 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant={periodicForm.watch('isSubscription') ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => periodicForm.setValue('isSubscription', !periodicForm.watch('isSubscription'))}
+                  className="gap-2"
+                >
+                  <Check className={`w-4 h-4 ${periodicForm.watch('isSubscription') ? 'opacity-100' : 'opacity-50'}`} />
+                  Ist ein Abo
+                </Button>
+                <span className="text-xs text-muted-foreground">Markiere wiederkehrende Abonnements</span>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -368,9 +407,25 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label>Info / Notizen (optional)</Label>
+                <Input {...periodicForm.register('info')} placeholder="z.B. Policennummer, Vertragsdetails..." />
+              </div>
+
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Speichern...' : isEditMode ? 'Änderungen speichern' : 'Ausgabe erstellen'}
+                {isSubmitting ? 'Speichern...' : isEditMode ? 'Änderungen speichern' : createdExpenseId ? 'Aktualisieren' : 'Ausgabe erstellen'}
               </Button>
+
+              {showDocuments && (editExpense || createdExpenseId) && (
+                <div className="pt-4 border-t border-border/50 space-y-3">
+                  <Label className="text-muted-foreground">Dokumente</Label>
+                  <DocumentList ref={documentListRef} expenseId={editExpense?.id || createdExpenseId!} />
+                  <FileUpload 
+                    expenseId={editExpense?.id || createdExpenseId!} 
+                    onUploadComplete={handleUploadComplete} 
+                  />
+                </div>
+              )}
             </form>
           </TabsContent>
 
@@ -450,9 +505,25 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
                 </div>
               )}
 
+              <div className="space-y-2">
+                <Label>Info / Notizen (optional)</Label>
+                <Input {...dailyForm.register('info')} placeholder="z.B. Quittungsnr., Händler..." />
+              </div>
+
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Speichern...' : isEditMode ? 'Änderungen speichern' : 'Ausgabe erstellen'}
+                {isSubmitting ? 'Speichern...' : isEditMode ? 'Änderungen speichern' : createdDailyExpenseId ? 'Aktualisieren' : 'Ausgabe erstellen'}
               </Button>
+
+              {showDocuments && (editDailyExpense || createdDailyExpenseId) && (
+                <div className="pt-4 border-t border-border/50 space-y-3">
+                  <Label className="text-muted-foreground">Dokumente</Label>
+                  <DocumentList ref={documentListRef} dailyExpenseId={editDailyExpense?.id || createdDailyExpenseId!} />
+                  <FileUpload 
+                    dailyExpenseId={editDailyExpense?.id || createdDailyExpenseId!} 
+                    onUploadComplete={handleUploadComplete} 
+                  />
+                </div>
+              )}
             </form>
           </TabsContent>
         </Tabs>

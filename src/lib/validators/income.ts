@@ -8,6 +8,7 @@ export const createIncomeSchema = z.object({
   amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/, 'Ungültiger Betrag'),
   recurrenceType: z.enum(incomeRecurrenceTypeValues),
   startDate: z.string().or(z.date()),
+  info: z.string().optional(),
 });
 
 export const updateIncomeSchema = createIncomeSchema.partial();
