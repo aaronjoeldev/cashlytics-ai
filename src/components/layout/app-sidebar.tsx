@@ -29,6 +29,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
@@ -122,30 +123,14 @@ export function AppSidebar() {
       {/* Brand Header */}
       <SidebarHeader className="border-b border-border/40 dark:border-white/[0.05] px-5 py-5">
         <Link href="/dashboard" className="flex items-center gap-3 group">
-          {/* Diamond logo mark */}
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center">
-            <div className="absolute inset-0 rotate-[15deg] rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-lg shadow-amber-500/30 transition-all duration-300 group-hover:shadow-amber-500/50 group-hover:scale-105" />
-            <span
-              className="relative text-sm font-bold text-stone-900 select-none"
-              style={{ fontFamily: 'var(--font-syne)' }}
-            >
-              C
-            </span>
-          </div>
-          <div className="flex flex-col leading-none">
-            <span
-              className="text-[15px] font-bold tracking-[-0.02em] text-foreground"
-              style={{ fontFamily: 'var(--font-syne)' }}
-            >
-              {tCommon('appName')}
-            </span>
-            <span
-              className="text-[10px] tracking-[0.15em] uppercase text-muted-foreground/50 mt-0.5"
-              style={{ fontFamily: 'var(--font-jakarta)' }}
-            >
-              Budget Planer
-            </span>
-          </div>
+          <Image
+            src="/logo.svg"
+            alt="Cashlytics"
+            width={120}
+            height={30}
+            className="h-7 w-auto transition-opacity duration-200 group-hover:opacity-80"
+            priority
+          />
         </Link>
       </SidebarHeader>
 
