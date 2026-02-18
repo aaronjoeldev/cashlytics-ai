@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v1.3.0...v1.4.0) (2026-02-18)
+
+### ✨ Features
+
+* add logo and favicon ([a65afce](https://github.com/aaronjoeldev/cashlytics-ai/commit/a65afce4a049485423bbdd7858215506cf8e8119))
+
 ## [1.3.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v1.2.0...v1.3.0) (2026-02-17)
 
 ### ✨ Features
