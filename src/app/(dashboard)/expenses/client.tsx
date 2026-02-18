@@ -55,6 +55,81 @@ function getDebitLabel(expense: { recurrenceType: string; startDate: Date | stri
   }
 }
 
+function getNextPaymentDate(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null; endDate?: Date | string | null }): Date | null {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const start = new Date(expense.startDate);
+  
+  if (expense.endDate) {
+    const endDate = new Date(expense.endDate);
+    if (endDate < now) return null;
+  }
+  
+  switch (expense.recurrenceType) {
+    case 'daily': {
+      const next = new Date(now);
+      next.setDate(next.getDate() + 1);
+      return next;
+    }
+    case 'weekly': {
+      const daysUntilNext = (7 - ((now.getDay() - start.getDay() + 7) % 7)) % 7 || 7;
+      const next = new Date(now);
+      next.setDate(next.getDate() + daysUntilNext);
+      return next;
+    }
+    case 'monthly': {
+      const next = new Date(now.getFullYear(), now.getMonth(), start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + 1);
+      }
+      return next;
+    }
+    case 'quarterly': {
+      const monthsToAdd = 3 - ((now.getMonth() - start.getMonth() + 3) % 3);
+      const next = new Date(now.getFullYear(), now.getMonth() + monthsToAdd, start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + 3);
+      }
+      return next;
+    }
+    case 'yearly': {
+      const next = new Date(now.getFullYear(), start.getMonth(), start.getDate());
+      if (next <= now) {
+        next.setFullYear(next.getFullYear() + 1);
+      }
+      return next;
+    }
+    case 'custom': {
+      if (!expense.recurrenceInterval) return start;
+      const monthsDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      const monthsUntilNext = expense.recurrenceInterval - (monthsDiff % expense.recurrenceInterval);
+      const next = new Date(now.getFullYear(), now.getMonth() + monthsUntilNext, start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + expense.recurrenceInterval);
+      }
+      return next;
+    }
+    default:
+      return null;
+  }
+}
+
+function formatNextPayment(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null; endDate?: Date | string | null }): string | null {
+  const nextDate = getNextPaymentDate(expense);
+  if (!nextDate) return null;
+  
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diffTime = nextDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Heute';
+  if (diffDays === 1) return 'Morgen';
+  if (diffDays <= 7) return `In ${diffDays} Tagen`;
+  
+  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(nextDate);
+}
+
 function normalizeToMonthly(amount: number, recurrenceType: string, recurrenceInterval: number | null): number {
   switch (recurrenceType) {
     case 'daily': return amount * 30;
@@ -179,6 +254,7 @@ export function ExpensesClient({
     const isMonthly = expense.recurrenceType === 'monthly';
     const isOnce = expense.recurrenceType === 'once';
     const debitLabel = !isOnce ? getDebitLabel(expense) : null;
+    const nextPaymentLabel = !isOnce ? formatNextPayment(expense) : null;
 
     return (
       <div className="flex items-center justify-between p-4 rounded-xl hover:bg-accent/30 dark:hover:bg-white/5 transition-colors duration-200">
@@ -205,14 +281,21 @@ export function ExpensesClient({
                 </span>
               )}
             </div>
-            {debitLabel && (
-              <div className="flex items-center gap-1 mt-1">
-                <CalendarDays className="w-3 h-3 text-primary flex-shrink-0" />
-                <span className="text-xs font-medium text-primary">
-                  Abbuchung: {debitLabel}
+            <div className="flex items-center gap-3 mt-1">
+              {debitLabel && (
+                <div className="flex items-center gap-1">
+                  <CalendarDays className="w-3 h-3 text-primary flex-shrink-0" />
+                  <span className="text-xs font-medium text-primary">
+                    {debitLabel}
+                  </span>
+                </div>
+              )}
+              {nextPaymentLabel && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  Nächste: {nextPaymentLabel}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-4">

@@ -147,31 +147,84 @@ export async function getCategoryBreakdown(
   startDate: Date = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
 ): Promise<ApiResponse<CategoryBreakdown[]>> {
   try {
-    const result = await db
+    const categoryMap = new Map<string, { categoryName: string; categoryIcon: string | null; categoryColor: string | null; total: number }>();
+
+    const dailyExpensesResult = await db
       .select({
         categoryId: dailyExpenses.categoryId,
         categoryName: categories.name,
         categoryIcon: categories.icon,
         categoryColor: categories.color,
-        total: sql<string>`COALESCE(SUM(${dailyExpenses.amount}), 0)`,
+        amount: dailyExpenses.amount,
       })
       .from(dailyExpenses)
       .leftJoin(categories, sql`${dailyExpenses.categoryId} = ${categories.id}`)
-      .where(gte(dailyExpenses.date, startDate))
-      .groupBy(dailyExpenses.categoryId, categories.name, categories.icon, categories.color)
-      .orderBy(sql`SUM(${dailyExpenses.amount}) DESC`);
+      .where(gte(dailyExpenses.date, startDate));
 
-    // Gesamtsumme berechnen
-    const totalSum = result.reduce((sum, row) => sum + parseFloat(row.total || '0'), 0);
+    for (const row of dailyExpensesResult) {
+      const categoryId = row.categoryId || 'uncategorized';
+      const amount = parseFloat(row.amount);
+      if (categoryMap.has(categoryId)) {
+        categoryMap.get(categoryId)!.total += amount;
+      } else {
+        categoryMap.set(categoryId, {
+          categoryName: row.categoryName || 'Ohne Kategorie',
+          categoryIcon: row.categoryIcon,
+          categoryColor: row.categoryColor,
+          total: amount,
+        });
+      }
+    }
 
-    const breakdown: CategoryBreakdown[] = result.map(row => ({
-      categoryId: row.categoryId,
-      categoryName: row.categoryName || 'Sonstiges',
-      categoryIcon: row.categoryIcon,
-      categoryColor: row.categoryColor,
-      total: parseFloat(row.total || '0'),
-      percentage: totalSum > 0 ? (parseFloat(row.total || '0') / totalSum) * 100 : 0,
-    }));
+    const periodicExpensesResult = await db
+      .select({
+        categoryId: expenses.categoryId,
+        categoryName: categories.name,
+        categoryIcon: categories.icon,
+        categoryColor: categories.color,
+        amount: expenses.amount,
+        recurrenceType: expenses.recurrenceType,
+        recurrenceInterval: expenses.recurrenceInterval,
+        endDate: expenses.endDate,
+      })
+      .from(expenses)
+      .leftJoin(categories, sql`${expenses.categoryId} = ${categories.id}`)
+      .where(sql`${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${startDate.toISOString()}`);
+
+    for (const row of periodicExpensesResult) {
+      if (row.recurrenceType === 'once') continue;
+      
+      const categoryId = row.categoryId || 'uncategorized-periodic';
+      const monthlyAmount = normalizeToMonthly(
+        parseFloat(row.amount),
+        row.recurrenceType,
+        row.recurrenceInterval
+      );
+      
+      if (categoryMap.has(categoryId)) {
+        categoryMap.get(categoryId)!.total += monthlyAmount;
+      } else {
+        categoryMap.set(categoryId, {
+          categoryName: row.categoryName || 'Ohne Kategorie',
+          categoryIcon: row.categoryIcon,
+          categoryColor: row.categoryColor,
+          total: monthlyAmount,
+        });
+      }
+    }
+
+    const totalSum = Array.from(categoryMap.values()).reduce((sum, c) => sum + c.total, 0);
+
+    const breakdown: CategoryBreakdown[] = Array.from(categoryMap.entries())
+      .map(([categoryId, data]) => ({
+        categoryId,
+        categoryName: data.categoryName,
+        categoryIcon: data.categoryIcon,
+        categoryColor: data.categoryColor,
+        total: data.total,
+        percentage: totalSum > 0 ? (data.total / totalSum) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
 
     return { success: true, data: breakdown };
   } catch (error) {

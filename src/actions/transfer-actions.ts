@@ -49,23 +49,21 @@ export async function createTransfer(data: NewTransfer): Promise<ApiResponse<Tra
       return { success: false, error: 'Quell- und Zielkonto müssen unterschiedlich sein' };
     }
 
-    const [transfer] = await db.insert(transfers).values(data).returning();
+    const transfer = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(transfers).values(data).returning();
 
-    if (data.recurrenceType === 'once') {
-      await db
+      await tx
         .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} - ${data.amount}`,
-        })
+        .set({ balance: sql`${accounts.balance} - ${data.amount}` })
         .where(eq(accounts.id, data.sourceAccountId));
 
-      await db
+      await tx
         .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} + ${data.amount}`,
-        })
+        .set({ balance: sql`${accounts.balance} + ${data.amount}` })
         .where(eq(accounts.id, data.targetAccountId));
-    }
+
+      return created;
+    });
 
     revalidatePath('/transfers');
     revalidatePath('/dashboard');
@@ -86,10 +84,47 @@ export async function updateTransfer(
       return { success: false, error: 'Quell- und Zielkonto müssen unterschiedlich sein' };
     }
 
-    const [transfer] = await db.update(transfers).set(data).where(eq(transfers.id, id)).returning();
-    if (!transfer) {
-      return { success: false, error: 'Transfer nicht gefunden' };
-    }
+    const transfer = await db.transaction(async (tx) => {
+      // Fetch old transfer to reverse its balance effect
+      const [old] = await tx.select().from(transfers).where(eq(transfers.id, id));
+      if (!old) throw new Error('Transfer nicht gefunden');
+
+      // Reverse old balance change
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance} + ${old.amount}` })
+        .where(eq(accounts.id, old.sourceAccountId));
+
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance} - ${old.amount}` })
+        .where(eq(accounts.id, old.targetAccountId));
+
+      // Write the update
+      const [updated] = await tx
+        .update(transfers)
+        .set(data)
+        .where(eq(transfers.id, id))
+        .returning();
+
+      // Apply new balance change (merge old values with the patch)
+      const newSourceId = data.sourceAccountId ?? old.sourceAccountId;
+      const newTargetId = data.targetAccountId ?? old.targetAccountId;
+      const newAmount = data.amount ?? old.amount;
+
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance} - ${newAmount}` })
+        .where(eq(accounts.id, newSourceId));
+
+      await tx
+        .update(accounts)
+        .set({ balance: sql`${accounts.balance} + ${newAmount}` })
+        .where(eq(accounts.id, newTargetId));
+
+      return updated;
+    });
+
     revalidatePath('/transfers');
     revalidatePath('/dashboard');
     revalidatePath('/accounts');
@@ -102,25 +137,24 @@ export async function updateTransfer(
 
 export async function deleteTransfer(id: string): Promise<ApiResponse<void>> {
   try {
-    const [transfer] = await db.select().from(transfers).where(eq(transfers.id, id));
-    
-    if (transfer && transfer.recurrenceType === 'once') {
-      await db
+    await db.transaction(async (tx) => {
+      const [transfer] = await tx.select().from(transfers).where(eq(transfers.id, id));
+      if (!transfer) throw new Error('Transfer nicht gefunden');
+
+      // Reverse the balance change
+      await tx
         .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} + ${transfer.amount}`,
-        })
+        .set({ balance: sql`${accounts.balance} + ${transfer.amount}` })
         .where(eq(accounts.id, transfer.sourceAccountId));
 
-      await db
+      await tx
         .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} - ${transfer.amount}`,
-        })
+        .set({ balance: sql`${accounts.balance} - ${transfer.amount}` })
         .where(eq(accounts.id, transfer.targetAccountId));
-    }
-    
-    await db.delete(transfers).where(eq(transfers.id, id));
+
+      await tx.delete(transfers).where(eq(transfers.id, id));
+    });
+
     revalidatePath('/transfers');
     revalidatePath('/dashboard');
     revalidatePath('/accounts');

@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import {
   TrendingUp,
   TrendingDown,
@@ -18,9 +19,13 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   X,
+  Loader2,
 } from 'lucide-react';
 import { useSettings } from '@/lib/settings-context';
+import { getMonthlyPaymentsCalendar } from '@/actions/analytics-actions';
 import type { MonthlyOverview, Forecast, CategoryBreakdown, ExpenseWithDetails } from '@/types/database';
 import type { CalendarDay, CalendarPayment } from '@/actions/analytics-actions';
 
@@ -32,7 +37,7 @@ interface OverviewClientProps {
   categoryBreakdown: CategoryBreakdown[];
   normalizedExpenses: Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>;
   subscriptions: Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>;
-  calendarDays: CalendarDay[];
+  initialCalendarDays: CalendarDay[];
 }
 
 function getMonthName(month: number): string {
@@ -52,6 +57,81 @@ function getRecurrenceLabel(type: string, interval: number | null): string {
   }
 }
 
+function getNextPaymentDate(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null; endDate?: Date | string | null }): Date | null {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const start = new Date(expense.startDate);
+  
+  if (expense.endDate) {
+    const endDate = new Date(expense.endDate);
+    if (endDate < now) return null;
+  }
+  
+  switch (expense.recurrenceType) {
+    case 'daily': {
+      const next = new Date(now);
+      next.setDate(next.getDate() + 1);
+      return next;
+    }
+    case 'weekly': {
+      const daysUntilNext = (7 - ((now.getDay() - start.getDay() + 7) % 7)) % 7 || 7;
+      const next = new Date(now);
+      next.setDate(next.getDate() + daysUntilNext);
+      return next;
+    }
+    case 'monthly': {
+      const next = new Date(now.getFullYear(), now.getMonth(), start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + 1);
+      }
+      return next;
+    }
+    case 'quarterly': {
+      const monthsToAdd = 3 - ((now.getMonth() - start.getMonth() + 3) % 3);
+      const next = new Date(now.getFullYear(), now.getMonth() + monthsToAdd, start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + 3);
+      }
+      return next;
+    }
+    case 'yearly': {
+      const next = new Date(now.getFullYear(), start.getMonth(), start.getDate());
+      if (next <= now) {
+        next.setFullYear(next.getFullYear() + 1);
+      }
+      return next;
+    }
+    case 'custom': {
+      if (!expense.recurrenceInterval) return start;
+      const monthsDiff = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      const monthsUntilNext = expense.recurrenceInterval - (monthsDiff % expense.recurrenceInterval);
+      const next = new Date(now.getFullYear(), now.getMonth() + monthsUntilNext, start.getDate());
+      if (next <= now) {
+        next.setMonth(next.getMonth() + expense.recurrenceInterval);
+      }
+      return next;
+    }
+    default:
+      return null;
+  }
+}
+
+function formatNextPayment(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null; endDate?: Date | string | null }): string | null {
+  const nextDate = getNextPaymentDate(expense);
+  if (!nextDate) return null;
+  
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diffTime = nextDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Heute';
+  if (diffDays === 1) return 'Morgen';
+  if (diffDays <= 7) return `In ${diffDays} Tagen`;
+  
+  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(nextDate);
+}
+
 export function OverviewClient({
   month,
   year,
@@ -60,11 +140,60 @@ export function OverviewClient({
   categoryBreakdown,
   normalizedExpenses,
   subscriptions,
-  calendarDays,
+  initialCalendarDays,
 }: OverviewClientProps) {
   const { formatCurrency } = useSettings();
   const [calendarExpanded, setCalendarExpanded] = useState(true);
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(month);
+  const [calendarYear, setCalendarYear] = useState(year);
+  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>(initialCalendarDays);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+
+  const fetchCalendarData = useCallback(async (y: number, m: number) => {
+    setCalendarLoading(true);
+    try {
+      const result = await getMonthlyPaymentsCalendar(y, m);
+      if (result.success && result.data) {
+        setCalendarDays(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch calendar data:', error);
+    } finally {
+      setCalendarLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (calendarMonth !== month || calendarYear !== year) {
+      fetchCalendarData(calendarYear, calendarMonth);
+    }
+  }, [calendarMonth, calendarYear, month, year, fetchCalendarData]);
+
+  const goToPrevMonth = () => {
+    if (calendarMonth === 1) {
+      setCalendarMonth(12);
+      setCalendarYear(calendarYear - 1);
+    } else {
+      setCalendarMonth(calendarMonth - 1);
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (calendarMonth === 12) {
+      setCalendarMonth(1);
+      setCalendarYear(calendarYear + 1);
+    } else {
+      setCalendarMonth(calendarMonth + 1);
+    }
+  };
+
+  const goToCurrentMonth = () => {
+    setCalendarMonth(month);
+    setCalendarYear(year);
+  };
+
+  const isCurrentMonth = calendarMonth === month && calendarYear === year;
   
   const totalIncome = overview?.totalIncome ?? 0;
   const totalExpenses = overview?.totalExpenses ?? 0;
@@ -111,92 +240,132 @@ export function OverviewClient({
 
       {/* Monthly Calendar */}
       <Card>
-        <CardHeader className="cursor-pointer" onClick={() => setCalendarExpanded(!calendarExpanded)}>
+        <CardHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCalendarExpanded(!calendarExpanded)}>
               <div className="bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl p-2">
                 <Calendar className="h-4 w-4 text-primary" />
               </div>
               <div>
                 <CardTitle>Zahlungskalender</CardTitle>
-                <CardDescription>{getMonthName(month)} {year}</CardDescription>
+                <CardDescription>Geplante Ein- und Ausgaben im Überblick</CardDescription>
               </div>
             </div>
-            <button className="p-2 hover:bg-accent rounded-lg transition-colors">
-              {calendarExpanded ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-1">
+              {!isCurrentMonth && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goToCurrentMonth}
+                  className="text-xs h-7 px-2"
+                >
+                  Heute
+                </Button>
               )}
-            </button>
+              <button className="p-2 hover:bg-accent rounded-lg transition-colors" onClick={goToPrevMonth}>
+                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button className="p-2 hover:bg-accent rounded-lg transition-colors" onClick={goToNextMonth}>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button className="p-2 hover:bg-accent rounded-lg transition-colors" onClick={() => setCalendarExpanded(!calendarExpanded)}>
+                {calendarExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+            </div>
           </div>
         </CardHeader>
         {calendarExpanded && (
           <CardContent>
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((day) => (
-                <div key={day} className="text-center text-xs font-medium text-muted-foreground/60 py-2">
-                  {day}
-                </div>
-              ))}
+            <div className="flex items-center justify-center mb-4">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-lg font-semibold min-w-[160px] text-center capitalize">
+                  {getMonthName(calendarMonth)} {calendarYear}
+                </span>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day, i) => {
-                const hasPayments = day.payments.length > 0;
-                
-                return (
-                  <div
-                    key={i}
-                    onClick={() => handleDayClick(day)}
-                    className={`
-                      relative min-h-[60px] p-1.5 rounded-lg border transition-all
-                      ${day.isCurrentMonth 
-                        ? 'bg-card border-border/50 dark:border-white/[0.06]' 
-                        : 'bg-muted/30 border-transparent'}
-                      ${day.isToday 
-                        ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' 
-                        : ''}
-                      ${hasPayments 
-                        ? 'cursor-pointer hover:border-primary/30 hover:bg-accent/30' 
-                        : ''}
-                      ${selectedDay?.date.toDateString() === day.date.toDateString() 
-                        ? 'border-primary bg-primary/5' 
-                        : ''}
-                    `}
-                  >
-                    <span className={`
-                      text-sm font-medium
-                      ${day.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/40'}
-                      ${day.isToday ? 'text-primary' : ''}
-                    `}>
-                      {day.dayOfMonth}
-                    </span>
-                    {hasPayments && (
-                      <div className="mt-1 space-y-0.5">
-                        {day.payments.slice(0, 2).map((payment, pi) => (
-                          <div
-                            key={pi}
-                            className={`
-                              text-[10px] px-1 py-0.5 rounded truncate
-                              ${payment.type === 'income' 
-                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
-                                : 'bg-red-500/20 text-red-600 dark:text-red-400'}
-                            `}
-                          >
-                            {payment.name.slice(0, 8)}
-                          </div>
-                        ))}
-                        {day.payments.length > 2 && (
-                          <div className="text-[10px] text-muted-foreground px-1">
-                            +{day.payments.length - 2} mehr
+            {calendarLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((day) => (
+                    <div key={day} className="text-center text-xs font-medium text-muted-foreground/60 py-2">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarDays.map((day: CalendarDay, i: number) => {
+                    const hasPayments = day.payments.length > 0;
+                    const isToday = day.date.toDateString() === new Date().toDateString();
+                    
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => handleDayClick(day)}
+                        className={`
+                          relative min-h-[60px] p-1.5 rounded-lg border transition-all
+                          ${day.isCurrentMonth 
+                            ? 'bg-card border-border/50 dark:border-white/[0.06]' 
+                            : 'bg-muted/30 border-transparent'}
+                          ${isToday 
+                            ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' 
+                            : ''}
+                          ${hasPayments 
+                            ? 'cursor-pointer hover:border-primary/30 hover:bg-accent/30' 
+                            : ''}
+                          ${selectedDay?.date.toDateString() === day.date.toDateString() 
+                            ? 'border-primary bg-primary/5' 
+                            : ''}
+                        `}
+                      >
+                        <span className={`
+                          text-sm font-medium
+                          ${day.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground/40'}
+                          ${isToday ? 'text-primary' : ''}
+                        `}>
+                          {day.dayOfMonth}
+                        </span>
+                        {hasPayments && (
+                          <div className="mt-1 space-y-0.5">
+                            {day.payments.slice(0, 2).map((payment: CalendarPayment, pi: number) => (
+                              <div
+                                key={pi}
+                                className={`
+                                  text-[10px] px-1 py-0.5 rounded truncate
+                                  ${payment.type === 'income' 
+                                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+                                    : 'bg-red-500/20 text-red-600 dark:text-red-400'}
+                                `}
+                              >
+                                {payment.name.slice(0, 8)}
+                              </div>
+                            ))}
+                            {day.payments.length > 2 && (
+                              <div className="text-[10px] text-muted-foreground px-1">
+                                +{day.payments.length - 2} mehr
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded bg-emerald-500/20"></div>
@@ -544,32 +713,36 @@ export function OverviewClient({
             <div className="space-y-1">
               {periodicReserves
                 .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
-                .map((item) => (
-                  <div key={item.expense.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-accent/30 dark:hover:bg-white/5 transition-colors duration-200">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-8 h-8 rounded-xl flex items-center justify-center"
-                        style={{
-                          background: item.expense.category?.color
-                            ? `linear-gradient(135deg, ${item.expense.category.color}33, ${item.expense.category.color}11)`
-                            : undefined,
-                        }}
-                      >
-                        <span className="text-base">{item.expense.category?.icon || '💰'}</span>
+                .map((item) => {
+                  const nextPayment = formatNextPayment(item.expense);
+                  return (
+                    <div key={item.expense.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-accent/30 dark:hover:bg-white/5 transition-colors duration-200">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-8 h-8 rounded-xl flex items-center justify-center"
+                          style={{
+                            background: item.expense.category?.color
+                              ? `linear-gradient(135deg, ${item.expense.category.color}33, ${item.expense.category.color}11)`
+                              : undefined,
+                          }}
+                        >
+                          <span className="text-base">{item.expense.category?.icon || '💰'}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{item.expense.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatCurrency(parseFloat(item.expense.amount))} &middot; {getRecurrenceLabel(item.expense.recurrenceType, item.expense.recurrenceInterval)}
+                            {nextPayment && <span className="text-emerald-600 dark:text-emerald-400 ml-2">• Nächste: {nextPayment}</span>}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{item.expense.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCurrency(parseFloat(item.expense.amount))} &middot; {getRecurrenceLabel(item.expense.recurrenceType, item.expense.recurrenceInterval)}
-                        </p>
+                      <div className="text-right">
+                        <span className="text-sm font-semibold tabular-nums">{formatCurrency(item.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/Mo</span></span>
+                        <p className="text-xs text-muted-foreground">Rücklage</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold tabular-nums">{formatCurrency(item.monthlyAmount)}<span className="text-xs text-muted-foreground font-normal">/Mo</span></span>
-                      <p className="text-xs text-muted-foreground">Rücklage</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               <div className="mt-3 p-3 rounded-xl bg-violet-500/5 dark:bg-violet-500/10 border border-violet-500/10 dark:border-violet-500/15">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Gesamt monatlich zurücklegen</span>

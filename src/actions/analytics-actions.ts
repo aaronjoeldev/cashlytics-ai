@@ -183,6 +183,8 @@ export async function getCategoryBreakdown(
   endDate: Date
 ): Promise<ApiResponse<CategoryBreakdown[]>> {
   try {
+    const categoryMap = new Map<string, { category: typeof categories.$inferSelect | null; amount: number }>();
+
     const dailyExpensesResult = await db
       .select({
         dailyExpense: dailyExpenses,
@@ -197,8 +199,6 @@ export async function getCategoryBreakdown(
         )
       );
 
-    const categoryMap = new Map<string, { category: typeof categories.$inferSelect | null; amount: number }>();
-
     for (const item of dailyExpensesResult) {
       const categoryId = item.category?.id ?? 'uncategorized';
       const amount = parseFloat(item.dailyExpense.amount);
@@ -208,6 +208,38 @@ export async function getCategoryBreakdown(
         existing.amount += amount;
       } else {
         categoryMap.set(categoryId, { category: item.category, amount });
+      }
+    }
+
+    const periodicExpensesResult = await db
+      .select({
+        expense: expenses,
+        category: categories,
+      })
+      .from(expenses)
+      .leftJoin(categories, eq(expenses.categoryId, categories.id))
+      .where(
+        and(
+          lte(expenses.startDate, endDate),
+          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${startDate.toISOString()})`
+        )
+      );
+
+    for (const item of periodicExpensesResult) {
+      if (item.expense.recurrenceType === 'once') continue;
+      
+      const categoryId = item.category?.id ?? 'uncategorized-periodic';
+      const monthlyAmount = normalizeToMonthly(
+        parseFloat(item.expense.amount),
+        item.expense.recurrenceType,
+        item.expense.recurrenceInterval
+      );
+
+      if (categoryMap.has(categoryId)) {
+        const existing = categoryMap.get(categoryId)!;
+        existing.amount += monthlyAmount;
+      } else {
+        categoryMap.set(categoryId, { category: item.category, amount: monthlyAmount });
       }
     }
 

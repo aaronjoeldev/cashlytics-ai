@@ -33,7 +33,7 @@ export default async function OverviewPage() {
       categoryBreakdown={breakdown}
       normalizedExpenses={normalizedExpenses}
       subscriptions={subscriptions}
-      calendarDays={calendarDays}
+      initialCalendarDays={calendarDays}
     />
   );
 }
