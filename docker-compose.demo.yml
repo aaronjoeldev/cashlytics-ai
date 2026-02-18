@@ -1,0 +1,98 @@
+# Cashlytics Demo Environment
+#
+# Starts the app with a pre-loaded demo dataset.
+# The database is automatically reset to the demo state every day at midnight UTC.
+#
+# Quick Start:
+#   docker compose -f docker-compose.demo.yml up -d
+#
+# Environment variables (optional — sensible defaults are set):
+#   APP_PORT          Port to expose the app on         (default: 3000)
+#   APP_URL           Public URL shown in the app        (default: http://localhost:3000)
+#   POSTGRES_PASSWORD Internal DB password               (default: cashlytics_demo)
+#   OPENAI_API_KEY    For the AI assistant feature       (default: empty, feature disabled)
+
+name: cashlytics-demo
+
+services:
+
+  # ------------------------------------------------------------
+  # PostgreSQL database (internal only, not exposed)
+  # ------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: cashlytics-demo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cashlytics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cashlytics_demo}
+      POSTGRES_DB: cashlytics
+    volumes:
+      - demo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashlytics -d cashlytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - demo_network
+
+  # ------------------------------------------------------------
+  # Cashlytics application
+  # Runs DB migrations automatically on startup via entrypoint.sh
+  # ------------------------------------------------------------
+  app:
+    image: ghcr.io/aaronjoeldev/cashlytics-ai:latest
+    container_name: cashlytics-demo-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://cashlytics:${POSTGRES_PASSWORD:-cashlytics_demo}@postgres:5432/cashlytics
+      NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    networks:
+      - demo_network
+
+  # ------------------------------------------------------------
+  # Demo seeder
+  # - Waits for the app to finish migrations
+  # - Seeds the database with demo data on startup
+  # - Resets to the demo dataset every day at midnight UTC
+  # ------------------------------------------------------------
+  demo-seeder:
+    image: postgres:16-alpine
+    container_name: cashlytics-demo-seeder
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-cashlytics_demo}
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: cashlytics
+      POSTGRES_DB: cashlytics
+    volumes:
+      - ./scripts/seed-demo.sql:/scripts/seed-demo.sql:ro
+      - ./scripts/demo-reset.sh:/scripts/demo-reset.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/demo-reset.sh"]
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - demo_network
+
+volumes:
+  demo_postgres_data:
+    driver: local
+
+networks:
+  demo_network:
+    driver: bridge
