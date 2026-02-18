@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -157,6 +158,18 @@ export function DashboardClient({
     year: 'numeric',
   });
 
+  // --- hydration diagnostics (remove once fixed) ---
+  const mountCount = useRef(0);
+  mountCount.current++;
+  useEffect(() => {
+    console.log(`[Dashboard] mount #${mountCount.current}`);
+    return () => console.log('[Dashboard] unmount');
+  }, []);
+  useEffect(() => {
+    console.log('[Dashboard] formatCurrency changed — potential hydration re-render');
+  }, [formatCurrency]);
+  // --- end diagnostics ---
+
   return (
     <div className="space-y-7 stagger-children">
       {/* Page header */}
@@ -175,6 +188,7 @@ export function DashboardClient({
             Dashboard
           </h2>
           <p
+            suppressHydrationWarning
             className="text-sm text-muted-foreground/60 mt-1.5 tracking-wide"
             style={{ fontFamily: 'var(--font-jakarta)' }}
           >

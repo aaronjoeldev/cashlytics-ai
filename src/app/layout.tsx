@@ -2,8 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import { Syne, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale, getMessages, getTimeZone } from 'next-intl/server';
+import { cookies } from 'next/headers';
 import { type Locale } from '@/i18n/config';
+import { type Currency, currencies, defaultCurrency } from '@/lib/currency';
 
 const syne = Syne({
   variable: '--font-syne',
@@ -56,13 +58,18 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale() as Locale;
   const messages = await getMessages();
+  const timeZone = await getTimeZone();
+  const cookieStore = await cookies();
+  const cookieCurrency = cookieStore.get('currency')?.value as Currency | undefined;
+  const initialCurrency: Currency =
+    cookieCurrency && currencies.includes(cookieCurrency) ? cookieCurrency : defaultCurrency;
 
   return (
     <html lang={locale} suppressHydrationWarning>
       <body
         className={`${syne.variable} ${jakartaSans.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <Providers locale={locale} messages={messages}>
+        <Providers locale={locale} messages={messages} timeZone={timeZone} initialCurrency={initialCurrency}>
           {children}
         </Providers>
       </body>

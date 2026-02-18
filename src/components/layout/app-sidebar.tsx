@@ -8,7 +8,6 @@ import {
   Wallet,
   TrendingUp,
   Building2,
-  Target,
   Settings,
   Bot,
   ChevronRight,
@@ -51,7 +50,6 @@ const mainNavItems: NavItem[] = [
   { titleKey: 'categories', url: '/categories', icon: FolderOpen },
   { titleKey: 'accounts', url: '/accounts', icon: Building2 },
   { titleKey: 'analytics', url: '/analytics', icon: PieChart },
-  { titleKey: 'goals', url: '/goals', icon: Target },
 ];
 
 const bottomNavItems: NavItem[] = [

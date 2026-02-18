@@ -432,8 +432,7 @@
 }
 
 .stagger-children > * {
-  opacity: 0;
-  animation: fadeInUp 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: fadeInUp 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
 .stagger-children > *:nth-child(2) { animation-delay: 60ms; }

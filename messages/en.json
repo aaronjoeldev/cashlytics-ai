@@ -1,7 +1,7 @@
 {
   "common": {
     "appName": "Cashlytics",
-    "search": "Search or enter command...",
+    "search": "Search...",
     "notifications": "Notifications",
     "navigation": "Navigation",
     "loading": "Loading...",
