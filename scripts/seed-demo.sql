@@ -79,9 +79,9 @@ VALUES
 INSERT INTO incomes
   (id, account_id, source, amount, recurrence_type, start_date, created_at)
 VALUES
-  ('i0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Gehalt',             3500.00, 'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
-  ('i0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Freelance Projekte',  650.00, 'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
-  ('i0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000002', 'Zinsen Sparkonto',     18.75, 'yearly',  NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days');
+  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Gehalt',             3500.00, 'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
+  ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'Freelance Projekte',  650.00, 'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
+  ('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000002', 'Zinsen Sparkonto',     18.75, 'yearly',  NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days');
 
 
 -- ==============================================================
@@ -90,8 +90,8 @@ VALUES
 INSERT INTO transfers
   (id, source_account_id, target_account_id, amount, description, recurrence_type, start_date, created_at)
 VALUES
-  ('t0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 300.00, 'Monatliche Sparrate', 'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
-  ('t0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 200.00, 'ETF Sparplan',        'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days');
+  ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 300.00, 'Monatliche Sparrate', 'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
+  ('d0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 200.00, 'ETF Sparplan',        'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days');
 
 
 -- ==============================================================
