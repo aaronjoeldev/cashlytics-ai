@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.3.2...v0.4.0) (2026-02-19)
+
+### ✨ Features
+
+* implement all english translations ([f97d7b2](https://github.com/aaronjoeldev/cashlytics-ai/commit/f97d7b26c9f46a6bffff1357b245aabed5b5b86a))
+
+### 🐛 Bug Fixes
+
+* solve colors not showing in analytics ([e9fcea7](https://github.com/aaronjoeldev/cashlytics-ai/commit/e9fcea79fdf95b097ffb4dbfc201353372519e6d))
+
 ## [0.3.2](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.3.1...v0.3.2) (2026-02-18)
 
 ### 🐛 Bug Fixes
