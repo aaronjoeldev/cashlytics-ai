@@ -17,6 +17,8 @@ services:
       - DATABASE_URL=postgresql://cashlytics:${POSTGRES_PASSWORD}@postgres:5432/cashlytics
       # Public URL of your Cashlytics instance
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      # Default locale (de or en)
+      - NEXT_PUBLIC_DEFAULT_LOCALE=${NEXT_PUBLIC_DEFAULT_LOCALE:-de}
       # OpenAI API Key for AI Assistant (optional)
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:

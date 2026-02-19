@@ -187,7 +187,7 @@ export function AnalyticsClient({ monthlyTrend, categoryBreakdown, currentMonthI
                     <PieChartComp>
                       <Pie data={categoryBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="amount" nameKey="name">
                         {categoryBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color ?? AMBER_PALETTE[index % AMBER_PALETTE.length]} />
+                          <Cell key={`cell-${index}`} fill={entry.color || AMBER_PALETTE[index % AMBER_PALETTE.length]} />
                         ))}
                       </Pie>
                       <Tooltip formatter={tooltipFormatter} />
@@ -198,7 +198,7 @@ export function AnalyticsClient({ monthlyTrend, categoryBreakdown, currentMonthI
                   {categoryBreakdown.slice(0, 7).map((item, index) => (
                     <div key={index} className="flex items-center justify-between gap-2 py-1 rounded-lg hover:bg-accent/20 dark:hover:bg-white/[0.03] px-2 transition-colors">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color ?? AMBER_PALETTE[index % AMBER_PALETTE.length] }} />
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color || AMBER_PALETTE[index % AMBER_PALETTE.length] }} />
                         <span className="text-xs font-medium truncate">{item.icon ? `${item.icon} ` : ''}{item.name}</span>
                       </div>
                       <div className="text-right flex-shrink-0">
