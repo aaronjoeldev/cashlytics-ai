@@ -12,6 +12,7 @@ import {
 import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Calendar, Loader2, ArrowRightLeft } from 'lucide-react';
 import { getAccountForecast, type AccountForecast } from '@/actions/forecast-actions';
 import { useSettings } from '@/lib/settings-context';
+import { useTranslations } from 'next-intl';
 
 interface ForecastClientProps {
   accountId: string;
@@ -28,6 +29,7 @@ export function ForecastClient({
   const [timeHorizon, setTimeHorizon] = useState<TimeHorizon>('6');
   const [forecast, setForecast] = useState<AccountForecast | null>(null);
   const [loading, setLoading] = useState(true);
+  const t = useTranslations('accounts');
 
   useEffect(() => {
     setLoading(true);
@@ -68,7 +70,7 @@ export function ForecastClient({
       <Card className="backdrop-blur-xl bg-white/5 border border-white/[0.08]">
         <CardContent className="py-8">
           <p className="text-muted-foreground text-center">
-            Prognose konnte nicht geladen werden.
+            {t('forecastLoadError')}
           </p>
         </CardContent>
       </Card>
@@ -78,16 +80,16 @@ export function ForecastClient({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h3 className="text-xl font-semibold">Finanz-Prognose</h3>
+        <h3 className="text-xl font-semibold">{t('forecastTitle')}</h3>
         <Select value={timeHorizon} onValueChange={(v) => setTimeHorizon(v as TimeHorizon)}>
           <SelectTrigger className="w-[180px] bg-white/5 backdrop-blur-sm border-white/[0.08] rounded-xl">
             <Calendar className="h-4 w-4 mr-2" />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="3">3 Monate</SelectItem>
-            <SelectItem value="6">6 Monate</SelectItem>
-            <SelectItem value="12">12 Monate</SelectItem>
+            <SelectItem value="3">{t('months3')}</SelectItem>
+            <SelectItem value="6">{t('months6')}</SelectItem>
+            <SelectItem value="12">{t('months12')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -97,7 +99,7 @@ export function ForecastClient({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-              Einnahmen
+              {t('income')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -111,7 +113,7 @@ export function ForecastClient({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <ArrowDownRight className="h-4 w-4 text-red-500" />
-              Ausgaben
+              {t('expenses')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -129,7 +131,7 @@ export function ForecastClient({
               ) : (
                 <TrendingDown className="h-4 w-4 text-red-500" />
               )}
-              Änderung
+              {t('change')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -143,7 +145,7 @@ export function ForecastClient({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Endsaldo
+              {t('endBalance')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -156,7 +158,7 @@ export function ForecastClient({
 
       <Card className="backdrop-blur-xl bg-white/5 border border-white/[0.08]">
         <CardHeader>
-          <CardTitle>Monatliche Projektion</CardTitle>
+          <CardTitle>{t('monthlyProjection')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -214,7 +216,7 @@ export function ForecastClient({
                   <div className="w-px h-8 bg-white/10" />
 
                   <div className="text-right min-w-[100px]">
-                    <p className="text-xs text-muted-foreground">{forecast.isCumulativeAccount ? 'kumuliert' : 'Saldo'}</p>
+                    <p className="text-xs text-muted-foreground">{forecast.isCumulativeAccount ? t('cumulative') : t('balance')}</p>
                     <div className={`text-sm font-bold ${(forecast.isCumulativeAccount ? month.cumulativeBalance : month.balance) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                       {formatCurrency(forecast.isCumulativeAccount ? month.cumulativeBalance : month.balance)}
                     </div>
@@ -228,7 +230,7 @@ export function ForecastClient({
 
       <Card className="backdrop-blur-xl bg-white/5 border border-white/[0.08]">
         <CardHeader>
-          <CardTitle>{forecast.isCumulativeAccount ? 'Kumulative Entwicklung' : 'Monatliche Bilanz'}</CardTitle>
+          <CardTitle>{forecast.isCumulativeAccount ? t('cumulativeDevelopment') : t('monthlyBalance')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">

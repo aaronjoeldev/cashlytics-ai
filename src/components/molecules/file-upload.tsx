@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Upload, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
 
 const ALLOWED_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -14,16 +15,17 @@ interface FileUploadProps {
 }
 
 export function FileUpload({ onUploadComplete, expenseId, dailyExpenseId }: FileUploadProps) {
+  const t = useTranslations('expenses');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const validateFile = (file: File): string | null => {
     if (!ALLOWED_TYPES.includes(file.type)) {
-      return 'Nur PDF, PNG und JPG Dateien sind erlaubt';
+      return t('onlyPdfPngJpg');
     }
     if (file.size > MAX_SIZE) {
-      return 'Datei ist größer als 5MB';
+      return t('fileTooLarge');
     }
     return null;
   };
@@ -50,14 +52,14 @@ export function FileUpload({ onUploadComplete, expenseId, dailyExpenseId }: File
       if (result.success) {
         onUploadComplete();
       } else {
-        setError(result.error ?? 'Upload fehlgeschlagen');
+        setError(result.error ?? t('uploadFailed'));
       }
     } catch {
-      setError('Upload fehlgeschlagen');
+      setError(t('uploadFailed'));
     } finally {
       setIsUploading(false);
     }
-  }, [expenseId, dailyExpenseId, onUploadComplete]);
+  }, [expenseId, dailyExpenseId, onUploadComplete, t]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -110,13 +112,10 @@ export function FileUpload({ onUploadComplete, expenseId, dailyExpenseId }: File
             <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
           )}
           <p className="text-sm font-medium">
-            {isUploading ? 'Wird hochgeladen...' : 'Datei hier ablegen'}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            oder klicken zum Auswählen
+            {isUploading ? t('uploading') : t('selectFile')}
           </p>
           <p className="text-xs text-muted-foreground mt-2">
-            PDF, PNG, JPG • max. 5MB
+            {t('fileTypes')}
           </p>
         </label>
       </div>

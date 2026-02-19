@@ -8,6 +8,7 @@ import { TransferForm } from '@/components/organisms/transfer-form';
 import { deleteTransfer } from '@/actions/transfer-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/lib/settings-context';
+import { useTranslations } from 'next-intl';
 import type { Account, TransferWithDetails } from '@/types/database';
 
 interface TransfersClientProps {
@@ -15,32 +16,8 @@ interface TransfersClientProps {
   initialTransfers: TransferWithDetails[];
 }
 
-const recurrenceLabels: Record<string, string> = {
-  once: 'Einmalig',
-  monthly: 'Monatlich',
-  quarterly: 'Quartalsweise',
-  yearly: 'Jährlich',
-};
-
 function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat('de-DE').format(new Date(date));
-}
-
-function getDebitLabel(transfer: { recurrenceType: string; startDate: Date | string }): string {
-  const date = new Date(transfer.startDate);
-  const day = date.getDate();
-  const month = date.toLocaleDateString('de-DE', { month: 'short' });
-
-  switch (transfer.recurrenceType) {
-    case 'monthly':
-      return `jeden ${day}.`;
-    case 'quarterly':
-      return `${day}. ${month} (quartalsweise)`;
-    case 'yearly':
-      return `${day}. ${month} (jährlich)`;
-    default:
-      return formatDate(transfer.startDate);
-  }
+  return new Intl.DateTimeFormat().format(new Date(date));
 }
 
 export function TransfersClient({
@@ -49,8 +26,27 @@ export function TransfersClient({
 }: TransfersClientProps) {
   const { toast } = useToast();
   const { formatCurrency: fmt } = useSettings();
+  const t = useTranslations('transfers');
+  const tRecurrence = useTranslations('recurrence');
   const formatCurrency = (amount: string | number) => fmt(typeof amount === 'string' ? parseFloat(amount) : amount);
   const [transfers, setTransfers] = useState(initialTransfers);
+
+  const getDebitLabel = (transfer: { recurrenceType: string; startDate: Date | string }): string => {
+    const date = new Date(transfer.startDate);
+    const day = date.getDate();
+    const month = date.toLocaleDateString(undefined, { month: 'short' });
+
+    switch (transfer.recurrenceType) {
+      case 'monthly':
+        return tRecurrence('everyMonths', { count: 1 });
+      case 'quarterly':
+        return `${day}. ${month} (${tRecurrence('quarterly')})`;
+      case 'yearly':
+        return `${day}. ${month} (${tRecurrence('yearly')})`;
+      default:
+        return formatDate(transfer.startDate);
+    }
+  };
 
   const recurringTransfers = transfers.filter(t => t.recurrenceType !== 'once');
   const oneTimeTransfers = transfers.filter(t => t.recurrenceType === 'once');
@@ -59,24 +55,24 @@ export function TransfersClient({
     .filter(t => t.recurrenceType === 'monthly')
     .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-  const handleSuccess = (data: any) => {
+  const handleSuccess = (data: { sourceAccountId: string; targetAccountId: string; [key: string]: unknown }) => {
     const newTransfer: TransferWithDetails = {
       ...data,
       sourceAccount: accounts.find(a => a.id === data.sourceAccountId) || null,
       targetAccount: accounts.find(a => a.id === data.targetAccountId) || null,
-    };
+    } as TransferWithDetails;
     setTransfers(prev => [newTransfer, ...prev]);
   };
 
   const handleDeleteTransfer = async (id: string, description: string) => {
-    if (!confirm(`Transfer "${description || 'ohne Beschreibung'}" wirklich löschen?`)) return;
+    if (!confirm(t('deleteConfirm', { name: description || t('noDescription') }))) return;
 
     const result = await deleteTransfer(id);
     if (result.success) {
       setTransfers(prev => prev.filter(t => t.id !== id));
-      toast({ title: 'Gelöscht', description: 'Transfer wurde entfernt.' });
+      toast({ title: t('deleted'), description: t('deletedDesc') });
     } else {
-      toast({ title: 'Fehler', description: 'Löschen fehlgeschlagen.', variant: 'destructive' });
+      toast({ title: t('deleteFailed'), description: '', variant: 'destructive' });
     }
   };
 
@@ -92,15 +88,15 @@ export function TransfersClient({
             <ArrowRightLeft className="w-5 h-5 text-emerald-500" />
           </div>
           <div>
-            <p className="font-medium">{transfer.description || 'Transfer'}</p>
+            <p className="font-medium">{transfer.description || t('title')}</p>
             <p className="text-sm text-muted-foreground">
-              {transfer.sourceAccount?.name ?? 'Unbekannt'} → {transfer.targetAccount?.name ?? 'Unbekannt'} • {recurrenceLabels[transfer.recurrenceType]}
+              {transfer.sourceAccount?.name ?? t('unknown')} → {transfer.targetAccount?.name ?? t('unknown')} • {tRecurrence(transfer.recurrenceType)}
             </p>
             {debitLabel && (
               <div className="flex items-center gap-1 mt-1">
                 <CalendarDays className="w-3 h-3 text-primary flex-shrink-0" />
                 <span className="text-xs font-medium text-primary">
-                  Ausführung: {debitLabel}
+                  {t('execution')} {debitLabel}
                 </span>
               </div>
             )}
@@ -110,9 +106,9 @@ export function TransfersClient({
           <div className="text-right">
             <p className="font-semibold">{formatCurrency(amount)}</p>
             {transfer.endDate ? (
-              <p className="text-xs text-muted-foreground">bis {formatDate(transfer.endDate)}</p>
+              <p className="text-xs text-muted-foreground">{t('until')} {formatDate(transfer.endDate)}</p>
             ) : (
-              <p className="text-xs text-muted-foreground">seit {formatDate(transfer.startDate)}</p>
+              <p className="text-xs text-muted-foreground">{t('since')} {formatDate(transfer.startDate)}</p>
             )}
           </div>
           <Button
@@ -132,8 +128,8 @@ export function TransfersClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">Transfers</h2>
-          <p className="text-sm text-muted-foreground/60 mt-1.5">Verwalte Geldtransfers zwischen deinen Konten</p>
+          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground/60 mt-1.5">{t('description')}</p>
         </div>
         <TransferForm accounts={accounts} onSuccess={handleSuccess} />
       </div>
@@ -141,14 +137,14 @@ export function TransfersClient({
       {transfers.length > 0 && (
         <Card className="hover:bg-card/80 dark:hover:bg-white/[0.08] hover:-translate-y-0.5 transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monatliche Transfers</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('monthlyTransfers')}</CardTitle>
             <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 rounded-xl p-2">
               <Repeat className="h-4 w-4 text-emerald-500" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-500">{formatCurrency(totalMonthlyRecurring)}</div>
-            <p className="text-xs text-muted-foreground mt-1">{recurringTransfers.length} wiederkehrende Transfers</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('recurringCount', { count: recurringTransfers.length })}</p>
           </CardContent>
         </Card>
       )}
@@ -161,9 +157,9 @@ export function TransfersClient({
                 <Repeat className="h-4 w-4 text-emerald-500" />
               </div>
               <div>
-                <CardTitle>Wiederkehrende Transfers</CardTitle>
+                <CardTitle>{t('recurringTransfers')}</CardTitle>
                 <CardDescription>
-                  Regelmäßige Geldtransfers zwischen Konten (z.B. Sparpläne)
+                  {t('recurringTransfersDesc')}
                 </CardDescription>
               </div>
             </div>
@@ -185,9 +181,9 @@ export function TransfersClient({
       {oneTimeTransfers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Einmalige Transfers</CardTitle>
+            <CardTitle>{t('oneTimeTransfers')}</CardTitle>
             <CardDescription>
-              Geplante einmalige Transfers zwischen Konten
+              {t('oneTimeTransfersDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -208,9 +204,9 @@ export function TransfersClient({
         <Card>
           <CardContent className="py-12 text-center">
             <ArrowRightLeft className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Keine Transfers vorhanden</h3>
+            <h3 className="text-lg font-medium mb-2">{t('noTransfers')}</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              Erstelle deinen ersten Transfer, um Geld zwischen Konten zu verschieben.
+              {t('noTransfersDesc')}
             </p>
             <TransferForm accounts={accounts} onSuccess={handleSuccess} />
           </CardContent>

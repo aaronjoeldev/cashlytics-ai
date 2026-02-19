@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -60,18 +61,6 @@ function formatDate(date: Date | string) {
   return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(date));
 }
 
-function formatRelativeDate(date: Date): string {
-  const now = new Date();
-  const diffTime = date.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return 'Heute';
-  if (diffDays === 1) return 'Morgen';
-  if (diffDays <= 7) return `In ${diffDays} Tagen`;
-  
-  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(date);
-}
-
 interface KpiCardProps {
   title: string;
   value: string;
@@ -86,7 +75,6 @@ interface KpiCardProps {
 function KpiCard({ title, value, subtitle, icon, iconBg, valueColor, trend, accentLine }: KpiCardProps) {
   return (
     <Card className="relative overflow-hidden hover:-translate-y-0.5 hover:dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_32px_rgba(0,0,0,0.32)] cursor-default">
-      {/* Top accent line */}
       {accentLine && (
         <div
           className="absolute top-0 left-6 right-6 h-px rounded-full opacity-60"
@@ -146,6 +134,8 @@ export function DashboardClient({
   recentTransactions,
   upcomingPayments,
 }: DashboardClientProps) {
+  const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
   const { formatCurrency } = useSettings();
   const hasExpenses = categoryBreakdown.length > 0;
   const hasTransactions = recentTransactions.length > 0;
@@ -158,7 +148,18 @@ export function DashboardClient({
     year: 'numeric',
   });
 
-  // --- hydration diagnostics (remove once fixed) ---
+  function formatRelativeDate(date: Date): string {
+    const now = new Date();
+    const diffTime = date.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return tCommon('today');
+    if (diffDays === 1) return tCommon('tomorrow');
+    if (diffDays <= 7) return tCommon('inDays', { count: diffDays });
+    
+    return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(date);
+  }
+
   const mountCount = useRef(0);
   mountCount.current++;
   useEffect(() => {
@@ -168,11 +169,9 @@ export function DashboardClient({
   useEffect(() => {
     console.log('[Dashboard] formatCurrency changed — potential hydration re-render');
   }, [formatCurrency]);
-  // --- end diagnostics ---
 
   return (
     <div className="space-y-7 stagger-children">
-      {/* Page header */}
       <div className="flex items-end justify-between">
         <div>
           <h2
@@ -185,7 +184,7 @@ export function DashboardClient({
               backgroundClip: 'text',
             }}
           >
-            Dashboard
+            {t('title')}
           </h2>
           <p
             suppressHydrationWarning
@@ -196,13 +195,12 @@ export function DashboardClient({
           </p>
         </div>
 
-        {/* Total assets badge */}
         <div className="hidden sm:flex flex-col items-end gap-0.5">
           <span
             className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/50"
             style={{ fontFamily: 'var(--font-jakarta)' }}
           >
-            Gesamtvermögen
+            {t('totalAssets')}
           </span>
           <span
             className="text-xl font-bold tracking-[-0.03em] text-foreground"
@@ -213,21 +211,20 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          title="Gesamtvermögen"
+          title={t('totalAssets')}
           value={formatCurrency(stats.totalAssets)}
-          subtitle="Alle Konten summiert"
+          subtitle={t('allAccountsSummarized')}
           icon={<Wallet className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
           iconBg="linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.06))"
           accentLine="linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent)"
         />
 
         <KpiCard
-          title="Monatliche Einnahmen"
+          title={t('monthlyIncome')}
           value={formatCurrency(stats.monthlyIncome)}
-          subtitle="vs. letzten Monat"
+          subtitle={t('vsLastMonth')}
           icon={<ArrowUpRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
           iconBg="linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.06))"
           valueColor="text-emerald-600 dark:text-emerald-400"
@@ -236,9 +233,9 @@ export function DashboardClient({
         />
 
         <KpiCard
-          title="Monatliche Ausgaben"
+          title={t('monthlyExpenses')}
           value={formatCurrency(stats.monthlyExpenses)}
-          subtitle="vs. letzten Monat"
+          subtitle={t('vsLastMonth')}
           icon={<ArrowDownRight className="h-4 w-4 text-red-500 dark:text-red-400" />}
           iconBg="linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.06))"
           valueColor="text-red-500 dark:text-red-400"
@@ -247,9 +244,9 @@ export function DashboardClient({
         />
 
         <KpiCard
-          title="Sparquote"
+          title={t('savingsRate')}
           value={formatCurrency(stats.savingsRate)}
-          subtitle={stats.savingsRate >= 0 ? 'Überschuss diesen Monat' : 'Defizit diesen Monat'}
+          subtitle={stats.savingsRate >= 0 ? t('surplusThisMonth') : t('deficitThisMonth')}
           icon={<PiggyBank className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
           iconBg="linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.06))"
           valueColor={stats.savingsRate >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}
@@ -260,7 +257,6 @@ export function DashboardClient({
         />
       </div>
 
-      {/* Upcoming Payments */}
       {hasUpcoming && (
         <Card>
           <CardHeader className="pb-3">
@@ -271,15 +267,15 @@ export function DashboardClient({
                 </div>
                 <div>
                   <CardTitle className="text-base" style={{ fontFamily: 'var(--font-syne)' }}>
-                    Nächste Zahlungen
+                    {t('upcomingPayments')}
                   </CardTitle>
                   <CardDescription className="mt-0.5 text-xs">
-                    Die nächsten 14 Tage
+                    {t('next14Days')}
                   </CardDescription>
                 </div>
               </div>
               <span className="text-xs font-medium text-muted-foreground/50 bg-white/5 dark:bg-white/[0.04] border border-border/50 dark:border-white/[0.06] rounded-lg px-2 py-1">
-                {upcomingPayments.length} anstehend
+                {t('pendingCount', { count: upcomingPayments.length })}
               </span>
             </div>
           </CardHeader>
@@ -320,9 +316,7 @@ export function DashboardClient({
         </Card>
       )}
 
-      {/* Bottom panels */}
       <div className="grid gap-5 md:grid-cols-2">
-        {/* Category Breakdown */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -331,16 +325,16 @@ export function DashboardClient({
                   className="text-base"
                   style={{ fontFamily: 'var(--font-syne)' }}
                 >
-                  Ausgaben nach Kategorie
+                  {t('expensesByCategory')}
                 </CardTitle>
-                <CardDescription className="mt-1 text-xs">Dieser Monat</CardDescription>
+                <CardDescription className="mt-1 text-xs">{t('thisMonth')}</CardDescription>
               </div>
               {hasExpenses && (
                 <span
                   className="text-xs font-medium text-muted-foreground/50 bg-white/5 dark:bg-white/[0.04] border border-border/50 dark:border-white/[0.06] rounded-lg px-2 py-1"
                   style={{ fontFamily: 'var(--font-jakarta)' }}
                 >
-                  {categoryBreakdown.length} Kategorien
+                  {t('categoriesCount', { count: categoryBreakdown.length })}
                 </span>
               )}
             </div>
@@ -353,7 +347,7 @@ export function DashboardClient({
                   className="text-sm text-muted-foreground/50 text-center"
                   style={{ fontFamily: 'var(--font-jakarta)' }}
                 >
-                  Noch keine Ausgaben diesen Monat
+                  {t('noExpensesThisMonth')}
                 </p>
               </div>
             ) : (
@@ -408,7 +402,6 @@ export function DashboardClient({
           </CardContent>
         </Card>
 
-        {/* Recent Transactions */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -417,16 +410,16 @@ export function DashboardClient({
                   className="text-base"
                   style={{ fontFamily: 'var(--font-syne)' }}
                 >
-                  Letzte Transaktionen
+                  {t('recentTransactions')}
                 </CardTitle>
-                <CardDescription className="mt-1 text-xs">Deine letzten Ausgaben</CardDescription>
+                <CardDescription className="mt-1 text-xs">{t('yourRecentExpenses')}</CardDescription>
               </div>
               {hasTransactions && (
                 <span
                   className="text-xs font-medium text-muted-foreground/50 bg-white/5 dark:bg-white/[0.04] border border-border/50 dark:border-white/[0.06] rounded-lg px-2 py-1"
                   style={{ fontFamily: 'var(--font-jakarta)' }}
                 >
-                  {recentTransactions.length} Einträge
+                  {t('entriesCount', { count: recentTransactions.length })}
                 </span>
               )}
             </div>
@@ -439,7 +432,7 @@ export function DashboardClient({
                   className="text-sm text-muted-foreground/50 text-center"
                   style={{ fontFamily: 'var(--font-jakarta)' }}
                 >
-                  Noch keine Transaktionen vorhanden
+                  {t('noTransactions')}
                 </p>
               </div>
             ) : (
@@ -467,7 +460,7 @@ export function DashboardClient({
                           className="text-xs text-muted-foreground/50 mt-0.5"
                           style={{ fontFamily: 'var(--font-jakarta)' }}
                         >
-                          {transaction.category?.name || 'Ohne Kategorie'}
+                          {transaction.category?.name || tCommon('withoutCategory')}
                           <span className="mx-1.5 opacity-40">·</span>
                           {formatDate(transaction.date)}
                         </p>

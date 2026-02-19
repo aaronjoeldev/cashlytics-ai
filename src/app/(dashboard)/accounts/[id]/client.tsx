@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Building2, PiggyBank, TrendingUp, ArrowUpRight, ArrowDownRight, Receipt, TrendingUp as ForecastIcon, ArrowRightLeft } from 'lucide-react';
 import { useSettings } from '@/lib/settings-context';
+import { useTranslations } from 'next-intl';
 import type { Account, ExpenseWithDetails, IncomeWithAccount, TransferWithDetails } from '@/types/database';
 import { ForecastClient } from './forecast-client';
 
@@ -23,12 +24,6 @@ interface AccountDetailClientProps {
   initialIncomes: IncomeWithAccount[];
   initialTransfers: TransferWithDetails[];
 }
-
-const accountTypeConfig = {
-  checking: { label: 'Girokonto', icon: Building2, color: 'text-blue-600' },
-  savings: { label: 'Sparkonto', icon: PiggyBank, color: 'text-emerald-500' },
-  etf: { label: 'ETF-Konto', icon: TrendingUp, color: 'text-purple-600' },
-};
 
 function formatDate(date: Date | string) {
   return new Intl.DateTimeFormat('de-DE', {
@@ -75,6 +70,14 @@ export function AccountDetailClient({
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const t = useTranslations('accounts');
+  const tCommon = useTranslations('common');
+
+  const accountTypeConfig = {
+    checking: { label: t('types.checking'), icon: Building2, color: 'text-blue-600' },
+    savings: { label: t('types.savings'), icon: PiggyBank, color: 'text-emerald-500' },
+    etf: { label: t('types.etf'), icon: TrendingUp, color: 'text-purple-600' },
+  };
 
   const monthOptions = getMonthOptions();
 
@@ -170,7 +173,7 @@ export function AccountDetailClient({
           className="backdrop-blur-sm bg-white/5 hover:bg-white/10 border border-white/[0.08] rounded-xl"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Zurück
+          {tCommon('back')}
         </Button>
       </div>
 
@@ -190,7 +193,7 @@ export function AccountDetailClient({
               <div className={`text-3xl font-bold ${parseFloat(account.balance) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                 {formatCurrency(account.balance)}
               </div>
-              <p className="text-xs text-muted-foreground">Aktueller Kontostand</p>
+              <p className="text-xs text-muted-foreground">{t('balance')}</p>
             </div>
           </div>
         </CardHeader>
@@ -200,20 +203,20 @@ export function AccountDetailClient({
         <TabsList className="bg-white/5 backdrop-blur-sm border border-white/[0.08]">
           <TabsTrigger value="transactions" className="gap-2">
             <Receipt className="h-4 w-4" />
-            Transaktionen
+            {t('transactions')}
           </TabsTrigger>
           <TabsTrigger value="forecast" className="gap-2">
             <ForecastIcon className="h-4 w-4" />
-            Vorschau
+            {t('forecast')}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <h3 className="text-xl font-semibold">Transaktionen</h3>
+            <h3 className="text-xl font-semibold">{t('transactions')}</h3>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[180px] bg-white/5 backdrop-blur-sm border-white/[0.08] rounded-xl">
-                <SelectValue placeholder="Monat wählen" />
+                <SelectValue placeholder={t('selectMonth')} />
               </SelectTrigger>
               <SelectContent>
                 {monthOptions.map((option) => (
@@ -230,7 +233,7 @@ export function AccountDetailClient({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-                  Einnahmen
+                  {t('income')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -244,7 +247,7 @@ export function AccountDetailClient({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <ArrowDownRight className="h-4 w-4 text-red-500" />
-                  Ausgaben
+                  {t('expenses')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -258,7 +261,7 @@ export function AccountDetailClient({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <ArrowRightLeft className="h-4 w-4 text-blue-500" />
-                  Transfers
+                  {t('transfers')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -283,7 +286,7 @@ export function AccountDetailClient({
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
-                  Saldo
+                  {t('balance')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -296,12 +299,12 @@ export function AccountDetailClient({
 
           <Card className="backdrop-blur-xl bg-white/5 border border-white/[0.08]">
             <CardHeader>
-              <CardTitle>Transaktionsliste</CardTitle>
+              <CardTitle>{t('transactionList')}</CardTitle>
             </CardHeader>
             <CardContent>
               {transactions.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  Keine Transaktionen in diesem Monat.
+                  {t('noTransactionsThisMonth')}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -337,7 +340,7 @@ export function AccountDetailClient({
                             <p className="text-xs text-muted-foreground">
                               {isTransfer
                                 ? transaction.description
-                                : transaction.category?.name || (isPositive ? 'Einnahme' : 'Ausgabe')}
+                                : transaction.category?.name || (isPositive ? t('income') : t('expenses'))}
                               {' • '}
                               {formatDate(transaction.date)}
                             </p>

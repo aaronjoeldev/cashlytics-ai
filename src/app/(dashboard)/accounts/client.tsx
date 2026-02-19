@@ -10,17 +10,12 @@ import { deleteAccount, updateAccount } from '@/actions/account-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/lib/settings-context';
 import { Trash2, Pencil, Building2, PiggyBank, TrendingUp, ChevronRight } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { Account } from '@/types/database';
 
 interface AccountsClientProps {
   initialAccounts: Account[];
 }
-
-const accountTypeConfig = {
-  checking: { label: 'Girokonto', icon: Building2, color: 'text-blue-600' },
-  savings: { label: 'Sparkonto', icon: PiggyBank, color: 'text-emerald-500' },
-  etf: { label: 'ETF-Konto', icon: TrendingUp, color: 'text-purple-600' },
-};
 
 export function AccountsClient({ initialAccounts }: AccountsClientProps) {
   const router = useRouter();
@@ -30,9 +25,17 @@ export function AccountsClient({ initialAccounts }: AccountsClientProps) {
   const [accounts, setAccounts] = useState(initialAccounts);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBalance, setEditBalance] = useState('');
+  const t = useTranslations('accounts');
+  const tCommon = useTranslations('common');
+
+  const accountTypeConfig = {
+    checking: { label: t('types.checking'), icon: Building2, color: 'text-blue-600' },
+    savings: { label: t('types.savings'), icon: PiggyBank, color: 'text-emerald-500' },
+    etf: { label: t('types.etf'), icon: TrendingUp, color: 'text-purple-600' },
+  };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Konto "${name}" wirklich löschen? Alle zugehörigen Transaktionen werden ebenfalls gelöscht.`)) {
+    if (!confirm(t('deleteConfirm'))) {
       return;
     }
 
@@ -40,14 +43,14 @@ export function AccountsClient({ initialAccounts }: AccountsClientProps) {
     if (result.success) {
       setAccounts(accounts.filter(a => a.id !== id));
       toast({
-        title: 'Konto gelöscht',
-        description: `${name} wurde erfolgreich gelöscht.`,
+        title: t('success.deleted'),
+        description: t('success.deleted'),
       });
       router.refresh();
     } else {
       toast({
-        title: 'Fehler',
-        description: result.error || 'Konto konnte nicht gelöscht werden.',
+        title: t('error'),
+        description: result.error || t('errors.deleteFailed'),
         variant: 'destructive',
       });
     }
@@ -65,14 +68,14 @@ export function AccountsClient({ initialAccounts }: AccountsClientProps) {
         a.id === account.id ? { ...a, balance: editBalance } : a
       ));
       toast({
-        title: 'Kontostand aktualisiert',
-        description: `${account.name} wurde aktualisiert.`,
+        title: t('success.updated'),
+        description: t('success.updated'),
       });
       router.refresh();
     } else {
       toast({
-        title: 'Fehler',
-        description: result.error || 'Konto konnte nicht aktualisiert werden.',
+        title: t('error'),
+        description: result.error || t('errors.updateFailed'),
         variant: 'destructive',
       });
     }
@@ -81,40 +84,40 @@ export function AccountsClient({ initialAccounts }: AccountsClientProps) {
   };
 
   const totalBalance = accounts.reduce((sum, a) => sum + parseFloat(a.balance), 0);
+  const accountCount = accounts.length;
+  const accountLabel = accountCount === 1 ? t('types.checking').split(' ')[0] : t('title');
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">Konten</h2>
+          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">{t('title')}</h2>
           <p className="text-sm text-muted-foreground/60 mt-1.5">
-            Verwalte deine Bankkonten und Depots
+            {t('description')}
           </p>
         </div>
         <AccountForm onSuccess={(data) => setAccounts(prev => [...prev, data])} />
       </div>
 
-      {/* Gesamtübersicht */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            Gesamtvermögen
+            {t('totalBalance')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">{formatCurrency(totalBalance)}</div>
           <p className="text-xs text-muted-foreground mt-1">
-            {accounts.length} {accounts.length === 1 ? 'Konto' : 'Konten'}
+            {accountCount} {accountLabel}
           </p>
         </CardContent>
       </Card>
 
-      {/* Konten-Liste */}
       {accounts.length === 0 ? (
         <Card>
           <CardContent className="py-8">
             <p className="text-muted-foreground text-center">
-              Noch keine Konten vorhanden. Füge dein erstes Konto hinzu, um loszulegen.
+              {t('noAccounts')}
             </p>
           </CardContent>
         </Card>
@@ -179,19 +182,19 @@ export function AccountsClient({ initialAccounts }: AccountsClientProps) {
                       {formatCurrency(account.balance)}
                     </div>
                     <div className="flex items-center gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setEditingId(account.id);
-                          setEditBalance(account.balance);
-                        }}
-                      >
-                        <Pencil className="h-3 w-3 mr-1" />
-                        Kontostand
-                      </Button>
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={(e) => {
+                           e.preventDefault();
+                           e.stopPropagation();
+                           setEditingId(account.id);
+                           setEditBalance(account.balance);
+                         }}
+                       >
+                         <Pencil className="h-3 w-3 mr-1" />
+                         {t('balance')}
+                       </Button>
                       <Button
                         variant="outline"
                         size="sm"

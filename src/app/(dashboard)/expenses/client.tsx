@@ -9,6 +9,7 @@ import { ExpenseForm } from '@/components/organisms/expense-form';
 import { deleteExpense, deleteDailyExpense } from '@/actions/expense-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/lib/settings-context';
+import { useTranslations } from 'next-intl';
 import type { Account, Category, Expense, DailyExpense, ExpenseWithDetails, DailyExpenseWithDetails } from '@/types/database';
 
 interface ExpensesClientProps {
@@ -18,41 +19,8 @@ interface ExpensesClientProps {
   initialDailyExpenses: DailyExpenseWithDetails[];
 }
 
-const recurrenceLabels: Record<string, string> = {
-  once: 'Einmalig',
-  daily: 'Täglich',
-  weekly: 'Wöchentlich',
-  monthly: 'Monatlich',
-  quarterly: 'Quartalsweise',
-  yearly: 'Jährlich',
-  custom: 'Benutzerdefiniert',
-};
-
 function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat('de-DE').format(new Date(date));
-}
-
-function getDebitLabel(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null }): string {
-  const date = new Date(expense.startDate);
-  const day = date.getDate();
-  const month = date.toLocaleDateString('de-DE', { month: 'short' });
-
-  switch (expense.recurrenceType) {
-    case 'monthly':
-      return `jeden ${day}.`;
-    case 'quarterly':
-      return `${day}. ${month} (quartalsweise)`;
-    case 'yearly':
-      return `${day}. ${month} (jährlich)`;
-    case 'weekly': {
-      const weekday = date.toLocaleDateString('de-DE', { weekday: 'long' });
-      return `jeden ${weekday}`;
-    }
-    case 'custom':
-      return `alle ${expense.recurrenceInterval ?? '?'} Monate (${day}. des Monats)`;
-    default:
-      return formatDate(expense.startDate);
-  }
+  return new Intl.DateTimeFormat().format(new Date(date));
 }
 
 function getNextPaymentDate(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null; endDate?: Date | string | null }): Date | null {
@@ -114,7 +82,7 @@ function getNextPaymentDate(expense: { recurrenceType: string; startDate: Date |
   }
 }
 
-function formatNextPayment(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null; endDate?: Date | string | null }): string | null {
+function formatNextPayment(expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null; endDate?: Date | string | null }, t: (key: string, params?: Record<string, number>) => string): string | null {
   const nextDate = getNextPaymentDate(expense);
   if (!nextDate) return null;
   
@@ -123,11 +91,11 @@ function formatNextPayment(expense: { recurrenceType: string; startDate: Date | 
   const diffTime = nextDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
-  if (diffDays === 0) return 'Heute';
-  if (diffDays === 1) return 'Morgen';
-  if (diffDays <= 7) return `In ${diffDays} Tagen`;
+  if (diffDays === 0) return t('today');
+  if (diffDays === 1) return t('tomorrow');
+  if (diffDays <= 7) return t('inDays', { count: diffDays });
   
-  return new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(nextDate);
+  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(nextDate);
 }
 
 function normalizeToMonthly(amount: number, recurrenceType: string, recurrenceInterval: number | null): number {
@@ -150,6 +118,9 @@ export function ExpensesClient({
 }: ExpensesClientProps) {
   const { toast } = useToast();
   const { formatCurrency: fmt } = useSettings();
+  const t = useTranslations('expenses');
+  const tCommon = useTranslations('common');
+  const tRecurrence = useTranslations('recurrence');
   const formatCurrency = (amount: string | number) => fmt(typeof amount === 'string' ? parseFloat(amount) : amount);
   const [categories, setCategories] = useState(initialCategories);
   const [expenses, setExpenses] = useState(initialExpenses);
@@ -158,7 +129,6 @@ export function ExpensesClient({
   const [editingDailyExpense, setEditingDailyExpense] = useState<DailyExpense | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  // Split periodic expenses
   const monthlyFixed = expenses.filter(e => e.recurrenceType === 'monthly');
   const periodicReserves = expenses.filter(e => e.recurrenceType !== 'monthly' && e.recurrenceType !== 'once');
   const oneTimeExpenses = expenses.filter(e => e.recurrenceType === 'once');
@@ -167,49 +137,72 @@ export function ExpensesClient({
   const totalReserves = periodicReserves.reduce((sum, e) => sum + normalizeToMonthly(parseFloat(e.amount), e.recurrenceType, e.recurrenceInterval), 0);
   const totalNormalized = totalMonthlyFixed + totalReserves;
 
-  const handleCategoryCreated = (category: Category) => {
-    setCategories(prev => [...prev, category]);
-    toast({ title: 'Kategorie erstellt', description: `"${category.name}" wurde angelegt.` });
+  const getDebitLabel = (expense: { recurrenceType: string; startDate: Date | string; recurrenceInterval: number | null }): string => {
+    const date = new Date(expense.startDate);
+    const day = date.getDate();
+    const month = date.toLocaleDateString(undefined, { month: 'short' });
+
+    switch (expense.recurrenceType) {
+      case 'monthly':
+        return tRecurrence('monthly');
+      case 'quarterly':
+        return `${day}. ${month} (${tRecurrence('quarterly')})`;
+      case 'yearly':
+        return `${day}. ${month} (${tRecurrence('yearly')})`;
+      case 'weekly': {
+        const weekday = date.toLocaleDateString(undefined, { weekday: 'long' });
+        return tRecurrence('weekly');
+      }
+      case 'custom':
+        return tRecurrence('everyMonths', { count: expense.recurrenceInterval ?? 1 });
+      default:
+        return formatDate(expense.startDate);
+    }
   };
 
-  const handleSuccess = (data: { type: 'periodic' | 'daily'; item: any }) => {
+  const handleCategoryCreated = (category: Category) => {
+    setCategories(prev => [...prev, category]);
+    toast({ title: t('categoryCreated'), description: t('categoryCreatedDesc', { name: category.name }) });
+  };
+
+  const handleSuccess = (data: { type: 'periodic' | 'daily'; item: { id: string; categoryId?: string; accountId?: string; [key: string]: unknown } }) => {
     if (data.type === 'periodic') {
       const newExpense = {
         ...data.item,
         category: categories.find(c => c.id === data.item.categoryId) || null,
         account: accounts.find(a => a.id === data.item.accountId) || null,
-      };
+      } as ExpenseWithDetails;
       setExpenses(prev => [newExpense, ...prev]);
     } else {
       const newDailyExpense = {
         ...data.item,
         category: categories.find(c => c.id === data.item.categoryId) || null,
         account: accounts.find(a => a.id === data.item.accountId) || null,
-      };
+      } as DailyExpenseWithDetails;
       setDailyExpenses(prev => [newDailyExpense, ...prev]);
     }
   };
 
-  const handleEditSuccess = (data: { type: 'periodic' | 'daily'; item: any }) => {
+  const handleEditSuccess = (data: { type: 'periodic' | 'daily'; item: { id: string; categoryId?: string; accountId?: string; [key: string]: unknown } }) => {
     if (data.type === 'periodic') {
       const updatedExpense = {
         ...data.item,
         category: categories.find(c => c.id === data.item.categoryId) || null,
         account: accounts.find(a => a.id === data.item.accountId) || null,
-      };
+      } as ExpenseWithDetails;
       setExpenses(prev => prev.map(e => e.id === data.item.id ? updatedExpense : e));
     } else {
       const updatedDailyExpense = {
         ...data.item,
         category: categories.find(c => c.id === data.item.categoryId) || null,
         account: accounts.find(a => a.id === data.item.accountId) || null,
-      };
+      } as DailyExpenseWithDetails;
       setDailyExpenses(prev => prev.map(e => e.id === data.item.id ? updatedDailyExpense : e));
     }
     setEditingExpense(null);
     setEditingDailyExpense(null);
     setEditDialogOpen(false);
-    toast({ title: 'Aktualisiert', description: 'Ausgabe wurde bearbeitet.' });
+    toast({ title: t('updated'), description: t('updatedDesc') });
   };
 
   const handleEditExpense = (expense: ExpenseWithDetails) => {
@@ -225,26 +218,26 @@ export function ExpensesClient({
   };
 
   const handleDeleteExpense = async (id: string, name: string) => {
-    if (!confirm(`Ausgabe "${name}" wirklich löschen?`)) return;
+    if (!confirm(t('deleteConfirm', { name }))) return;
 
     const result = await deleteExpense(id);
     if (result.success) {
       setExpenses(prev => prev.filter(e => e.id !== id));
-      toast({ title: 'Gelöscht', description: `"${name}" wurde entfernt.` });
+      toast({ title: tCommon('delete'), description: `"${name}" wurde entfernt.` });
     } else {
-      toast({ title: 'Fehler', description: 'Löschen fehlgeschlagen.', variant: 'destructive' });
+      toast({ title: t('deleteFailed'), variant: 'destructive' });
     }
   };
 
   const handleDeleteDailyExpense = async (id: string, description: string) => {
-    if (!confirm(`Ausgabe "${description}" wirklich löschen?`)) return;
+    if (!confirm(t('deleteConfirm', { name: description }))) return;
 
     const result = await deleteDailyExpense(id);
     if (result.success) {
       setDailyExpenses(prev => prev.filter(e => e.id !== id));
-      toast({ title: 'Gelöscht', description: `"${description}" wurde entfernt.` });
+      toast({ title: tCommon('delete'), description: `"${description}" wurde entfernt.` });
     } else {
-      toast({ title: 'Fehler', description: 'Löschen fehlgeschlagen.', variant: 'destructive' });
+      toast({ title: t('deleteFailed'), variant: 'destructive' });
     }
   };
 
@@ -254,7 +247,7 @@ export function ExpensesClient({
     const isMonthly = expense.recurrenceType === 'monthly';
     const isOnce = expense.recurrenceType === 'once';
     const debitLabel = !isOnce ? getDebitLabel(expense) : null;
-    const nextPaymentLabel = !isOnce ? formatNextPayment(expense) : null;
+    const nextPaymentLabel = !isOnce ? formatNextPayment(expense, tCommon) : null;
 
     return (
       <div className="flex items-center justify-between p-4 rounded-xl hover:bg-accent/30 dark:hover:bg-white/5 transition-colors duration-200">
@@ -273,11 +266,11 @@ export function ExpensesClient({
             <p className="font-medium">{expense.name}</p>
             <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-0.5">
               <span className="text-sm text-muted-foreground">
-                {expense.category?.name ?? 'Ohne Kategorie'} • {recurrenceLabels[expense.recurrenceType]}
+                {expense.category?.name ?? tCommon('withoutCategory')} • {tRecurrence(expense.recurrenceType)}
               </span>
               {!isMonthly && !isOnce && (
                 <span className="text-xs text-violet-500 dark:text-violet-400 font-medium">
-                  {formatCurrency(monthly)}/Mo Rücklage
+                  {formatCurrency(monthly)}/Mo {t('reserve') || 'Rücklage'}
                 </span>
               )}
             </div>
@@ -292,7 +285,7 @@ export function ExpensesClient({
               )}
               {nextPaymentLabel && (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                  Nächste: {nextPaymentLabel}
+                  {t('nextPayment')} {nextPaymentLabel}
                 </span>
               )}
             </div>
@@ -302,9 +295,9 @@ export function ExpensesClient({
           <div className="text-right">
             <p className="font-semibold">{formatCurrency(amount)}</p>
             {expense.endDate ? (
-              <p className="text-xs text-muted-foreground">bis {formatDate(expense.endDate)}</p>
+              <p className="text-xs text-muted-foreground">{t('until')} {formatDate(expense.endDate)}</p>
             ) : (
-              <p className="text-xs text-muted-foreground">seit {formatDate(expense.startDate)}</p>
+              <p className="text-xs text-muted-foreground">{t('since')} {formatDate(expense.startDate)}</p>
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -333,8 +326,8 @@ export function ExpensesClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">Ausgaben</h2>
-          <p className="text-sm text-muted-foreground/60 mt-1.5">Verwalte deine periodischen und täglichen Ausgaben</p>
+          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground/60 mt-1.5">{t('description')}</p>
         </div>
         <ExpenseForm accounts={accounts} categories={categories} onSuccess={handleSuccess} onCategoryCreated={handleCategoryCreated} />
       </div>
@@ -356,45 +349,44 @@ export function ExpensesClient({
         onCategoryCreated={handleCategoryCreated}
       />
 
-      {/* Summary Cards */}
       {expenses.length > 0 && (
         <div className="grid gap-4 md:grid-cols-3 stagger-children">
           <Card className="hover:bg-card/80 dark:hover:bg-white/[0.08] hover:-translate-y-0.5 transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monatliche Fixkosten</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('monthlyFixedCosts')}</CardTitle>
               <div className="bg-gradient-to-br from-amber-500/20 to-amber-500/5 rounded-xl p-2">
                 <Wallet className="h-4 w-4 text-amber-500" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalMonthlyFixed)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{monthlyFixed.length} monatliche Abbuchungen</p>
+              <p className="text-xs text-muted-foreground mt-1">{monthlyFixed.length} {t('monthlyDebits')}</p>
             </CardContent>
           </Card>
 
           <Card className="hover:bg-card/80 dark:hover:bg-white/[0.08] hover:-translate-y-0.5 transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monatliche Rücklage</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('monthlyReserve')}</CardTitle>
               <div className="bg-gradient-to-br from-violet-500/20 to-violet-500/5 rounded-xl p-2">
                 <PiggyBank className="h-4 w-4 text-violet-500" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-violet-500">{formatCurrency(totalReserves)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{periodicReserves.length} periodische Ausgaben</p>
+              <p className="text-xs text-muted-foreground mt-1">{periodicReserves.length} {t('periodicExpenses')}</p>
             </CardContent>
           </Card>
 
           <Card className="hover:bg-card/80 dark:hover:bg-white/[0.08] hover:-translate-y-0.5 transition-all duration-300">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Gesamt pro Monat</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('totalPerMonth')}</CardTitle>
               <div className="bg-gradient-to-br from-red-500/20 to-red-500/5 rounded-xl p-2">
                 <Repeat className="h-4 w-4 text-red-500" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-500">{formatCurrency(totalNormalized)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Fixkosten + Rücklagen</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('fixedCostsPlusReserves')}</p>
             </CardContent>
           </Card>
         </div>
@@ -404,24 +396,23 @@ export function ExpensesClient({
         <TabsList>
           <TabsTrigger value="fixed">
             <Wallet className="w-3.5 h-3.5 mr-1.5" />
-            Fixkosten ({monthlyFixed.length})
+            {t('fixedCosts')} ({monthlyFixed.length})
           </TabsTrigger>
           <TabsTrigger value="periodic">
             <PiggyBank className="w-3.5 h-3.5 mr-1.5" />
-            Rücklagen ({periodicReserves.length})
+            {t('reserves')} ({periodicReserves.length})
           </TabsTrigger>
           {oneTimeExpenses.length > 0 && (
             <TabsTrigger value="once">
-              Einmalig ({oneTimeExpenses.length})
+              {tRecurrence('once')} ({oneTimeExpenses.length})
             </TabsTrigger>
           )}
           <TabsTrigger value="daily">
             <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
-            Tägliche ({dailyExpenses.length})
+            {t('daily')} ({dailyExpenses.length})
           </TabsTrigger>
         </TabsList>
 
-        {/* Monthly Fixed Costs */}
         <TabsContent value="fixed">
           <Card>
             <CardHeader>
@@ -430,9 +421,9 @@ export function ExpensesClient({
                   <Wallet className="h-4 w-4 text-amber-500" />
                 </div>
                 <div>
-                  <CardTitle>Monatliche Fixkosten</CardTitle>
+                  <CardTitle>{t('monthlyFixedCosts')}</CardTitle>
                   <CardDescription>
-                    Ausgaben die jeden Monat direkt abgebucht werden
+                    {t('monthlyFixedCostsDesc')}
                   </CardDescription>
                 </div>
               </div>
@@ -440,7 +431,7 @@ export function ExpensesClient({
             <CardContent>
               {monthlyFixed.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  Noch keine monatlichen Fixkosten vorhanden. Füge eine Ausgabe mit Wiederholung &quot;Monatlich&quot; hinzu.
+                  {t('noMonthlyFixedCosts')}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -454,7 +445,7 @@ export function ExpensesClient({
                   ))}
                   <div className="mt-3 p-3 rounded-xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/10 dark:border-amber-500/15">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Summe monatliche Fixkosten</span>
+                      <span className="text-sm text-muted-foreground">{t('totalMonthlyFixedCosts')}</span>
                       <span className="text-sm font-bold">{formatCurrency(totalMonthlyFixed)}</span>
                     </div>
                   </div>
@@ -464,7 +455,6 @@ export function ExpensesClient({
           </Card>
         </TabsContent>
 
-        {/* Periodic Reserves */}
         <TabsContent value="periodic">
           <Card>
             <CardHeader>
@@ -473,9 +463,9 @@ export function ExpensesClient({
                   <PiggyBank className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
-                  <CardTitle>Periodische Ausgaben &amp; Rücklagen</CardTitle>
+                  <CardTitle>{t('periodicReserves')}</CardTitle>
                   <CardDescription>
-                    Nicht-monatliche Ausgaben &mdash; der monatliche Rücklagebetrag wird berechnet, damit die Zahlung gedeckt ist
+                    {t('periodicReservesDesc')}
                   </CardDescription>
                 </div>
               </div>
@@ -483,7 +473,7 @@ export function ExpensesClient({
             <CardContent>
               {periodicReserves.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  Noch keine periodischen Ausgaben vorhanden. Füge Ausgaben mit Wiederholung wie &quot;Jährlich&quot; oder &quot;Quartalsweise&quot; hinzu.
+                  {t('noPeriodicExpenses')}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -497,7 +487,7 @@ export function ExpensesClient({
                   ))}
                   <div className="mt-3 p-3 rounded-xl bg-violet-500/5 dark:bg-violet-500/10 border border-violet-500/10 dark:border-violet-500/15">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Monatlich zurückzulegen</span>
+                      <span className="text-sm text-muted-foreground">{t('monthlyReserveLabel')}</span>
                       <span className="text-sm font-bold text-violet-500">{formatCurrency(totalReserves)}</span>
                     </div>
                   </div>
@@ -507,12 +497,11 @@ export function ExpensesClient({
           </Card>
         </TabsContent>
 
-        {/* One-time expenses */}
         {oneTimeExpenses.length > 0 && (
           <TabsContent value="once">
             <Card>
               <CardHeader>
-                <CardTitle>Einmalige Ausgaben</CardTitle>
+                <CardTitle>{tRecurrence('once')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -530,7 +519,6 @@ export function ExpensesClient({
           </TabsContent>
         )}
 
-        {/* Daily expenses */}
         <TabsContent value="daily">
           <Card>
             <CardHeader>
@@ -539,15 +527,15 @@ export function ExpensesClient({
                   <CalendarDays className="h-4 w-4 text-blue-500" />
                 </div>
                 <div>
-                  <CardTitle>Tägliche Ausgaben</CardTitle>
-                  <CardDescription>Einzelne Ausgaben im Alltag</CardDescription>
+                  <CardTitle>{t('dailyExpenses')}</CardTitle>
+                  <CardDescription>{t('dailyExpensesDesc')}</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               {dailyExpenses.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  Noch keine täglichen Ausgaben vorhanden.
+                  {t('noDailyExpenses')}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -570,14 +558,14 @@ export function ExpensesClient({
                         <div>
                           <p className="font-medium">{expense.description}</p>
                           <p className="text-sm text-muted-foreground">
-                            {expense.category?.name ?? 'Ohne Kategorie'} • {formatDate(expense.date)}
+                            {expense.category?.name ?? tCommon('withoutCategory')} • {formatDate(expense.date)}
                           </p>
                         </div>
                       </div>
                        <div className="flex items-center gap-4">
                          <div className="text-right">
                            <p className="font-semibold">{formatCurrency(expense.amount)}</p>
-                           <p className="text-sm text-muted-foreground">{expense.account?.name ?? 'Unbekanntes Konto'}</p>
+                           <p className="text-sm text-muted-foreground">{expense.account?.name ?? t('unknownAccount')}</p>
                          </div>
                          <div className="flex items-center gap-1">
                            <Button

@@ -109,3 +109,52 @@ export async function downloadDocument(id: string) {
     return { success: false, error: 'Download fehlgeschlagen.' };
   }
 }
+
+export type DocumentWithDetails = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  createdAt: Date;
+  expenseId: string | null;
+  dailyExpenseId: string | null;
+  expenseName: string | null;
+  expenseType: 'periodic' | 'daily' | null;
+  category: { id: string; name: string; icon: string | null; color: string | null } | null;
+};
+
+export async function getAllDocuments(): Promise<{ success: true; data: DocumentWithDetails[] } | { success: false; error: string }> {
+  try {
+    const { expenses, dailyExpenses, categories } = await import('@/lib/db/schema');
+    
+    const allDocs = await db
+      .select({
+        document: documents,
+        expense: expenses,
+        dailyExpense: dailyExpenses,
+        category: categories,
+      })
+      .from(documents)
+      .leftJoin(expenses, eq(documents.expenseId, expenses.id))
+      .leftJoin(dailyExpenses, eq(documents.dailyExpenseId, dailyExpenses.id))
+      .leftJoin(categories, eq(expenses.categoryId, categories.id));
+
+    const result: DocumentWithDetails[] = allDocs.map(row => ({
+      id: row.document.id,
+      fileName: row.document.fileName,
+      mimeType: row.document.mimeType,
+      size: row.document.size,
+      createdAt: row.document.createdAt,
+      expenseId: row.document.expenseId,
+      dailyExpenseId: row.document.dailyExpenseId,
+      expenseName: row.expense?.name ?? row.dailyExpense?.description ?? null,
+      expenseType: (row.expense ? 'periodic' : row.dailyExpense ? 'daily' : null) as 'periodic' | 'daily' | null,
+      category: row.category ? { id: row.category.id, name: row.category.name, icon: row.category.icon, color: row.category.color } : null,
+    }));
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Failed to fetch all documents:', error);
+    return { success: false, error: 'Dokumente konnten nicht geladen werden.' };
+  }
+}

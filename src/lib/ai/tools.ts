@@ -101,7 +101,27 @@ export const tools = {
       if (name) filters.name = name;
       if (startDate) filters.startDate = new Date(startDate);
       if (endDate) filters.endDate = new Date(endDate);
-      return getExpenses(filters);
+      const result = await getExpenses(filters);
+      if (!result.success) return result;
+      // Explicit allowlist: only return fields the AI needs.
+      // Documents are intentionally excluded — uploaded files (invoices, bank statements)
+      // may contain sensitive personal data and must never reach the AI context.
+      return {
+        success: true,
+        data: result.data.map((e) => ({
+          id: e.id,
+          name: e.name,
+          amount: e.amount,
+          recurrenceType: e.recurrenceType,
+          recurrenceInterval: e.recurrenceInterval,
+          startDate: e.startDate,
+          endDate: e.endDate,
+          isSubscription: e.isSubscription,
+          info: e.info,
+          category: e.category ? { id: e.category.id, name: e.category.name, icon: e.category.icon } : null,
+          account: e.account ? { id: e.account.id, name: e.account.name, type: e.account.type } : null,
+        })),
+      };
     },
   }),
 
@@ -173,7 +193,23 @@ export const tools = {
       if (description) filters.description = description;
       if (startDate) filters.startDate = new Date(startDate);
       if (endDate) filters.endDate = new Date(endDate);
-      return getDailyExpenses(filters);
+      const result = await getDailyExpenses(filters);
+      if (!result.success) return result;
+      // Explicit allowlist: only return fields the AI needs.
+      // Documents are intentionally excluded — uploaded files (invoices, bank statements)
+      // may contain sensitive personal data and must never reach the AI context.
+      return {
+        success: true,
+        data: result.data.map((e) => ({
+          id: e.id,
+          description: e.description,
+          amount: e.amount,
+          date: e.date,
+          info: e.info,
+          category: e.category ? { id: e.category.id, name: e.category.name, icon: e.category.icon } : null,
+          account: e.account ? { id: e.account.id, name: e.account.name, type: e.account.type } : null,
+        })),
+      };
     },
   }),
 

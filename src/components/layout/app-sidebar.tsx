@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ArrowRightLeft,
   FolderOpen,
+  FileText,
 } from 'lucide-react';
 
 import {
@@ -48,6 +49,7 @@ const mainNavItems: NavItem[] = [
   { titleKey: 'income', url: '/income', icon: TrendingUp },
   { titleKey: 'transfers', url: '/transfers', icon: ArrowRightLeft },
   { titleKey: 'categories', url: '/categories', icon: FolderOpen },
+  { titleKey: 'documents', url: '/documents', icon: FileText },
   { titleKey: 'accounts', url: '/accounts', icon: Building2 },
   { titleKey: 'analytics', url: '/analytics', icon: PieChart },
 ];

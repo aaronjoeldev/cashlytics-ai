@@ -8,6 +8,7 @@ import { IncomeForm } from '@/components/organisms/income-form';
 import { deleteIncome } from '@/actions/income-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/lib/settings-context';
+import { useTranslations } from 'next-intl';
 import type { Account, IncomeWithAccount, Income } from '@/types/database';
 
 interface IncomeClientProps {
@@ -15,25 +16,8 @@ interface IncomeClientProps {
   initialIncomes: IncomeWithAccount[];
 }
 
-const recurrenceLabels: Record<string, string> = {
-  once: 'Einmalig',
-  monthly: 'Monatlich',
-  yearly: 'Jährlich',
-};
-
 function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat('de-DE').format(new Date(date));
-}
-
-function getDebitLabel(recurrenceType: string, startDate: Date | string): string {
-  const date = new Date(startDate);
-  const day = date.getDate();
-  const month = date.toLocaleDateString('de-DE', { month: 'short' });
-  switch (recurrenceType) {
-    case 'monthly': return `jeden ${day}.`;
-    case 'yearly': return `${day}. ${month} (jährlich)`;
-    default: return formatDate(startDate);
-  }
+  return new Intl.DateTimeFormat().format(new Date(date));
 }
 
 export function IncomeClient({
@@ -42,39 +26,53 @@ export function IncomeClient({
 }: IncomeClientProps) {
   const { toast } = useToast();
   const { formatCurrency: fmt } = useSettings();
+  const t = useTranslations('income');
+  const tCommon = useTranslations('common');
+  const tRecurrence = useTranslations('recurrence');
   const formatCurrency = (amount: string | number) => fmt(typeof amount === 'string' ? parseFloat(amount) : amount);
   const [incomes, setIncomes] = useState(initialIncomes);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  const handleSuccess = (data: any) => {
+  const getDebitLabel = (recurrenceType: string, startDate: Date | string): string => {
+    const date = new Date(startDate);
+    const day = date.getDate();
+    const month = date.toLocaleDateString(undefined, { month: 'short' });
+    switch (recurrenceType) {
+      case 'monthly': return tRecurrence('monthly');
+      case 'yearly': return `${day}. ${month} (${tRecurrence('yearly')})`;
+      default: return formatDate(startDate);
+    }
+  };
+
+  const handleSuccess = (data: { id: string; accountId?: string; [key: string]: unknown }) => {
     const newIncome = {
       ...data,
       account: accounts.find(a => a.id === data.accountId) || null,
-    };
+    } as IncomeWithAccount;
     setIncomes(prev => [newIncome, ...prev]);
   };
 
-  const handleEditSuccess = (data: any) => {
+  const handleEditSuccess = (data: { id: string; accountId?: string; [key: string]: unknown }) => {
     const updatedIncome = {
       ...data,
       account: accounts.find(a => a.id === data.accountId) || null,
-    };
+    } as IncomeWithAccount;
     setIncomes(prev => prev.map(i => i.id === data.id ? updatedIncome : i));
     setEditingIncome(null);
     setEditDialogOpen(false);
-    toast({ title: 'Aktualisiert', description: 'Einnahme wurde bearbeitet.' });
+    toast({ title: t('updated'), description: t('updatedDesc') });
   };
 
   const handleDelete = async (id: string, source: string) => {
-    if (!confirm(`Einnahme "${source}" wirklich löschen?`)) return;
+    if (!confirm(t('deleteConfirm', { source }))) return;
     
     const result = await deleteIncome(id);
     if (result.success) {
       setIncomes(prev => prev.filter(i => i.id !== id));
-      toast({ title: 'Gelöscht', description: `"${source}" wurde entfernt.` });
+      toast({ title: tCommon('delete'), description: `"${source}" wurde entfernt.` });
     } else {
-      toast({ title: 'Fehler', description: 'Löschen fehlgeschlagen.', variant: 'destructive' });
+      toast({ title: t('deleteFailed'), variant: 'destructive' });
     }
   };
 
@@ -87,8 +85,8 @@ export function IncomeClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">Einnahmen</h2>
-          <p className="text-sm text-muted-foreground/60 mt-1.5">Verwalte deine Einnahmequellen</p>
+          <h2 className="text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground/60 mt-1.5">{t('description')}</p>
         </div>
         <IncomeForm accounts={accounts} onSuccess={handleSuccess} />
       </div>
@@ -106,12 +104,12 @@ export function IncomeClient({
 
       <Card>
         <CardHeader>
-          <CardTitle>Alle Einnahmen ({incomes.length})</CardTitle>
+          <CardTitle>{t('allIncome', { count: incomes.length })}</CardTitle>
         </CardHeader>
         <CardContent>
           {incomes.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              Noch keine Einnahmen vorhanden. Füge deine erste Einnahmequelle hinzu.
+              {t('noIncome')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -127,13 +125,13 @@ export function IncomeClient({
                     <div>
                       <p className="font-medium">{income.source}</p>
                       <p className="text-sm text-muted-foreground">
-                        {income.account?.name ?? 'Unbekanntes Konto'} • {recurrenceLabels[income.recurrenceType]}
+                        {income.account?.name ?? t('unknownAccount')} • {tRecurrence(income.recurrenceType)}
                       </p>
                       {income.recurrenceType !== 'once' && (
                         <div className="flex items-center gap-1 mt-1">
                           <CalendarDays className="w-3 h-3 text-emerald-500 flex-shrink-0" />
                           <span className="text-xs font-medium text-emerald-500">
-                            Gutschrift: {getDebitLabel(income.recurrenceType, income.startDate)}
+                            {t('credit')} {getDebitLabel(income.recurrenceType, income.startDate)}
                           </span>
                         </div>
                       )}
@@ -142,7 +140,7 @@ export function IncomeClient({
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="font-semibold text-emerald-500">{formatCurrency(income.amount)}</p>
-                      <p className="text-sm text-muted-foreground">seit {formatDate(income.startDate)}</p>
+                      <p className="text-sm text-muted-foreground">{t('since')} {formatDate(income.startDate)}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button

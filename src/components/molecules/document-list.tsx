@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { FileText, Image, Download, Trash2, Loader2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useTranslations } from 'next-intl';
 import type { Document } from '@/types/database';
 
 export interface DocumentListRef {
@@ -29,10 +30,12 @@ function getFileIcon(mimeType: string) {
 
 function PreviewModal({
   docId,
-  onClose
+  onClose,
+  t
 }: {
   docId: string | null;
   onClose: () => void;
+  t: (key: string) => string;
 }) {
   const [doc, setDoc] = useState<Document | null>(null);
   const [data, setData] = useState<string | null>(null);
@@ -83,7 +86,7 @@ function PreviewModal({
     <Dialog open={!!docId} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-4 py-3 border-b shrink-0">
-          <DialogTitle className="truncate pr-8">{doc?.fileName || 'Wird geladen...'}</DialogTitle>
+          <DialogTitle className="truncate pr-8">{doc?.fileName || t('loading')}</DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-auto p-4 min-h-0">
           {isLoading ? (
@@ -104,7 +107,7 @@ function PreviewModal({
                 title={doc.fileName}
               />
             ) : (
-              <p className="text-center text-muted-foreground">Vorschau nicht verfügbar</p>
+              <p className="text-center text-muted-foreground">{t('previewNotAvailable')}</p>
             )
           ) : null}
         </div>
@@ -117,12 +120,16 @@ function DeleteModal({
   isOpen,
   isDeleting,
   onConfirm,
-  onCancel
+  onCancel,
+  t,
+  tCommon
 }: {
   isOpen: boolean;
   isDeleting: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  t: (key: string) => string;
+  tCommon: (key: string) => string;
 }) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -145,20 +152,20 @@ function DeleteModal({
         className="bg-background rounded-xl max-w-md w-full mx-4 p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold mb-2">Dokument löschen?</h3>
+        <h3 className="text-lg font-semibold mb-2">{t('deleteConfirm')}</h3>
         <p className="text-muted-foreground mb-6">
-          Diese Aktion kann nicht rückgängig gemacht werden.
+          {t('deleteConfirmDesc')}
         </p>
         <div className="flex gap-3 justify-end">
           <Button variant="outline" onClick={onCancel}>
-            Abbrechen
+            {tCommon('cancel')}
           </Button>
           <Button 
             variant="destructive" 
             onClick={onConfirm}
             disabled={isDeleting}
           >
-            {isDeleting ? 'Lösche...' : 'Löschen'}
+            {isDeleting ? t('deleting') : tCommon('delete')}
           </Button>
         </div>
       </div>
@@ -169,6 +176,8 @@ function DeleteModal({
 
 export const DocumentList = forwardRef<DocumentListRef, DocumentListProps>(
   function DocumentList({ expenseId, dailyExpenseId }, ref) {
+    const t = useTranslations('documents');
+    const tCommon = useTranslations('common');
     const [documents, setDocuments] = useState<Document[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [previewDocId, setPreviewDocId] = useState<string | null>(null);
@@ -246,7 +255,7 @@ export const DocumentList = forwardRef<DocumentListRef, DocumentListProps>(
     if (documents.length === 0) {
       return (
         <p className="text-sm text-muted-foreground text-center py-4">
-          Keine Dokumente vorhanden
+          {t('noDocumentsYet')}
         </p>
       );
     }
@@ -274,7 +283,7 @@ export const DocumentList = forwardRef<DocumentListRef, DocumentListProps>(
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => setPreviewDocId(doc.id)}
-                    title="Ansehen"
+                    title={t('view')}
                   >
                     <Eye className="w-3.5 h-3.5" />
                   </Button>
@@ -283,7 +292,7 @@ export const DocumentList = forwardRef<DocumentListRef, DocumentListProps>(
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => handleDownload(doc)}
-                    title="Herunterladen"
+                    title="Download"
                   >
                     <Download className="w-3.5 h-3.5" />
                   </Button>
@@ -293,7 +302,7 @@ export const DocumentList = forwardRef<DocumentListRef, DocumentListProps>(
                     size="icon-xs"
                     onClick={() => setDeleteDocId(doc.id)}
                     className="text-destructive hover:text-destructive"
-                    title="Löschen"
+                    title={t('delete')}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
@@ -305,7 +314,8 @@ export const DocumentList = forwardRef<DocumentListRef, DocumentListProps>(
 
         <PreviewModal 
           docId={previewDocId} 
-          onClose={() => setPreviewDocId(null)} 
+          onClose={() => setPreviewDocId(null)}
+          t={t}
         />
         
         <DeleteModal
@@ -313,6 +323,8 @@ export const DocumentList = forwardRef<DocumentListRef, DocumentListProps>(
           isDeleting={isDeleting}
           onConfirm={handleDelete}
           onCancel={() => setDeleteDocId(null)}
+          t={t}
+          tCommon={tCommon}
         />
       </>
     );

@@ -27,6 +27,7 @@ import { createCategory, updateCategory, deleteCategory } from '@/actions/catego
 import { defaultCategories, type CategoryInput } from '@/lib/validations/category';
 import type { Category } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslations } from 'next-intl';
 
 interface CategoriesClientProps {
   initialCategories: Category[];
@@ -34,6 +35,8 @@ interface CategoriesClientProps {
 
 export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
   const { toast } = useToast();
+  const t = useTranslations('categories');
+  const tCommon = useTranslations('common');
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -45,9 +48,9 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
     if (result.success) {
       setCategories([...categories, result.data]);
       setIsDialogOpen(false);
-      toast({ title: 'Kategorie erstellt', description: `"${result.data.name}" wurde angelegt.` });
+      toast({ title: t('created'), description: t('createdDesc', { name: result.data.name }) });
     } else {
-      toast({ title: 'Fehler', description: 'Kategorie konnte nicht erstellt werden.', variant: 'destructive' });
+      toast({ title: tCommon('error') || 'Error', description: t('createFailed'), variant: 'destructive' });
     }
   };
 
@@ -58,9 +61,9 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
       setCategories(categories.map(c => c.id === editingCategory.id ? result.data : c));
       setEditingCategory(null);
       setIsDialogOpen(false);
-      toast({ title: 'Kategorie aktualisiert', description: `"${result.data.name}" wurde geändert.` });
+      toast({ title: t('updated'), description: t('updatedDesc', { name: result.data.name }) });
     } else {
-      toast({ title: 'Fehler', description: 'Kategorie konnte nicht aktualisiert werden.', variant: 'destructive' });
+      toast({ title: tCommon('error') || 'Error', description: t('updateFailed'), variant: 'destructive' });
     }
   };
 
@@ -71,9 +74,9 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
     if (result.success) {
       setCategories(categories.filter(c => c.id !== deleteId));
       setDeleteId(null);
-      toast({ title: 'Kategorie gelöscht', description: category ? `"${category.name}" wurde entfernt.` : '' });
+      toast({ title: t('deleted'), description: category ? t('deletedDesc', { name: category.name }) : '' });
     } else {
-      toast({ title: 'Fehler', description: 'Kategorie konnte nicht gelöscht werden.', variant: 'destructive' });
+      toast({ title: tCommon('error') || 'Error', description: t('deleteFailed'), variant: 'destructive' });
     }
   };
 
@@ -91,9 +94,9 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
       }
       setCategories([...categories, ...newCategories]);
       if (newCategories.length > 0) {
-        toast({ title: 'Kategorien hinzugefügt', description: `${newCategories.length} Standardkategorien wurden angelegt.` });
+        toast({ title: t('defaultCategoriesAdded'), description: t('defaultCategoriesAddedDesc', { count: newCategories.length }) });
       } else {
-        toast({ title: 'Keine Änderung', description: 'Alle Standardkategorien existieren bereits.' });
+        toast({ title: t('noChange'), description: t('noChangeDesc') });
       }
     } finally {
       setIsAddingDefaults(false);
@@ -110,33 +113,37 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
     setIsDialogOpen(true);
   };
 
+  const categoriesCountText = categories.length === 1 
+    ? t('categoriesCount', { count: categories.length, plural: '' })
+    : t('categoriesCount', { count: categories.length, plural: 'n' });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl sm:text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">Kategorien</h2>
-          <p className="text-sm text-muted-foreground/60 mt-1.5">Verwalte deine Ausgaben-Kategorien</p>
+          <h2 className="text-2xl sm:text-[2rem] font-bold tracking-[-0.03em] leading-none bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground/60 mt-1.5">{t('description')}</p>
         </div>
         <div className="flex gap-2">
           {categories.length === 0 && (
             <Button variant="outline" size="sm" onClick={handleAddDefaults} disabled={isAddingDefaults} className="flex-1 sm:flex-none">
-              {isAddingDefaults ? 'Wird hinzugefügt...' : 'Standardkategorien'}
+              {isAddingDefaults ? t('adding') : t('addDefaultCategories')}
             </Button>
           )}
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingCategory(null); }}>
             <DialogTrigger asChild>
               <Button size="sm" onClick={openCreateDialog} className="flex-1 sm:flex-none">
                 <Plus className="w-4 h-4 mr-2" />
-                Kategorie hinzufügen
+                {t('addCategory')}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>
-                  {editingCategory ? 'Kategorie bearbeiten' : 'Neue Kategorie'}
+                  {editingCategory ? t('editCategory') : t('newCategory')}
                 </DialogTitle>
                 <DialogDescription>
-                  {editingCategory ? 'Ändere die Details der Kategorie.' : 'Erstelle eine neue Kategorie für deine Ausgaben.'}
+                  {editingCategory ? t('editCategoryDesc') : t('newCategoryDesc')}
                 </DialogDescription>
               </DialogHeader>
               <CategoryForm
@@ -153,17 +160,17 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
         <Card className="backdrop-blur-xl bg-white/5 border border-white/[0.08]">
           <CardContent className="py-16 text-center">
             <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Keine Kategorien vorhanden</h3>
+            <h3 className="text-lg font-medium mb-2">{t('noCategories')}</h3>
             <p className="text-muted-foreground text-sm mb-6 max-w-md mx-auto">
-              Füge Standardkategorien hinzu, um schnell loszulegen, oder erstelle eigene Kategorien für deine Ausgaben.
+              {t('noCategoriesDesc')}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button variant="outline" onClick={handleAddDefaults} disabled={isAddingDefaults}>
-                {isAddingDefaults ? 'Wird hinzugefügt...' : 'Standardkategorien hinzufügen'}
+                {isAddingDefaults ? t('adding') : t('addDefaultCategories')}
               </Button>
               <Button onClick={openCreateDialog}>
                 <Plus className="w-4 h-4 mr-2" />
-                Eigene erstellen
+                {t('createOwn')}
               </Button>
             </div>
           </CardContent>
@@ -171,9 +178,9 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
       ) : (
         <Card className="backdrop-blur-xl bg-white/5 border border-white/[0.08]">
           <CardHeader>
-            <CardTitle>Alle Kategorien</CardTitle>
+            <CardTitle>{t('allCategories')}</CardTitle>
             <CardDescription>
-              {categories.length} {categories.length === 1 ? 'Kategorie' : 'Kategorien'} vorhanden
+              {categoriesCountText}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -204,7 +211,7 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
                           />
                         )}
                         <span className="text-xs text-muted-foreground truncate">
-                          {new Date(category.createdAt).toLocaleDateString('de-DE')}
+                          {new Date(category.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
@@ -237,15 +244,15 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Kategorie löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteConfirm')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Diese Aktion kann nicht rückgängig gemacht werden. Ausgaben mit dieser Kategorie behalten ihre Daten, aber die Kategorie-Referenz wird entfernt.
+              {t('deleteConfirmDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Löschen
+              {tCommon('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
