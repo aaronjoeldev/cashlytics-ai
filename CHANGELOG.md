@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.4.0...v0.4.1) (2026-02-21)
+
+### 🐛 Bug Fixes
+
+* remove orphan translation ([6764c44](https://github.com/aaronjoeldev/cashlytics-ai/commit/6764c44ed963cd04ddbe4760afc4dac718bc7cf9))
+
 ## [0.4.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.3.2...v0.4.0) (2026-02-19)
 
 ### ✨ Features
