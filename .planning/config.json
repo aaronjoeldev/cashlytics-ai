@@ -1,0 +1,18 @@
+{
+  "model_profile": "balanced",
+  "commit_docs": true,
+  "search_gitignored": false,
+  "parallelization": true,
+  "brave_search": false,
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "auto_advance": false
+  },
+  "git": {
+    "branching_strategy": "none"
+  },
+  "phase_branch_template": "gsd/phase-{phase}-{slug}",
+  "milestone_branch_template": "gsd/{milestone}-{slug}"
+}

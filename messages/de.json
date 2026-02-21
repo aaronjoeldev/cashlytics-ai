@@ -245,9 +245,6 @@
     "until": "bis",
     "since": "seit"
   },
-    "fileTooLarge": "Datei ist größer als 5MB",
-    "uploadFailed": "Upload fehlgeschlagen"
-  },
   "income": {
     "title": "Einnahmen",
     "description": "Verwalte deine Einnahmequellen",
