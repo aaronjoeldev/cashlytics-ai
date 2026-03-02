@@ -331,7 +331,7 @@ export async function getAdminUserDetail(userId: string) {
     db
       .select({
         count: sql<number>`count(*)::int`,
-        totalBytes: sql<number>`coalesce(sum(${documents.size}), 0)::int`,
+        totalBytes: sql<string>`coalesce(sum(${documents.size}), 0)::text`,
       })
       .from(documents)
       .where(eq(documents.userId, userId)),
@@ -360,7 +360,7 @@ export async function getAdminUserDetail(userId: string) {
       budgetsCount: 0,
       attachmentsCount: attachmentsSummary[0]?.count ?? 0,
       estimatedStorageMb: Number(
-        ((attachmentsSummary[0]?.totalBytes ?? 0) / (1024 * 1024)).toFixed(2)
+        (toNumber(attachmentsSummary[0]?.totalBytes) / (1024 * 1024)).toFixed(2)
       ),
     },
   };
