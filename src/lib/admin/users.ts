@@ -408,7 +408,7 @@ export async function getAdminUserUsage(userId: string, query: z.infer<typeof us
     return { ok: false as const, status: 400, error: "Invalid date range" };
   }
 
-  const daySql = sql<string>`to_char(date_trunc('day', ${usageEvents.occurredAt}), 'YYYY-MM-DD')`;
+  const daySql = sql<string>`to_char(date_trunc('day', ${usageEvents.createdAt}), 'YYYY-MM-DD')`;
 
   const rows = await db
     .select({
@@ -420,8 +420,8 @@ export async function getAdminUserUsage(userId: string, query: z.infer<typeof us
     .where(
       and(
         eq(usageEvents.userId, userId),
-        sql`${usageEvents.occurredAt} >= ${range.from}`,
-        sql`${usageEvents.occurredAt} <= ${range.to}`
+        sql`${usageEvents.createdAt} >= ${range.from}`,
+        sql`${usageEvents.createdAt} <= ${range.to}`
       )
     )
     .groupBy(daySql)
