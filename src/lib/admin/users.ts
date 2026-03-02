@@ -130,6 +130,29 @@ function toNumber(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function toIsoDate(value: Date | string | null | undefined): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+
+  return new Date(0).toISOString();
+}
+
+function toIsoDateNullable(value: Date | string | null | undefined): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return toIsoDate(value);
+}
+
 function toBillingStatus(value: string | null | undefined): (typeof billingStatusValues)[number] {
   if (value && (billingStatusValues as readonly string[]).includes(value)) {
     return value as (typeof billingStatusValues)[number];
@@ -245,10 +268,10 @@ export async function listAdminUsers(input: z.infer<typeof baseListUsersQuerySch
     name: row.name?.trim() || row.email,
     planCode: toPlanCode(row.planCode),
     status: toBillingStatus(row.status),
-    trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
+    trialEndsAt: toIsoDateNullable(row.trialEndsAt),
     aiCostUsedEur: toNumber(row.aiCostUsedEur),
     aiCostLimitEur: toNumber(row.aiCostLimitEur),
-    lastActiveAt: row.lastActiveAt.toISOString(),
+    lastActiveAt: toIsoDate(row.lastActiveAt),
   }));
 
   return {
@@ -318,12 +341,12 @@ export async function getAdminUserDetail(userId: string) {
     id: user.id,
     email: user.email,
     name: user.name?.trim() || user.email,
-    createdAt: user.createdAt.toISOString(),
+    createdAt: toIsoDate(user.createdAt),
     billing: {
       planCode: toPlanCode(user.planCode),
       interval: user.planInterval ?? "none",
       status: resolveBillingStatus(user.entitlementStatus, user.subscriptionStatus),
-      trialEndsAt: user.trialEndsAt?.toISOString() ?? null,
+      trialEndsAt: toIsoDateNullable(user.trialEndsAt),
     },
     entitlement: {
       aiEnabled: user.aiEnabled ?? false,
