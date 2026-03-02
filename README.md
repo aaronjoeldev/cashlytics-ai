@@ -67,12 +67,29 @@ POSTGRES_PASSWORD=your_secure_password_here
 # Required: Update DATABASE_URL with the same password
 DATABASE_URL=postgresql://cashlytics:your_secure_password_here@postgres:5432/cashlytics
 
+# Required: generate a strong auth secret
+AUTH_SECRET=generate_with_npx_auth_secret
+
+# Required for self-host behind Docker, reverse proxy, or custom domain
+AUTH_TRUST_HOST=true
+
+# Recommended for self-hosted personal deployment
+SINGLE_USER_MODE=true
+
 # Optional: Enable AI Assistant (requires OpenAI API key)
 OPENAI_API_KEY=sk-your-openai-key
 
-# Recommended for self-host: disable SaaS billing/paywall enforcement
+# Required for self-host mock payment flow (no Stripe required)
 BILLING_REQUIRED=false
 ```
+
+If you run Cashlytics as a classic self-hosted instance, these flags should always be set:
+
+- `BILLING_REQUIRED=false` disables Stripe paywall enforcement and uses the self-host mock payment path.
+- `SINGLE_USER_MODE=true` keeps registration limited to the first user (typical personal deployment).
+- `AUTH_TRUST_HOST=true` is required when not using plain localhost.
+
+Stripe keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY_ID`, `STRIPE_PRICE_YEARLY_ID`) are only needed when you explicitly set `BILLING_REQUIRED=true`.
 
 ### 3. Start Cashlytics
 
@@ -168,10 +185,11 @@ npm start
 | `DATABASE_URL`        | ✅ Yes   | —                       | PostgreSQL connection string                                |
 | `NEXT_PUBLIC_APP_URL` | ✅ Yes   | `http://localhost:3000` | Public URL of your Cashlytics instance                      |
 | `AUTH_SECRET`         | ✅ Yes   | —                       | Secret for JWT encryption (generate with `npx auth secret`) |
+| `AUTH_TRUST_HOST`     | ❌ No    | `false`                 | Set to `true` for Docker/VPS/custom-domain self-host setups |
 | `SINGLE_USER_MODE`    | ❌ No    | `true`                  | Set to `false` to allow open registration                   |
 | `SINGLE_USER_EMAIL`   | ❌ No    | —                       | Email for single-user mode data migration                   |
 | `OPENAI_API_KEY`      | ❌ No    | —                       | OpenAI API key for AI Assistant feature                     |
-| `BILLING_REQUIRED`    | ❌ No    | `true`                  | Set to `false` for self-host mode without payment lock      |
+| `BILLING_REQUIRED`    | ❌ No    | `true`                  | Set to `false` for self-host mode with mocked payment flow  |
 | `SMTP_HOST`           | ❌ No    | —                       | SMTP server hostname (e.g., `smtp.gmail.com`)               |
 | `SMTP_PORT`           | ❌ No    | —                       | SMTP port (587 for STARTTLS, 465 for TLS)                   |
 | `SMTP_USER`           | ❌ No    | —                       | SMTP authentication username                                |
