@@ -16,7 +16,7 @@ import { useTranslations } from "next-intl";
 import { useSettings } from "@/lib/settings-context";
 import { locales, localeNames, type Locale } from "@/i18n/config";
 import { currencies, type Currency } from "@/lib/currency";
-import { NotificationSettings } from "@/components/settings/notification-settings";
+
 import { BillingCard } from "@/components/settings/billing-card";
 
 export default function SettingsPage() {
@@ -72,7 +72,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
       <BillingCard />
-      <NotificationSettings />
 
       <Card>
         <CardHeader>
