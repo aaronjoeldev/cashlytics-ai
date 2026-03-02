@@ -12,6 +12,15 @@ BEGIN;
 -- Note: users table is truncated last to maintain FK integrity
 -- --------------------------------------------------------------
 TRUNCATE TABLE
+  admin_override_audit,
+  billing_events,
+  usage_events,
+  usage_periods,
+  entitlements,
+  billing_subscriptions,
+  billing_customers,
+  password_reset_tokens,
+  push_subscriptions,
   messages,
   conversations,
   documents,
@@ -43,6 +52,15 @@ TRUNCATE TABLE users CASCADE;
 INSERT INTO users (id, email, name, password, email_verified, created_at) VALUES
   ('00000000-0000-0000-0000-000000000001', 'demo@cashlytics.online', 'Demo User', '$2b$12$7EjadckorvJ2muOK3d3UtukHot0fflJQ94WBKvyOCSiI8Bl5O/2Gm', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days')
 ON CONFLICT (email) DO NOTHING;
+
+
+-- ==============================================================
+-- ENTITLEMENTS
+-- ==============================================================
+INSERT INTO entitlements
+  (id, user_id, plan_code, status, ai_enabled, ai_hard_cap_eur, ai_spend_to_date_eur, trial_started_at, trial_ends_at, created_at, updated_at)
+VALUES
+  ('f0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'free', 'trialing', true, 2.00, 0.65, NOW() - INTERVAL '2 days', NOW() + INTERVAL '5 days', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day');
 
 
 -- ==============================================================

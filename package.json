@@ -11,6 +11,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
+    "simulate:ops-alerts": "npx tsx scripts/simulate-alert-thresholds.ts",
+    "test:ops-alerts": "npx tsx --test src/lib/admin/diagnostics-alerts.test.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -53,6 +55,7 @@
     "react-hook-form": "^7.71.1",
     "recharts": "^3.7.0",
     "sonner": "^2.0.7",
+    "stripe": "^20.4.0",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.6"
   },

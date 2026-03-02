@@ -69,6 +69,9 @@ DATABASE_URL=postgresql://cashlytics:your_secure_password_here@postgres:5432/cas
 
 # Optional: Enable AI Assistant (requires OpenAI API key)
 OPENAI_API_KEY=sk-your-openai-key
+
+# Recommended for self-host: disable SaaS billing/paywall enforcement
+BILLING_REQUIRED=false
 ```
 
 ### 3. Start Cashlytics
@@ -168,6 +171,7 @@ npm start
 | `SINGLE_USER_MODE`    | ❌ No    | `true`                  | Set to `false` to allow open registration                   |
 | `SINGLE_USER_EMAIL`   | ❌ No    | —                       | Email for single-user mode data migration                   |
 | `OPENAI_API_KEY`      | ❌ No    | —                       | OpenAI API key for AI Assistant feature                     |
+| `BILLING_REQUIRED`    | ❌ No    | `true`                  | Set to `false` for self-host mode without payment lock      |
 | `SMTP_HOST`           | ❌ No    | —                       | SMTP server hostname (e.g., `smtp.gmail.com`)               |
 | `SMTP_PORT`           | ❌ No    | —                       | SMTP port (587 for STARTTLS, 465 for TLS)                   |
 | `SMTP_USER`           | ❌ No    | —                       | SMTP authentication username                                |

@@ -16,6 +16,7 @@ import {
   consumeResetToken,
   invalidateUserTokens,
 } from "@/lib/auth/reset-token";
+import { initializeTrialForUser } from "@/lib/billing/trial";
 import { renderResetPasswordEmail, renderWelcomeEmail } from "@/emails";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
@@ -107,7 +108,17 @@ export async function registerAction(
   }
 
   const hashedPassword = await hashPassword(password);
-  await db.insert(users).values({ email, password: hashedPassword });
+  const registrationTimestamp = new Date();
+  const [createdUser] = await db
+    .insert(users)
+    .values({
+      email,
+      password: hashedPassword,
+      createdAt: registrationTimestamp,
+    })
+    .returning({ id: users.id });
+
+  await initializeTrialForUser(createdUser.id, registrationTimestamp);
 
   // Send welcome email (non-blocking, failures ignored)
   if (isEmailConfigured()) {
