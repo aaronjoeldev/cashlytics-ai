@@ -48,15 +48,38 @@ type EntitlementAuditSnapshot = {
   updatedAt: string;
 };
 
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function toIsoDate(value: Date | string | null | undefined): string {
+  return toDate(value)?.toISOString() ?? new Date(0).toISOString();
+}
+
+function toIsoDateNullable(value: Date | string | null | undefined): string | null {
+  return toDate(value)?.toISOString() ?? null;
+}
+
 function toAuditSnapshot(entitlement: EntitlementRow): EntitlementAuditSnapshot {
   return {
     planCode: entitlement.planCode,
     status: entitlement.status,
     aiEnabled: entitlement.aiEnabled,
     aiHardCapEur: entitlement.aiHardCapEur,
-    trialEndsAt: entitlement.trialEndsAt?.toISOString() ?? null,
+    trialEndsAt: toIsoDateNullable(entitlement.trialEndsAt),
     aiBlockedReason: entitlement.aiBlockedReason,
-    updatedAt: entitlement.updatedAt.toISOString(),
+    updatedAt: toIsoDate(entitlement.updatedAt),
   };
 }
 
@@ -91,10 +114,11 @@ export async function applyAdminOverride(params: {
       return { ok: false as const, status: 500, error: "Failed to load entitlement" };
     }
 
+    const currentTrialEndsAt = toDate(current.trialEndsAt);
     if (
       params.payload.action === "extend_trial_end" &&
-      current.trialEndsAt &&
-      params.payload.trialEndsAt.getTime() <= current.trialEndsAt.getTime()
+      currentTrialEndsAt &&
+      params.payload.trialEndsAt.getTime() <= currentTrialEndsAt.getTime()
     ) {
       return {
         ok: false as const,
@@ -179,7 +203,7 @@ export async function getAdminOverrideTimeline(userId: string) {
 
   return rows.map((row) => ({
     ...row,
-    createdAt: row.createdAt.toISOString(),
+    createdAt: toIsoDate(row.createdAt),
   }));
 }
 

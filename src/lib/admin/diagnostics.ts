@@ -24,6 +24,21 @@ function toNumber(value: number | string | null | undefined): number {
   return 0;
 }
 
+function toIsoDateNullable(value: Date | string | null | undefined): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+
+  return null;
+}
+
 export async function getBillingPipelineHealthSummary(now: Date = new Date()) {
   const windowStart = new Date(now.getTime() - WEBHOOK_WINDOW_MINUTES * 60 * 1000);
 
@@ -76,7 +91,7 @@ export async function getBillingPipelineHealthSummary(now: Date = new Date()) {
       failedCountExceeded: alert.failedThresholdExceeded,
       failedRateExceeded: alert.failureRateThresholdExceeded,
     },
-    latestEventAt: latestEvent?.processedAt?.toISOString() ?? null,
+    latestEventAt: toIsoDateNullable(latestEvent?.processedAt),
   };
 }
 
