@@ -54,19 +54,12 @@
     {
       "idx": 7,
       "version": "7",
-      "when": 1772358734855,
-      "tag": "0007_old_ikaris",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
       "when": 1772456449543,
       "tag": "0008_smart_luminals",
       "breakpoints": true
     },
     {
-      "idx": 9,
+      "idx": 8,
       "version": "7",
       "when": 1772550000000,
       "tag": "0009_admin_override_audit",
