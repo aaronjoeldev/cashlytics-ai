@@ -17,6 +17,8 @@ import { useSettings } from "@/lib/settings-context";
 import { locales, localeNames, type Locale } from "@/i18n/config";
 import { currencies, type Currency } from "@/lib/currency";
 
+import { BillingCard } from "@/components/settings/billing-card";
+
 export default function SettingsPage() {
   const t = useTranslations("settings");
   const tCurrency = useTranslations("currency");
@@ -69,6 +71,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      <BillingCard />
+
       <Card>
         <CardHeader>
           <CardTitle>Datenverwaltung</CardTitle>
