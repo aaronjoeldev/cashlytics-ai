@@ -1,235 +1,169 @@
 # Architecture
 
-**Analysis Date:** 2026-02-20
+**Analysis Date:** 2026-03-03
 
 ## Pattern Overview
 
-**Overall:** Next.js App Router with Server Actions
+**Overall:** Next.js App Router monolith with server actions as the primary backend boundary.
 
 **Key Characteristics:**
-- React Server Components (RSC) for data fetching
-- Server Actions for mutations
-- Atomic Design component hierarchy
-- AI SDK integration for conversational UI
-- Drizzle ORM with relational queries
+
+- Route-first architecture in `src/app/` with route groups for auth and dashboard flows.
+- Domain logic centralized in server actions under `src/actions/`, called by server pages, client components, and AI tool handlers.
+- Shared infrastructure and cross-cutting utilities (DB, auth, logging, validation, AI tools, email, push, cron) in `src/lib/`.
 
 ## Layers
 
-### Presentation Layer
-- Purpose: UI rendering and user interactions
-- Location: `src/app/`, `src/components/`
-- Contains: Pages, layouts, client components, UI primitives
-- Depends on: Server actions, hooks, context providers
-- Used by: Browser
+**Routing and Rendering Layer:**
 
-### Data Access Layer
-- Purpose: Database operations and query building
-- Location: `src/lib/db/`, `src/actions/`
-- Contains: Schema definitions, server actions, query logic
-- Depends on: Drizzle ORM, PostgreSQL client
-- Used by: Presentation layer, API routes
+- Purpose: Define routes, layouts, and API handlers.
+- Location: `src/app/` and `src/proxy.ts`.
+- Contains: App Router pages/layouts (`page.tsx`, `layout.tsx`, `client.tsx`) and Route Handlers (`route.ts`).
+- Depends on: `src/actions/`, `src/components/`, `src/lib/`, `@/auth`.
+- Used by: Browser requests and scheduled/API clients.
 
-### AI Integration Layer
-- Purpose: AI assistant functionality
-- Location: `src/lib/ai/`, `src/app/api/chat/`
-- Contains: Tool definitions, chat route, system prompts
-- Depends on: Vercel AI SDK, OpenAI, server actions
-- Used by: Chat interface component
+**UI Composition Layer:**
 
-### Infrastructure Layer
-- Purpose: Cross-cutting concerns and configuration
-- Location: `src/lib/`, `src/i18n/`, `src/hooks/`, `src/types/`
-- Contains: Utilities, validations, i18n config, type definitions
-- Depends on: Framework packages
-- Used by: All other layers
+- Purpose: Render reusable UI primitives and feature UI modules.
+- Location: `src/components/`.
+- Contains: Atomic UI (`src/components/ui/`), feature organisms (`src/components/organisms/`), layout shell (`src/components/layout/`), app providers (`src/components/providers/index.tsx`).
+- Depends on: `src/hooks/`, `src/lib/`, `src/actions/` (via hooks/forms), `next-intl`.
+- Used by: Route pages in `src/app/`.
+
+**Application Service Layer (Server Actions):**
+
+- Purpose: Execute business operations and data access with auth checks.
+- Location: `src/actions/*.ts`.
+- Contains: CRUD and analytics operations like `src/actions/account-actions.ts`, `src/actions/auth-actions.ts`, `src/actions/analytics-actions.ts`, `src/actions/dashboard-actions.ts`, `src/actions/conversation-actions.ts`.
+- Depends on: `src/lib/db/index.ts`, `src/lib/db/schema.ts`, `src/lib/auth/require-auth.ts`, `src/lib/logger.ts`, validators.
+- Used by: Server pages, client actions/forms, API routes, and AI tools.
+
+**Domain/Infrastructure Layer:**
+
+- Purpose: Provide shared technical capabilities and domain helpers.
+- Location: `src/lib/`, root auth files `auth.ts`, `auth.config.ts`.
+- Contains: Auth helpers (`src/lib/auth/*`), DB (`src/lib/db/*`), AI tool wiring (`src/lib/ai/tools.ts`), rate limiting (`src/lib/rate-limiter.ts`), email (`src/lib/email/*`), push and cron (`src/lib/push.ts`, `src/lib/cron/upcoming-payments.ts`), i18n config (`src/i18n/*`).
+- Depends on: External SDKs and environment config.
+- Used by: Actions, API routes, layouts/providers, and proxy.
+
+**Persistence Layer:**
+
+- Purpose: Store users, financial entities, chat data, documents, and push subscriptions.
+- Location: `src/lib/db/schema.ts`, connection in `src/lib/db/index.ts`, migrations in `drizzle/*.sql`.
+- Contains: Drizzle tables and relations for auth, accounts, categories, expenses, incomes, transfers, documents, conversations/messages, push subscriptions.
+- Depends on: PostgreSQL via `postgres` client.
+- Used by: All server actions and selected API routes.
 
 ## Data Flow
 
-### Page Data Loading Flow:
+**Page-driven dashboard flow:**
 
-1. Server Component (page.tsx) imports server actions
-2. Server actions execute database queries via Drizzle
-3. Data is passed as props to Client Component
-4. Client component renders UI with data
+1. Incoming request resolves in App Router page (example: `src/app/(dashboard)/dashboard/page.tsx`).
+2. Page calls one or more server actions (`getDashboardStats`, `getCategoryBreakdown`, `getRecentTransactions`, `getUpcomingPayments` in `src/actions/dashboard-actions.ts`).
+3. Each action enforces auth (`src/lib/auth/require-auth.ts`) before querying Drizzle (`src/lib/db/index.ts` + `src/lib/db/schema.ts`).
+4. Page passes serialized data to client component (`src/app/(dashboard)/dashboard/client.tsx`) for interaction/rendering.
 
-```typescript
-// Example: src/app/(dashboard)/dashboard/page.tsx
-export default async function DashboardPage() {
-  const [statsResult, breakdownResult] = await Promise.all([
-    getDashboardStats(),
-    getCategoryBreakdown(),
-  ]);
-  return <DashboardClient stats={stats} categoryBreakdown={breakdown} />;
-}
-```
+**Form/server-action mutation flow:**
 
-### Mutation Flow:
+1. Client form component binds to a server action via `useActionState` (example: `src/components/organisms/login-form.tsx` -> `loginAction` in `src/actions/auth-actions.ts`).
+2. Server action validates payload (`src/lib/validations/auth.ts` and inline checks), executes business logic and DB writes.
+3. Action returns typed state or redirects, and may trigger cache invalidation via `revalidatePath` (examples in `src/actions/account-actions.ts`, `src/actions/conversation-actions.ts`).
 
-1. Client component triggers server action via form or button
-2. Server action validates input with Zod schemas
-3. Server action executes database mutation via Drizzle
-4. Server action calls `revalidatePath()` for cache invalidation
-5. Server action returns `ApiResponse<T>` type
-6. Client handles success/error response
+**AI assistant flow:**
 
-```typescript
-// Response type pattern: src/types/database.ts
-export type ApiResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: string };
-```
+1. UI chat hook (`src/hooks/use-conversations.ts`) uses `useChat` and sends messages to `POST /api/chat` (`src/app/api/chat/route.ts`).
+2. Route applies in-memory rate limiting (`src/lib/rate-limiter.ts`), validates message payload, builds contextual prompt via action calls.
+3. `streamText` executes with tool registry from `src/lib/ai/tools.ts`; tools call existing server actions.
+4. Conversation state persists through `src/actions/conversation-actions.ts` and is reloaded in UI.
 
-### AI Chat Flow:
+**Background notification flow:**
 
-1. User sends message via `useChat` hook
-2. POST request to `src/app/api/chat/route.ts`
-3. Server builds system prompt with current context
-4. `streamText()` processes with tools
-5. Tools requiring approval show confirmation card
-6. User approves/denies via `addToolApprovalResponse()`
-7. On completion, messages saved to database
+1. External scheduler calls `GET /api/cron/upcoming-payments` (`src/app/api/cron/upcoming-payments/route.ts`) with bearer `CRON_SECRET`.
+2. Handler delegates to `checkUpcomingPayments` (`src/lib/cron/upcoming-payments.ts`).
+3. Cron service queries recurring expenses, computes due items, and sends web push via `sendPushNotification` (`src/lib/push.ts`).
+4. Service worker in `public/sw.js` receives push events and opens/focuses relevant app route.
 
 **State Management:**
-- React Context for global settings (locale, currency, theme)
-- `useChat` hook for AI conversation state
-- Local state in organisms for form handling
-- Server state managed by Next.js cache + revalidation
+
+- Server state is authoritative in PostgreSQL via Drizzle (`src/lib/db/*`, `src/actions/*`).
+- Route-level data loading is server-first (`src/app/(dashboard)/*/page.tsx` calling actions).
+- Client UI state uses React hooks/context (`src/hooks/*`, `src/lib/settings-context.tsx`).
+- Session state is managed by Auth.js (`auth.ts`, `auth.config.ts`, `src/app/api/auth/[...nextauth]/route.ts`) and checked in actions/routes.
 
 ## Key Abstractions
 
-### Server Actions
-- Purpose: Server-side mutations accessible from client
-- Examples: `src/actions/accounts-actions.ts`, `src/actions/expense-actions.ts`
-- Pattern: Export async functions with `'use server'` directive
+**Auth Gate Abstraction:**
 
-```typescript
-// Pattern: src/actions/*.ts
-'use server';
-import { db } from '@/lib/db';
-import { revalidatePath } from 'next/cache';
+- Purpose: Uniformly enforce authenticated user context before domain operations.
+- Examples: `src/lib/auth/require-auth.ts`, usage across `src/actions/account-actions.ts`, `src/actions/analytics-actions.ts`, `src/actions/conversation-actions.ts`.
+- Pattern: Early-return union type `{ userId } | { error: "Unauthorized" }` at top of each action.
 
-export async function createAccount(data: CreateInput): Promise<ApiResponse<Account>> {
-  const [result] = await db.insert(accounts).values(data).returning();
-  revalidatePath('/accounts');
-  return { success: true, data: result };
-}
-```
+**Typed API Result Abstraction:**
 
-### AI Tools
-- Purpose: Define callable functions for AI assistant
-- Examples: `src/lib/ai/tools.ts`
-- Pattern: Export tool definitions with Zod schemas
+- Purpose: Keep action responses predictable for server pages, client components, and AI tools.
+- Examples: `ApiResponse<T>` in `src/types/database.ts`; returned in most action files.
+- Pattern: Discriminated union `{ success: true, data } | { success: false, error }`.
 
-```typescript
-// Pattern: src/lib/ai/tools.ts
-export const tools = {
-  createExpense: tool({
-    description: 'Erstellt eine wiederkehrende Ausgabe',
-    inputSchema: z.object({
-      accountId: z.uuid(),
-      amount: z.number().positive(),
-      // ...
-    }),
-    needsApproval: true,
-    execute: async (input) => createExpense(input),
-  }),
-};
-```
+**Schema-first Data Model Abstraction:**
 
-### Atomic Components
-- Purpose: Reusable UI building blocks
-- Examples: `src/components/atoms/`, `src/components/molecules/`, `src/components/organisms/`
-- Pattern: Hierarchical composition with shadcn/ui base
+- Purpose: Keep table definitions and relation graph centralized.
+- Examples: `src/lib/db/schema.ts` and derived types in `src/types/database.ts`.
+- Pattern: Drizzle table definitions + `relations(...)` + `InferSelectModel/InferInsertModel` types.
 
-```
-atoms/     → Basic UI elements (wrappers around shadcn)
-molecules/ → Composed UI patterns (forms, cards, inputs)
-organisms/ → Full features (chat interface, expense form)
-templates/ → Page layouts
-layout/    → App structure (sidebar, header)
-```
+**Tool-Backed AI Command Abstraction:**
 
-### Type Inference
-- Purpose: Derive TypeScript types from Drizzle schema
-- Examples: `src/types/database.ts`
-- Pattern: Use `InferSelectModel` and `InferInsertModel`
-
-```typescript
-// Pattern: src/types/database.ts
-import type { InferSelectModel } from 'drizzle-orm';
-import { accounts, expenses } from '@/lib/db/schema';
-
-export type Account = InferSelectModel<typeof accounts>;
-export type ExpenseWithDetails = Expense & {
-  category: Category | null;
-  account: Account | null;
-};
-```
+- Purpose: Reuse existing business operations from conversational interface.
+- Examples: Tool registry `src/lib/ai/tools.ts`, chat route `src/app/api/chat/route.ts`.
+- Pattern: Zod-validated tool inputs mapped to existing server action calls with `needsApproval` for writes.
 
 ## Entry Points
 
-### Web Application Entry:
-- Location: `src/app/layout.tsx`
-- Triggers: Initial page load
-- Responsibilities: Root layout, providers setup, fonts, metadata
+**Web App Root:**
 
-### Dashboard Entry:
-- Location: `src/app/(dashboard)/layout.tsx`
-- Triggers: Navigation to any dashboard route
-- Responsibilities: Sidebar, header, main content area, background styling
+- Location: `src/app/layout.tsx` and `src/app/page.tsx`.
+- Triggers: Any browser request to app root.
+- Responsibilities: Global providers, locale/messages/timezone bootstrapping, currency bootstrap from cookies, root redirect to `/dashboard`.
 
-### API Routes:
-- Location: `src/app/api/chat/route.ts`, `src/app/api/documents/[id]/route.ts`
-- Triggers: HTTP requests
-- Responsibilities: AI chat streaming, document CRUD
+**Authentication Runtime:**
 
-### Landing Page:
-- Location: `src/app/page.tsx`
-- Triggers: Root path access
-- Responsibilities: Redirects to `/dashboard`
+- Location: `auth.ts`, `auth.config.ts`, `src/app/api/auth/[...nextauth]/route.ts`.
+- Triggers: Auth API requests and session lookups.
+- Responsibilities: Auth.js handler setup, credential provider authorization, JWT/session callbacks, Drizzle adapter binding.
+
+**Route Protection Middleware:**
+
+- Location: `src/proxy.ts`.
+- Triggers: Matched requests via exported `config.matcher`.
+- Responsibilities: Check JWT token, allowlist public/auth/cron routes, redirect unauthenticated users to `/login`, redirect authenticated users away from auth pages.
+
+**HTTP API Endpoints:**
+
+- Location: `src/app/api/chat/route.ts`, `src/app/api/documents/route.ts`, `src/app/api/documents/[id]/route.ts`, `src/app/api/push/subscribe/route.ts`, `src/app/api/push/vapid-public-key/route.ts`, `src/app/api/cron/upcoming-payments/route.ts`.
+- Triggers: Programmatic HTTP requests (browser, AI SDK client, scheduler, push setup).
+- Responsibilities: Validate/authenticate requests, apply rate limits where configured, perform targeted DB/AI/push operations.
+
+**PWA Runtime:**
+
+- Location: `src/components/pwa/service-worker-registrar.tsx` and `public/sw.js`.
+- Triggers: Client hydration and browser service-worker lifecycle events.
+- Responsibilities: Register SW, handle caching/offline fallback, process push notifications, route notification clicks.
 
 ## Error Handling
 
-**Strategy:** Typed response pattern with success/error discrimination
+**Strategy:** Return safe, user-facing failures from actions/routes and log internal details centrally.
 
 **Patterns:**
-- Server actions return `ApiResponse<T>` discriminated union
-- Client components check `result.success` before accessing data
-- Toast notifications for user feedback via `sonner`
-- Console.error logging on server side
 
-```typescript
-// Client-side error handling pattern
-const result = await createExpense(data);
-if (result.success) {
-  toast.success('Ausgabe erstellt');
-  onSuccess?.(result.data);
-} else {
-  toast.error(result.error);
-}
-```
+- Try/catch around server actions and route handlers with structured logger calls (`src/lib/logger.ts`) and stable failure strings (examples across `src/actions/*.ts`, `src/app/api/*/route.ts`).
+- Validation-first guards with 4xx responses in APIs (examples in `src/app/api/chat/route.ts`, `src/app/api/push/subscribe/route.ts`, `src/app/api/documents/route.ts`).
+- Authorization short-circuiting before expensive work (`src/lib/auth/require-auth.ts`, direct `auth()` checks in API routes).
 
 ## Cross-Cutting Concerns
 
-**Logging:** Console-based with development-only AI step logging in chat route
+**Logging:** Console-backed logger abstraction in `src/lib/logger.ts`; actions/routes log operation context and errors.
+**Validation:** Zod schemas in `src/lib/validations/*`, tool schemas in `src/lib/ai/tools.ts`, plus route-level guards in `src/app/api/*/route.ts`.
+**Authentication:** Auth.js with Drizzle adapter (`auth.ts`) and JWT session strategy (`auth.config.ts`); consumed via `auth()` and `requireAuth()`.
 
-**Validation:** Zod schemas in `src/lib/validations/` and `src/lib/validators/`
-- Used with `@hookform/resolvers` for form validation
-- Used in AI tools for input validation
+---
 
-**Authentication:** Not implemented (single-user/self-hosted application)
-
-**Internationalization:** 
-- `next-intl` for translations
-- Message files in `messages/de.json`, `messages/en.json`
-- Locale and currency stored in cookies
-
-**Theme:** 
-- `next-themes` for dark/light mode
-- CSS variables for theming
-- System preference detection
-
-**Caching:**
-- Next.js built-in cache
-- `revalidatePath()` for targeted invalidation
-- `revalidateTag()` not currently used
+_Architecture analysis: 2026-03-03_

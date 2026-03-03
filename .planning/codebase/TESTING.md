@@ -1,507 +1,142 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-02-20
+**Analysis Date:** 2026-03-03
 
 ## Test Framework
 
-**Status:** Not Configured
+**Runner:**
 
-**Current State:**
-- No test framework installed in the project
-- No test configuration files found
-- No test files in the `src/` directory
-- No testing scripts in `package.json`
+- Node.js built-in test runner (`node:test`) is used in `src/lib/billing/subscriptions.test.ts`.
+- Config: Not detected (`jest.config.*`, `vitest.config.*`, `playwright.config.*`, and `cypress.config.*` are absent in repo root).
 
-**Available Scripts in package.json:**
-```json
-{
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
-  }
-}
+**Assertion Library:**
+
+- Node.js strict assertions (`node:assert/strict`) in `src/lib/billing/subscriptions.test.ts`.
+
+**Run Commands:**
+
+```bash
+npm run test                         # Not available (no "test" script in `package.json`)
+node --test "src/lib/billing/subscriptions.test.ts"  # Current direct run fails due alias/module resolution
+npm run lint                         # Current quality gate used instead of automated tests
 ```
 
 ## Test File Organization
 
-**Current State:** No test files exist in the project
+**Location:**
 
-**Recommended Location (if tests are added):**
+- Co-located tests are used (test file sits beside production module path) as shown by `src/lib/billing/subscriptions.test.ts`.
+
+**Naming:**
+
+- Use `*.test.ts` naming (`src/lib/billing/subscriptions.test.ts`).
+- `*.spec.*` pattern is not present in `src/`.
+
+**Structure:**
+
 ```
 src/
-├── actions/
-│   ├── expense-actions.ts
-│   └── expense-actions.test.ts    # Co-located tests
-├── components/
-│   └── organisms/
-│       ├── expense-form.tsx
-│       └── expense-form.test.tsx  # Co-located tests
 └── lib/
-    └── utils.test.ts
+    └── billing/
+        └── subscriptions.test.ts
 ```
 
-**Alternative Structure (separate directory):**
-```
-__tests__/
-├── actions/
-│   └── expense-actions.test.ts
-├── components/
-│   └── expense-form.test.tsx
-└── lib/
-    └── utils.test.ts
-```
+## Test Structure
 
-## Recommended Test Framework Setup
+**Suite Organization:**
 
-**Suggested Stack:**
-- **Vitest** - Fast, Vite-compatible test runner
-- **@testing-library/react** - React component testing
-- **MSW (Mock Service Worker)** - API mocking for server actions
-
-**Installation Command:**
-```bash
-npm install -D vitest @vitest/ui @testing-library/react @testing-library/jest-dom jsdom
-```
-
-**Suggested vitest.config.ts:**
 ```typescript
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import assert from "node:assert/strict";
+import test from "node:test";
+import { mapSubscriptionStatusToEntitlementStatus } from "@/lib/billing/subscriptions";
 
-export default defineConfig({
-  plugins: [react()],
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: ['./vitest.setup.ts'],
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
+test("maps trialing subscriptions to trial entitlement status", () => {
+  assert.equal(mapSubscriptionStatusToEntitlementStatus("trialing"), "trial");
 });
 ```
 
-**Suggested Scripts to Add:**
-```json
-{
-  "scripts": {
-    "test": "vitest",
-    "test:watch": "vitest watch",
-    "test:coverage": "vitest --coverage"
-  }
-}
-```
+**Patterns:**
 
-## Recommended Test Patterns
-
-### Unit Tests for Utilities
-
-**Pattern for testing utility functions:**
-```typescript
-// src/lib/utils.test.ts
-import { describe, it, expect } from 'vitest';
-import { cn } from './utils';
-
-describe('cn utility', () => {
-  it('should merge class names', () => {
-    expect(cn('foo', 'bar')).toBe('foo bar');
-  });
-
-  it('should handle conditional classes', () => {
-    expect(cn('base', true && 'included', false && 'excluded')).toBe('base included');
-  });
-});
-```
-
-### Server Action Tests
-
-**Pattern for testing server actions:**
-```typescript
-// src/actions/expense-actions.test.ts
-import { describe, it, expect, beforeEach } from 'vitest';
-import { getExpenses, createExpense } from './expense-actions';
-import { db } from '@/lib/db';
-
-// Mock the database
-vi.mock('@/lib/db', () => ({
-  db: {
-    query: {
-      expenses: {
-        findMany: vi.fn(),
-      },
-    },
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: vi.fn(),
-      })),
-    })),
-  },
-}));
-
-describe('expense-actions', () => {
-  describe('getExpenses', () => {
-    it('should return expenses with success status', async () => {
-      const mockExpenses = [{ id: '1', name: 'Test' }];
-      db.query.expenses.findMany.mockResolvedValue(mockExpenses);
-      
-      const result = await getExpenses();
-      
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual(mockExpenses);
-    });
-
-    it('should filter by accountId', async () => {
-      await getExpenses({ accountId: 'account-123' });
-      
-      // Verify filter was applied
-    });
-  });
-
-  describe('createExpense', () => {
-    it('should create expense and revalidate paths', async () => {
-      const newExpense = { name: 'Rent', amount: '1000' };
-      
-      const result = await createExpense(newExpense);
-      
-      expect(result.success).toBe(true);
-    });
-  });
-});
-```
-
-### React Component Tests
-
-**Pattern for testing components:**
-```typescript
-// src/components/organisms/expense-form.test.tsx
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { ExpenseForm } from './expense-form';
-
-// Mock server actions
-vi.mock('@/actions/expense-actions', () => ({
-  createExpense: vi.fn(() => Promise.resolve({ success: true, data: { id: '1' } })),
-}));
-
-describe('ExpenseForm', () => {
-  const mockAccounts = [
-    { id: '1', name: 'Checking', type: 'checking' },
-  ];
-  const mockCategories = [
-    { id: '1', name: 'Rent', icon: '🏠' },
-  ];
-
-  it('should render form with required fields', () => {
-    render(
-      <ExpenseForm 
-        accounts={mockAccounts} 
-        categories={mockCategories} 
-      />
-    );
-    
-    expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/amount/i)).toBeInTheDocument();
-  });
-
-  it('should call onSuccess after successful submission', async () => {
-    const onSuccess = vi.fn();
-    const user = userEvent.setup();
-    
-    render(
-      <ExpenseForm 
-        accounts={mockAccounts} 
-        categories={mockCategories}
-        onSuccess={onSuccess}
-      />
-    );
-    
-    // Open dialog, fill form, submit
-    await user.click(screen.getByRole('button', { name: /add/i }));
-    await user.type(screen.getByLabelText(/name/i), 'Test Expense');
-    await user.type(screen.getByLabelText(/amount/i), '100');
-    await user.click(screen.getByRole('button', { name: /create/i }));
-    
-    await waitFor(() => {
-      expect(onSuccess).toHaveBeenCalled();
-    });
-  });
-});
-```
-
-### Hook Tests
-
-**Pattern for testing custom hooks:**
-```typescript
-// src/hooks/use-conversations.test.ts
-import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { useConversations } from './use-conversations';
-
-// Mock server actions
-vi.mock('@/actions/conversation-actions', () => ({
-  getConversations: vi.fn(() => Promise.resolve({ 
-    success: true, 
-    data: [{ id: '1', title: 'Test' }] 
-  })),
-  createConversation: vi.fn(() => Promise.resolve({ 
-    success: true, 
-    data: { id: '2', title: 'New Chat' } 
-  })),
-}));
-
-describe('useConversations', () => {
-  it('should load conversations on mount', async () => {
-    const { result } = renderHook(() => useConversations());
-    
-    await waitFor(() => {
-      expect(result.current.isLoadingConversations).toBe(false);
-    });
-    
-    expect(result.current.conversations).toHaveLength(1);
-  });
-
-  it('should create new chat', async () => {
-    const { result } = renderHook(() => useConversations());
-    
-    await act(async () => {
-      await result.current.startNewChat();
-    });
-    
-    expect(result.current.conversations).toHaveLength(2);
-  });
-});
-```
+- Use flat `test("...")` cases rather than nested `describe` blocks in `src/lib/billing/subscriptions.test.ts`.
+- Setup pattern: None detected (`beforeEach`/`beforeAll` are not used in `src/lib/billing/subscriptions.test.ts`).
+- Teardown pattern: None detected (`afterEach`/`afterAll` are not used in `src/lib/billing/subscriptions.test.ts`).
+- Assertion pattern: deterministic one-liner `assert.equal(...)` checks in `src/lib/billing/subscriptions.test.ts`.
 
 ## Mocking
 
-**Recommended Mocking Strategy:**
+**Framework:** Not detected (no `jest.mock`, `vi.mock`, `sinon`, or `mock` usage in `*.test.*` files under `src/`).
+
+**Patterns:**
+
+```typescript
+// No mocking pattern exists yet in `src/lib/billing/subscriptions.test.ts`.
+// Current tests are pure input/output checks without dependency isolation.
+```
 
 **What to Mock:**
-- Database (`@/lib/db`) - Always mock for unit tests
-- Server actions - Mock when testing components
-- External services (OpenAI API) - Always mock
-- Next.js specific modules (`next/navigation`, `next/cache`)
+
+- No repository-standard rule is codified; future tests should mock external boundaries used heavily in runtime code (`@/lib/db` in `src/actions/account-actions.ts`, `@/auth` in `src/lib/auth/require-auth.ts`, and SDK calls in `src/app/api/chat/route.ts`).
 
 **What NOT to Mock:**
-- Utility functions - Test their actual behavior
-- Validation schemas - Test actual validation
-- Type definitions - Not applicable
 
-**Mock Pattern for Database:**
-```typescript
-// vitest.setup.ts
-import { vi } from 'vitest';
-
-vi.mock('@/lib/db', () => ({
-  db: {
-    query: {
-      expenses: { findMany: vi.fn() },
-      accounts: { findMany: vi.fn() },
-    },
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: vi.fn(),
-      })),
-    })),
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(),
-      })),
-    })),
-    delete: vi.fn(() => ({
-      where: vi.fn(),
-    })),
-  },
-}));
-```
+- Keep deterministic pure logic real (for example utilities in `src/lib/safe-parse.ts` and recurrence mappers when present near `src/lib/billing/subscriptions.test.ts`).
 
 ## Fixtures and Factories
 
-**Recommended Test Data Pattern:**
+**Test Data:**
+
 ```typescript
-// src/__tests__/fixtures/index.ts
-import type { Account, Expense, Category } from '@/types/database';
-
-export function createMockAccount(overrides?: Partial<Account>): Account {
-  return {
-    id: 'account-1',
-    name: 'Test Account',
-    type: 'checking',
-    balance: '1000.00',
-    currency: 'EUR',
-    createdAt: new Date('2024-01-01'),
-    ...overrides,
-  };
-}
-
-export function createMockExpense(overrides?: Partial<Expense>): Expense {
-  return {
-    id: 'expense-1',
-    accountId: 'account-1',
-    categoryId: 'category-1',
-    name: 'Test Expense',
-    amount: '100.00',
-    recurrenceType: 'monthly',
-    startDate: new Date('2024-01-01'),
-    endDate: null,
-    isSubscription: false,
-    info: null,
-    createdAt: new Date('2024-01-01'),
-    ...overrides,
-  };
-}
-
-export function createMockCategory(overrides?: Partial<Category>): Category {
-  return {
-    id: 'category-1',
-    name: 'Test Category',
-    icon: '📦',
-    color: '#3b82f6',
-    createdAt: new Date('2024-01-01'),
-    ...overrides,
-  };
-}
+// Inline literals are used directly in each test case.
+assert.equal(mapSubscriptionStatusToEntitlementStatus("active"), "active");
+assert.equal(mapSubscriptionStatusToEntitlementStatus("paused"), "none");
 ```
+
+**Location:**
+
+- Dedicated fixtures/factories directories are not present under `src/`.
 
 ## Coverage
 
-**Current State:** No coverage tracking
+**Requirements:** None enforced (no coverage tooling, thresholds, or CI checks detected in `package.json` and `.github/workflows/release.yml`).
 
-**Recommended Coverage Target:**
-- Minimum: 70% line coverage
-- Target: 80% line coverage
-- Critical paths: 100% coverage (server actions, data transformations)
+**View Coverage:**
 
-**View Coverage (when configured):**
 ```bash
-npm run test:coverage
+# Not available: no coverage command configured in `package.json`.
 ```
 
 ## Test Types
 
-### Unit Tests
+**Unit Tests:**
 
-**Scope:**
-- Utility functions (`src/lib/utils.ts`, `src/lib/currency.ts`)
-- Validation schemas (`src/lib/validations/*.ts`)
-- Helper functions (e.g., `formatDate`, `normalizeToMonthly`)
+- Minimal unit coverage exists for status mapping in `src/lib/billing/subscriptions.test.ts`.
 
-**Approach:**
-- Test pure functions with various inputs
-- Test edge cases and error conditions
-- Use parameterized tests for multiple scenarios
+**Integration Tests:**
 
-### Integration Tests
+- Not detected (no DB-backed action tests for files like `src/actions/account-actions.ts` or API tests for `src/app/api/*/route.ts`).
 
-**Scope:**
-- Server actions with database interactions
-- React components with user interactions
-- Form submission flows
+**E2E Tests:**
 
-**Approach:**
-- Mock database for consistent test data
-- Test complete user flows
-- Verify side effects (revalidation, redirects)
-
-### End-to-End Tests
-
-**Recommendation:** Consider Playwright for E2E tests
-
-**Scope:**
-- Critical user journeys
-- Multi-step workflows
-- Cross-page interactions
-
-**Setup:**
-```bash
-npm install -D @playwright/test
-npx playwright install
-```
+- Not used (no Playwright/Cypress configuration files in repository root).
 
 ## Common Patterns
 
-### Async Testing
+**Async Testing:**
 
 ```typescript
-// Wait for async operations
-import { waitFor } from '@testing-library/react';
-
-it('should load data asynchronously', async () => {
-  render(<Component />);
-  
-  await waitFor(() => {
-    expect(screen.getByText('Loaded Data')).toBeInTheDocument();
-  });
-});
+// Pattern not present in current test file.
+// Runtime code is async-heavy (`src/actions/*`, `src/app/api/*/route.ts`),
+// but async test examples are currently absent.
 ```
 
-### Error Testing
+**Error Testing:**
 
 ```typescript
-// Test error states
-it('should handle errors gracefully', async () => {
-  vi.mocked(createExpense).mockRejectedValueOnce(new Error('Network error'));
-  
-  render(<ExpenseForm />);
-  
-  await user.click(submitButton);
-  
-  await waitFor(() => {
-    expect(screen.getByText(/error/i)).toBeInTheDocument();
-  });
+test("falls back to none for unknown statuses", () => {
+  assert.equal(mapSubscriptionStatusToEntitlementStatus("paused"), "none");
 });
 ```
-
-### Form Validation Testing
-
-```typescript
-// Test validation
-it('should show validation errors', async () => {
-  const user = userEvent.setup();
-  render(<ExpenseForm accounts={[]} categories={[]} />);
-  
-  await user.click(submitButton);
-  
-  expect(screen.getByText(/name is required/i)).toBeInTheDocument();
-  expect(screen.getByText(/amount is required/i)).toBeInTheDocument();
-});
-```
-
-## Priority Test Areas
-
-**High Priority:**
-1. Server actions in `src/actions/` - Critical business logic
-2. Validation schemas in `src/lib/validations/` - Data integrity
-3. Currency formatting in `src/lib/currency.ts` - Financial accuracy
-
-**Medium Priority:**
-4. Form components - User input handling
-5. Data transformations - Correct calculations
-
-**Lower Priority:**
-6. UI components - Visual regression handled separately
-7. Provider components - Complex to test, lower risk
-
-## Missing Test Infrastructure
-
-**Current Gaps:**
-- No test runner configured
-- No assertion library installed
-- No test utilities for React
-- No mocking infrastructure
-- No CI/CD test integration
-
-**Recommendation:** Set up Vitest with React Testing Library as the foundation for testing this codebase.
 
 ---
 
-*Testing analysis: 2026-02-20*
+_Testing analysis: 2026-03-03_

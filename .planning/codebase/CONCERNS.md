@@ -1,168 +1,192 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-02-20
-
-## Critical Security Issues
-
-**No Authentication System:**
-- Issue: Application has zero authentication or user isolation. All users share the same database records.
-- Files: `src/lib/db/schema.ts` (no userId columns), `src/actions/*` (no auth checks), `src/app/api/*` (no auth middleware)
-- Impact: Any user can view, modify, or delete any other user's financial data. Complete data exposure.
-- Fix approach: Add authentication (Clerk, NextAuth, or custom). Add `userId` column to all tables. Filter all queries by authenticated user.
-
-**API Routes Without Auth:**
-- Issue: `/api/documents` and `/api/chat` endpoints have no authentication checks.
-- Files: `src/app/api/documents/route.ts`, `src/app/api/chat/route.ts`
-- Impact: Anyone can upload documents or interact with the AI assistant without being logged in.
-- Fix approach: Add auth middleware to all API routes. Return 401 for unauthenticated requests.
-
-**No Rate Limiting:**
-- Issue: API routes have no rate limiting protection.
-- Files: `src/app/api/documents/route.ts`, `src/app/api/chat/route.ts`
-- Impact: Vulnerable to DoS attacks and API abuse. AI endpoint could be exploited for cost attacks.
-- Fix approach: Implement rate limiting (e.g., `next-rate-limit` or Upstash).
+**Analysis Date:** 2026-03-03
 
 ## Tech Debt
 
-**Large Monolithic Files:**
-- Issue: Multiple files exceed 500-800 lines, mixing concerns and making maintenance difficult.
-- Files:
-  - `src/actions/analytics-actions.ts` (851 lines) - 13+ different analytics functions
-  - `src/app/(dashboard)/overview/client.tsx` (859 lines) - Single component with calendar, subscriptions, categories, forecast
-  - `src/components/ui/sidebar.tsx` (726 lines)
-  - `src/components/organisms/expense-form.tsx` (706 lines)
-- Impact: Difficult to understand, test, and modify. High cognitive load for developers.
-- Fix approach: Split into smaller, focused modules. Extract reusable logic to hooks.
+**Duplicated server-action modules (parallel APIs with overlapping names):**
 
-**Type Safety Bypasses:**
-- Issue: Extensive use of `any` types bypasses TypeScript's safety net.
-- Files:
-  - `src/components/organisms/account-form.tsx:29` - `onSuccess?: (data: any) => void`
-  - `src/components/organisms/transfer-form.tsx:31` - `onSuccess?: (data: any) => void`
-  - `src/components/organisms/income-form.tsx:31` - `onSuccess?: (data: any) => void`
-  - `src/components/organisms/expense-form.tsx:44` - `onSuccess?: (data: { type: 'periodic' | 'daily'; item: any })`
-  - `src/lib/validations/transaction.ts:19,45,66` - `z.any()` for endDate fields
-- Impact: Runtime errors, lost IDE autocomplete, reduced code reliability.
-- Fix approach: Define proper types for all callbacks. Use `z.date().nullable()` instead of `z.any()`.
+- Issue: Two sets of near-duplicate action files exist with overlapping exports (`getAccounts`, `getExpenses`, `getIncomes`, `create*`, `update*`, `delete*`), which creates drift and inconsistent behavior.
+- Files: `src/actions/account-actions.ts`, `src/actions/accounts-actions.ts`, `src/actions/expense-actions.ts`, `src/actions/expenses-actions.ts`, `src/actions/income-actions.ts`, `src/actions/incomes-actions.ts`, `src/app/(dashboard)/accounts/[id]/page.tsx`
+- Impact: Features call different implementations depending on import path, causing inconsistent ordering, validation behavior, and future bug fixes being applied in only one branch.
+- Fix approach: Consolidate each domain to one canonical action module, migrate imports, then delete the duplicate modules.
 
-**Incomplete Feature:**
-- Issue: Historical trend comparison marked as TODO.
-- Files: `src/actions/dashboard-actions.ts:136` - `incomeTrend: 0, // TODO: Historische Daten vergleichen`
-- Impact: Feature shows placeholder value instead of real data.
-- Fix approach: Implement historical comparison by querying previous month's data.
+**Business logic concentrated in very large files:**
 
-## Error Handling Gaps
+- Issue: Domain logic and orchestration are concentrated in large files (400-1100 LOC), making safe edits difficult.
+- Files: `src/actions/analytics-actions.ts`, `src/actions/dashboard-actions.ts`, `src/app/(dashboard)/overview/client.tsx`, `src/app/(dashboard)/expenses/client.tsx`, `src/components/organisms/expense-form.tsx`
+- Impact: Higher regression risk, slower onboarding, and frequent merge conflicts in shared hotspots.
+- Fix approach: Split by domain use case (queries/calculations/formatting/UI sections), keep each module narrowly scoped.
 
-**Console-Only Error Logging:**
-- Issue: All errors logged to console.error without structured logging or user notification.
-- Files: All `src/actions/*.ts` files (40+ instances), `src/app/api/documents/route.ts`, `src/app/api/chat/route.ts`
-- Impact: Errors invisible in production. No alerting on failures. Poor debugging experience.
-- Fix approach: Implement structured logging service (e.g., Pino, Winston). Add error tracking (Sentry). Use toast notifications for user-facing errors.
+**Stale/dead code paths and comments:**
 
-**Inconsistent Error Returns:**
-- Issue: Server actions return `{ success: false, error: string }` but error handling varies.
-- Files: All `src/actions/*.ts`
-- Impact: Inconsistent error handling on client side. Some errors silently fail.
-- Fix approach: Standardize error response format. Add error codes for programmatic handling.
+- Issue: Residual TODOs and stale references remain from earlier phases.
+- Files: `auth.ts` (stale Phase 2 TODO), `src/actions/dashboard-actions.ts` (income trend TODO), `src/lib/billing/subscriptions.test.ts` (references `@/lib/billing/subscriptions` which is not present)
+- Impact: Misleading maintenance context and weak signal-to-noise in implementation status.
+- Fix approach: Remove stale comments, either implement missing billing module or delete the orphan test.
+
+## Known Bugs
+
+**Document upload validates UUID fields as integers:**
+
+- Symptoms: Upload endpoint rejects valid UUID `expenseId`/`dailyExpenseId` values with 400 errors.
+- Files: `src/app/api/documents/route.ts`, `src/lib/db/schema.ts`
+- Trigger: `POST /api/documents` with real UUID transaction IDs; `isValidIntegerId` only accepts positive integers.
+- Workaround: Use server actions in `src/actions/document-actions.ts` instead of the API route for upload.
+
+**Upcoming payment date calculation skips current-month/current-year due dates:**
+
+- Symptoms: Monthly and yearly recurring expenses can appear one cycle late in upcoming payments.
+- Files: `src/actions/dashboard-actions.ts`
+- Trigger: `getNextPaymentDate` initializes monthly/yearly next dates from `now.getMonth() + 1` and `now.getFullYear() + 1` before checking current cycle eligibility.
+- Workaround: No reliable workaround in current implementation.
+
+**AI tool contract advertises filters not actually applied:**
+
+- Symptoms: `minAmount`/`maxAmount` appear supported in AI tool schema for daily expenses, but filtering does not happen.
+- Files: `src/lib/ai/tools.ts`, `src/actions/expense-actions.ts`
+- Trigger: `getDailyExpenses` tool passes `minAmount`/`maxAmount`, but action filter type does not implement those fields.
+- Workaround: Use date/category/account filters only.
+
+## Security Considerations
+
+**IDOR risk on document-by-id route:**
+
+- Risk: Any authenticated user can fetch or delete another user's document if they obtain the document UUID.
+- Files: `src/app/api/documents/[id]/route.ts`, `src/lib/db/schema.ts`
+- Current mitigation: None in this route; query scopes by `documents.id` only and does not verify `documents.userId` against session.
+- Recommendations: Require `auth()` in route and scope all `GET`/`DELETE` queries with `and(eq(documents.id, id), eq(documents.userId, session.user.id))`.
+
+**Password reset does not revoke existing JWT sessions:**
+
+- Risk: Active sessions remain valid after password change, so stolen session cookies remain usable until expiry.
+- Files: `auth.config.ts`, `src/actions/auth-actions.ts`, `.planning/STATE.md`
+- Current mitigation: Reset tokens are single-use and invalidated, but session revocation is not implemented under JWT strategy.
+- Recommendations: Add server-side session versioning or switch to revocable session storage for forced logout on credential reset.
+
+**Rate limiting is process-local and header-trust dependent:**
+
+- Risk: Limits are bypassed across replicas/restarts and may be spoofable via proxy headers in some deployments.
+- Files: `src/lib/rate-limiter.ts`, `src/app/api/chat/route.ts`, `src/app/api/documents/route.ts`
+- Current mitigation: Basic in-memory counters per key.
+- Recommendations: Move to shared store (Redis/Postgres) and canonical client IP extraction behind trusted proxy boundaries.
 
 ## Performance Bottlenecks
 
-**Documents Stored as Base64:**
-- Issue: File uploads stored as base64-encoded strings directly in PostgreSQL.
-- Files: `src/lib/db/schema.ts:85` - `data: text('data').notNull()`, `src/app/api/documents/route.ts:36-46`
-- Impact: Database bloat, slow queries, high memory usage. Base64 adds 33% size overhead.
-- Fix approach: Use object storage (S3, Vercel Blob, Supabase Storage). Store only references in DB.
+**Binary documents stored as base64 in primary database rows:**
 
-**Sequential Database Calls in Loops:**
-- Issue: `getForecast()` calls `getMonthlyOverview()` sequentially for each month.
-- Files: `src/actions/analytics-actions.ts:144-163`
-- Impact: N database round-trips for N-month forecast. 3-month forecast = 3x slower than needed.
-- Fix approach: Batch queries or use a single aggregated query.
+- Problem: Every document write/read inflates payload size and DB storage by base64 overhead.
+- Files: `src/lib/db/schema.ts`, `src/actions/document-actions.ts`, `src/app/api/documents/[id]/route.ts`
+- Cause: `documents.data` uses `text` base64 blob storage instead of external object storage.
+- Improvement path: Store file metadata in DB and move binary payloads to object storage (S3-compatible, local MinIO, etc.).
 
-**No Database Connection Pooling:**
-- Issue: Single postgres connection used without explicit pooling configuration.
-- Files: `src/lib/db/index.ts:11`
-- Impact: May bottleneck under concurrent requests. Connection exhaustion risk.
-- Fix approach: Configure connection pooling (PgBouncer or postgres.js pool settings).
+**Cron payment checks load broad dataset then compute in memory:**
+
+- Problem: Upcoming payment job scans active expenses for all users and filters due items in application code.
+- Files: `src/lib/cron/upcoming-payments.ts`
+- Cause: Recurrence evaluation occurs post-query (`typedRows.filter(isDueTomorrow)`), with one push attempt per due expense.
+- Improvement path: Precompute/snapshot next-due dates or batch by user with indexed due-date criteria.
+
+**Dashboard statistics require many sequential queries:**
+
+- Problem: Dashboard stats execute multiple round trips and in-memory normalization each request.
+- Files: `src/actions/dashboard-actions.ts`
+- Cause: Separate selects for assets, incomes, one-time incomes, daily expenses, periodic expenses, and trends.
+- Improvement path: Consolidate with fewer aggregate queries/materialized summaries.
 
 ## Fragile Areas
 
-**parseFloat Without NaN Handling:**
-- Issue: 50+ uses of `parseFloat()` without NaN validation. Malformed data causes NaN propagation.
-- Files: `src/actions/analytics-actions.ts` (30+ instances), `src/components/molecules/*.tsx`
-- Impact: NaN values corrupt calculations, display as "NaN" in UI, break aggregations.
-- Fix approach: Wrap parseFloat in utility function with fallback. Validate at form submission.
+**Balance mutation logic is non-transactional in income/expense flows:**
 
-**Date Handling Without Timezone Safety:**
-- Issue: Date comparisons and creations without explicit timezone handling.
-- Files: `src/actions/analytics-actions.ts`, `src/app/(dashboard)/overview/client.tsx`
-- Impact: Calendar and date filtering may be off by one day in certain timezones.
-- Fix approach: Use date-fns with explicit timezone or store all dates as UTC midnight.
+- Files: `src/actions/expense-actions.ts`, `src/actions/income-actions.ts`
+- Why fragile: Insert/delete and corresponding account balance updates are separate operations outside a DB transaction.
+- Safe modification: Convert create/update/delete financial writes to single `db.transaction` blocks with invariant checks.
+- Test coverage: No automated tests cover balance integrity under partial failures.
 
-**Calendar Payment Calculation Complexity:**
-- Issue: `getPaymentDatesInMonth()` handles 7 recurrence types with complex logic.
-- Files: `src/actions/analytics-actions.ts:605-684`
-- Impact: High cyclomatic complexity. Edge cases likely missed (leap years, month boundaries).
-- Fix approach: Extract to dedicated recurrence service with comprehensive unit tests.
+**Recurrence logic duplicated across modules:**
 
-## AI Integration Risks
+- Files: `src/actions/dashboard-actions.ts`, `src/actions/forecast-actions.ts`, `src/lib/cron/upcoming-payments.ts`
+- Why fragile: Similar recurrence calculations are implemented multiple times with different edge-case behavior.
+- Safe modification: Centralize recurrence/date math into shared pure utilities and reuse everywhere.
+- Test coverage: No focused recurrence edge-case suite exists.
 
-**AI Tool Data Exposure:**
-- Issue: AI tools return financial data (amounts, account names, categories) to LLM context.
-- Files: `src/lib/ai/tools.ts`, `src/app/api/chat/route.ts`
-- Impact: Sensitive financial data sent to OpenAI. May be logged or stored externally.
-- Current mitigation: Documents explicitly excluded from AI context (line 106-108, 197-200)
-- Recommendations: Add data masking option. Audit what's sent to LLM. Consider local models.
+**Mixed direct console debugging in production paths:**
 
-**AI Step Limit Hardcoded:**
-- Issue: Max 10 AI steps per request hardcoded without configuration.
-- Files: `src/app/api/chat/route.ts:156` - `stopWhen: stepCountIs(10)`
-- Impact: Complex multi-step operations may fail silently.
-- Fix approach: Make configurable. Add user feedback when limit reached.
+- Files: `src/app/(dashboard)/dashboard/client.tsx`, `src/app/api/documents/[id]/route.ts`, `src/lib/cron/upcoming-payments.ts`, `src/lib/push.ts`
+- Why fragile: Runtime logs are inconsistent (`console.*` vs `logger`) and harder to control/route.
+- Safe modification: Standardize on `logger` with environment-aware levels.
+- Test coverage: Logging behavior is not tested.
 
-## Test Coverage Gaps
+## Scaling Limits
 
-**Zero Test Files in Source:**
-- Issue: No test files found in `src/` directory. Only tests exist in `node_modules/`.
-- Files: None exist
-- Impact: No regression protection. Refactoring is risky. Bug fixes may introduce new bugs.
-- Risk: Critical - financial calculations untested
-- Priority: High
-- Fix approach: Add Vitest/Jest. Start with unit tests for `normalizeToMonthly()`, `getPaymentDatesInMonth()`, and calculation-heavy functions.
+**API throttling capacity is single-process only:**
+
+- Current capacity: Limited to one Node.js process memory map per deployment unit.
+- Limit: Horizontal scaling or process restart resets limits, allowing burst bypass.
+- Scaling path: Shared distributed limiter backend with consistent keys and retry metadata.
+
+**Query scalability constrained by missing explicit indexes on hot filters:**
+
+- Current capacity: Acceptable for small datasets.
+- Limit: Multi-tenant growth increases scan cost on frequent `userId` and date-range filters.
+- Scaling path: Add composite indexes for common access patterns (for example on `user_id + created_at/date/start_date`) in Drizzle schema+migrations.
+
+**Document storage growth competes with transactional data:**
+
+- Current capacity: Bounded by primary Postgres disk and row bloat tolerance.
+- Limit: Larger attachments increase backup size, vacuum pressure, and I/O latency for core financial tables.
+- Scaling path: Externalize blobs and keep DB rows metadata-only.
+
+## Dependencies at Risk
+
+**`next-auth` beta channel in production dependency graph:**
+
+- Risk: Breaking behavior changes across beta updates.
+- Impact: Auth/session flows can regress without code changes.
+- Migration plan: Pin exact beta version, monitor release notes, and plan migration to stable Auth.js release once available.
 
 ## Missing Critical Features
 
-**No Data Export:**
-- Issue: Users cannot export their financial data.
-- Impact: Data lock-in. GDPR compliance risk.
-- Fix approach: Add CSV/PDF export functionality.
+**Session revocation model for credential-security events:**
 
-**No Data Backup:**
-- Issue: No backup/restore functionality.
-- Impact: Data loss risk if database corrupted.
-- Fix approach: Add scheduled backups. User-initiated backup download.
+- Problem: No server-side revocation mechanism for existing JWT sessions after password reset.
+- Blocks: Immediate account takeover containment after password compromise.
 
-**No Multi-Currency Support:**
-- Issue: Currency field exists but only EUR used throughout. No conversion.
-- Files: `src/lib/db/schema.ts:16`, all display components
-- Impact: Cannot track accounts in different currencies.
-- Fix approach: Add currency conversion service. Display converted totals.
+**Integrated automated test pipeline for core domains:**
 
-## Dependency Concerns
+- Problem: No test script in package scripts and only one isolated test file.
+- Blocks: Safe refactors in auth, finance math, balance mutation, and API authorization layers.
 
-**React 19 in Production:**
-- Issue: Using React 19.2.3 which is very recent. Some ecosystem libraries may have compatibility issues.
-- Files: `package.json:31-32`
-- Impact: Potential edge case bugs, fewer Stack Overflow solutions.
-- Current mitigation: None
-- Recommendations: Monitor React 19 issues. Pin exact versions.
+## Test Coverage Gaps
 
-**Zod v4 with Breaking Changes:**
-- Issue: Using Zod 4.3.6 which has different API from Zod 3.
-- Files: `package.json:37`
-- Impact: Examples and docs may reference old API.
-- Fix approach: Ensure team aware of Zod 4 differences. Document patterns used.
+**Authentication and password-reset flows:**
+
+- What's not tested: Registration mode gating, forgot-password enumeration protection, token consumption/invalidation, session behavior after reset.
+- Files: `src/actions/auth-actions.ts`, `src/lib/auth/reset-token.ts`, `auth.config.ts`
+- Risk: Security regressions can ship undetected.
+- Priority: High
+
+**Document API authorization and ownership checks:**
+
+- What's not tested: Per-user access constraints for document read/delete endpoints.
+- Files: `src/app/api/documents/[id]/route.ts`, `src/app/api/documents/route.ts`
+- Risk: Data leakage or cross-user destructive actions.
+- Priority: High
+
+**Financial mutation consistency (balances vs transaction rows):**
+
+- What's not tested: Atomicity/invariants for expense/income create/update/delete and account balance reconciliation.
+- Files: `src/actions/expense-actions.ts`, `src/actions/income-actions.ts`, `src/actions/transfer-actions.ts`
+- Risk: Silent ledger drift during partial failure scenarios.
+- Priority: High
+
+**Recurrence and forecast edge-case correctness:**
+
+- What's not tested: Monthly/yearly recurrence boundaries, custom intervals, month-end behavior, and upcoming payment date selection.
+- Files: `src/actions/dashboard-actions.ts`, `src/actions/forecast-actions.ts`, `src/lib/cron/upcoming-payments.ts`
+- Risk: Incorrect projections and reminder timing.
+- Priority: Medium
 
 ---
 
-*Concerns audit: 2026-02-20*
+_Concerns audit: 2026-03-03_

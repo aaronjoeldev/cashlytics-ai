@@ -1,251 +1,171 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-02-20
+**Analysis Date:** 2026-03-03
 
 ## Directory Layout
 
-```
+```text
 cashlytics/
-├── src/                    # Application source code
-│   ├── app/                # Next.js App Router
-│   ├── components/         # React components (atomic design)
-│   ├── actions/            # Server actions
-│   ├── lib/                # Utilities and core logic
-│   ├── hooks/              # Custom React hooks
-│   ├── types/              # TypeScript type definitions
-│   └── i18n/               # Internationalization config
-├── public/                 # Static assets
-├── messages/               # Translation JSON files
-├── drizzle/                # Database migrations
-├── scripts/                # Build and deployment scripts
-├── docs/                   # Documentation
-├── models/                 # (Empty - legacy/placeholder)
-├── articles/               # (Empty - legacy/placeholder)
-├── .claude/                # Claude AI assistant config
-└── .planning/              # Planning documents
+├── src/                    # Application source (routes, actions, components, lib)
+├── drizzle/                # SQL migrations generated/maintained for Drizzle
+├── messages/               # i18n message bundles (de/en)
+├── public/                 # Static assets and service worker
+├── scripts/                # Project scripts (migration helper, demo reset/seed)
+├── docs/                   # Human-facing architecture/component/page docs
+├── auth.ts                 # Auth.js runtime config with adapter/providers
+├── auth.config.ts          # Edge-safe auth config (JWT/session callbacks)
+├── next.config.ts          # Next.js config + next-intl plugin wiring
+├── drizzle.config.ts       # Drizzle-kit config (schema + output)
+└── tsconfig.json           # TS compiler settings and path aliases
 ```
 
 ## Directory Purposes
 
-**src/app:**
-- Purpose: Next.js App Router pages, layouts, and API routes
-- Contains: Route handlers, page components, layouts
-- Key files: `layout.tsx` (root), `page.tsx` (redirect), `(dashboard)/` (route group)
+**`src/app/`:**
 
-**src/components:**
-- Purpose: Reusable UI components following atomic design
-- Contains: Organized component hierarchy
-- Key files: `providers/index.tsx`, `layout/app-sidebar.tsx`, `organisms/chat-interface.tsx`
+- Purpose: App Router routes, layouts, and route handlers.
+- Contains: Route groups `(auth)` and `(dashboard)`, API handlers in `src/app/api/`, root wrappers `src/app/layout.tsx` and `src/app/page.tsx`.
+- Key files: `src/app/layout.tsx`, `src/app/(dashboard)/layout.tsx`, `src/app/api/chat/route.ts`, `src/app/api/auth/[...nextauth]/route.ts`.
 
-**src/actions:**
-- Purpose: Server actions for data mutations
-- Contains: One file per domain entity
-- Key files: `accounts-actions.ts`, `expense-actions.ts`, `conversation-actions.ts`
+**`src/actions/`:**
 
-**src/lib:**
-- Purpose: Core utilities, database, and shared logic
-- Contains: DB schema, AI tools, validators, helpers
-- Key files: `db/schema.ts`, `ai/tools.ts`, `settings-context.tsx`
+- Purpose: Server actions as the main business/service layer.
+- Contains: Domain actions per concern (`account-actions.ts`, `expense-actions.ts`, `analytics-actions.ts`, `auth-actions.ts`, `conversation-actions.ts`).
+- Key files: `src/actions/account-actions.ts`, `src/actions/dashboard-actions.ts`, `src/actions/analytics-actions.ts`, `src/actions/auth-actions.ts`.
 
-**src/hooks:**
-- Purpose: Custom React hooks
-- Contains: Reusable stateful logic
-- Key files: `use-conversations.ts`, `use-toast.ts`, `use-mobile.ts`
+**`src/lib/`:**
 
-**src/types:**
-- Purpose: TypeScript type definitions
-- Contains: Database model types, API response types
-- Key files: `database.ts`
+- Purpose: Shared infrastructure, domain helpers, and integration utilities.
+- Contains: DB setup/schema (`src/lib/db/`), auth helpers (`src/lib/auth/`), AI tooling (`src/lib/ai/tools.ts`), email/push/cron/rate-limiter/logging.
+- Key files: `src/lib/db/schema.ts`, `src/lib/db/index.ts`, `src/lib/auth/require-auth.ts`, `src/lib/ai/tools.ts`, `src/lib/logger.ts`.
 
-**src/i18n:**
-- Purpose: Internationalization configuration
-- Contains: Locale config, request handler
-- Key files: `config.ts`, `request.ts`
+**`src/components/`:**
+
+- Purpose: Reusable UI and feature-level presentation components.
+- Contains: `ui/` primitives, `organisms/` feature composites, `layout/` shell, `providers/` app-level providers, plus `atoms/` and `molecules/`.
+- Key files: `src/components/providers/index.tsx`, `src/components/layout/app-sidebar.tsx`, `src/components/organisms/chat-interface.tsx`, `src/components/ui/button.tsx`.
+
+**`src/hooks/`:**
+
+- Purpose: Client-side reusable behavior.
+- Contains: Hooks for AI chat orchestration and UI utilities.
+- Key files: `src/hooks/use-conversations.ts`, `src/hooks/use-mobile.ts`, `src/hooks/use-toast.ts`.
+
+**`src/i18n/`:**
+
+- Purpose: Locale setup and request-time message loading.
+- Contains: Locale constants and request config.
+- Key files: `src/i18n/config.ts`, `src/i18n/request.ts`.
+
+**`src/types/`:**
+
+- Purpose: Shared TypeScript types derived from DB schema and API contracts.
+- Contains: Drizzle inference types and action response types.
+- Key files: `src/types/database.ts`.
+
+**`drizzle/`:**
+
+- Purpose: SQL migration history.
+- Contains: Sequential migration files and metadata.
+- Key files: `drizzle/0000_rapid_cloak.sql`, `drizzle/0007_old_ikaris.sql`, `drizzle/meta/`.
+
+**`messages/`:**
+
+- Purpose: Translation dictionaries consumed by `next-intl`.
+- Contains: One JSON file per locale.
+- Key files: `messages/de.json`, `messages/en.json`.
 
 ## Key File Locations
 
-### Entry Points:
-- `src/app/layout.tsx`: Root layout with providers
-- `src/app/page.tsx`: Landing page (redirects to dashboard)
-- `src/app/(dashboard)/layout.tsx`: Dashboard shell with sidebar
-- `src/app/api/chat/route.ts`: AI chat API endpoint
+**Entry Points:**
 
-### Configuration:
-- `package.json`: Dependencies and scripts
-- `tsconfig.json`: TypeScript config with `@/*` path alias
-- `drizzle.config.ts`: Database migration config
-- `next.config.ts`: Next.js configuration
-- `eslint.config.mjs`: ESLint rules
+- `src/app/layout.tsx`: Root HTML/body, global providers, locale/timezone/currency bootstrap.
+- `src/app/page.tsx`: Root route redirect logic.
+- `src/proxy.ts`: Request-level route protection and redirect rules.
+- `src/app/api/auth/[...nextauth]/route.ts`: Auth.js route handler export.
+- `auth.ts`: Auth.js runtime config with Drizzle adapter and credentials provider.
 
-### Database:
-- `src/lib/db/schema.ts`: Drizzle ORM schema definitions
-- `src/lib/db/index.ts`: Database client initialization
-- `drizzle/meta/`: Generated migration files
+**Configuration:**
 
-### Core Logic:
-- `src/lib/ai/tools.ts`: AI tool definitions for assistant
-- `src/lib/settings-context.tsx`: Global settings (locale, currency)
-- `src/lib/utils.ts`: Utility functions (cn, etc.)
-- `src/lib/currency.ts`: Currency formatting utilities
+- `next.config.ts`: App output mode and `next-intl` plugin wiring.
+- `tsconfig.json`: Compiler strictness and path aliases (`@/*`, `@/auth`).
+- `drizzle.config.ts`: Drizzle schema path and migration output directory.
+- `eslint.config.mjs`: ESLint setup for linting behavior.
+- `.prettierrc`: Formatting rules.
 
-### Translations:
-- `messages/de.json`: German translations
-- `messages/en.json`: English translations
-- `src/i18n/config.ts`: Locale configuration
+**Core Logic:**
 
-### Testing:
-- Not currently present in the codebase
+- `src/actions/*.ts`: Business operations and DB interaction.
+- `src/lib/db/schema.ts`: Canonical domain data model and relations.
+- `src/lib/ai/tools.ts`: AI-callable operation catalog mapped to server actions.
+- `src/app/api/chat/route.ts`: LLM request pipeline and streaming responses.
+
+**Testing:**
+
+- `src/lib/billing/subscriptions.test.ts`: Current test location and pattern (Node test runner).
 
 ## Naming Conventions
 
-### Files:
-- **Pages:** `page.tsx` (route segment), `client.tsx` (client component)
-- **Layouts:** `layout.tsx`
-- **API Routes:** `route.ts`
-- **Components:** `kebab-case.tsx` (e.g., `expense-form.tsx`)
-- **Actions:** `*-actions.ts` (e.g., `expense-actions.ts`)
-- **Types:** `kebab-case.ts` (e.g., `database.ts`)
-- **Hooks:** `use-*.ts` (e.g., `use-conversations.ts`)
+**Files:**
 
-### Directories:
-- **Route groups:** `(name)` with parentheses (e.g., `(dashboard)`)
-- **Dynamic routes:** `[param]` with brackets (e.g., `[id]`)
-- **Components:** Plural nouns (e.g., `organisms/`, `molecules/`)
+- Kebab-case for most source files: `account-actions.ts`, `rate-limiter.ts`, `chat-interface.tsx`.
+- Framework-reserved App Router names in route folders: `page.tsx`, `layout.tsx`, `route.ts`.
+- Route-specific client split uses `client.tsx` next to page: `src/app/(dashboard)/dashboard/client.tsx`.
 
-### Code:
-- **Components:** PascalCase (e.g., `ExpenseForm`, `ChatInterface`)
-- **Functions:** camelCase (e.g., `getAccounts`, `createExpense`)
-- **Types:** PascalCase (e.g., `Account`, `ExpenseWithDetails`)
-- **Constants:** camelCase or SCREAMING_SNAKE_CASE
-- **Files with directive:** `'use client'` or `'use server'` at top
+**Directories:**
+
+- Lowercase directories with semantic grouping: `src/actions`, `src/lib/auth`, `src/components/organisms`.
+- App Router route groups use parentheses: `src/app/(auth)`, `src/app/(dashboard)`.
+- Dynamic route segments use bracket syntax: `src/app/(dashboard)/accounts/[id]`, `src/app/api/auth/[...nextauth]`.
 
 ## Where to Add New Code
 
-### New Feature (e.g., "Budgets"):
-1. **Database schema:** Add table to `src/lib/db/schema.ts`
-2. **Types:** Add types to `src/types/database.ts`
-3. **Server actions:** Create `src/actions/budget-actions.ts`
-4. **Validations:** Create `src/lib/validations/budget.ts`
-5. **AI tool (if needed):** Add to `src/lib/ai/tools.ts`
-6. **Page:** Create `src/app/(dashboard)/budgets/page.tsx` and `client.tsx`
-7. **Components:** Add organisms/molecules in `src/components/`
-8. **Translations:** Add keys to `messages/de.json` and `messages/en.json`
-9. **Sidebar:** Add navigation item in `src/components/layout/app-sidebar.tsx`
+**New Feature:**
 
-### New Component/Module:
-- **Atoms:** `src/components/atoms/` - Basic UI primitives
-- **Molecules:** `src/components/molecules/` - Composed patterns
-- **Organisms:** `src/components/organisms/` - Full features
-- **Layout:** `src/components/layout/` - App structure
-- **UI primitives:** `src/components/ui/` - shadcn/ui components
+- Primary code: Add/extend server action in `src/actions/<domain>-actions.ts`; expose UI route in `src/app/(dashboard)/<feature>/page.tsx`.
+- Tests: Add co-located or domain-adjacent test file in the relevant module directory using `*.test.ts` (current precedent: `src/lib/billing/subscriptions.test.ts`).
 
-### New API Endpoint:
-- Create `src/app/api/[endpoint]/route.ts`
-- Export async `GET`, `POST`, `PUT`, or `DELETE` functions
+**New Component/Module:**
 
-### New AI Tool:
-1. Define tool in `src/lib/ai/tools.ts`
-2. Import corresponding server action
-3. Add to exported `tools` object
-4. Update system prompt in `src/app/api/chat/route.ts` if needed
+- Implementation: Put reusable primitives in `src/components/ui/`; feature components in `src/components/organisms/` (or `molecules/`/`atoms/` when simpler).
 
-### New Translation Keys:
-1. Add key to `messages/de.json` (German - primary)
-2. Add key to `messages/en.json` (English translation)
-3. Use in component via `useTranslations('namespace')`
+**Utilities:**
 
-### Utilities:
-- Shared helpers: `src/lib/utils.ts`
-- Validators: `src/lib/validators/` or `src/lib/validations/`
-- Domain-specific utilities: `src/lib/[domain].ts`
+- Shared helpers: Put infrastructure/domain utilities in `src/lib/<area>/` or `src/lib/<utility>.ts`.
+- Shared types: Add to `src/types/database.ts` if schema-derived, otherwise colocate near the module using them.
 
 ## Special Directories
 
-**drizzle/:**
-- Purpose: Database migration files
-- Generated: Yes (by drizzle-kit)
-- Committed: Yes
+**`src/app/api/`:**
 
-**public/:**
-- Purpose: Static assets served directly
-- Contains: Images, favicon, manifest
+- Purpose: Route handlers for HTTP interfaces (chat, auth, documents, push, cron).
+- Generated: No.
+- Committed: Yes.
 
-**messages/:**
-- Purpose: Translation JSON files
-- Generated: No (manually maintained)
-- Committed: Yes
+**`drizzle/`:**
 
-**.claude/:**
-- Purpose: Claude AI assistant configuration
-- Contains: Skills, agents, instructions
-- Committed: Yes
+- Purpose: Migration artifacts for database evolution.
+- Generated: Yes (via drizzle-kit), then maintained in repo.
+- Committed: Yes.
 
-**.planning/:**
-- Purpose: Planning and analysis documents
-- Contains: Codebase maps, phase plans
-- Committed: Varies (typically yes for docs)
+**`.next/`:**
 
-**.next/:**
-- Purpose: Next.js build output
-- Generated: Yes (by next build)
-- Committed: No (in .gitignore)
+- Purpose: Next.js build output and type artifacts.
+- Generated: Yes.
+- Committed: No.
 
-**node_modules/:**
-- Purpose: Package dependencies
-- Generated: Yes (by npm install)
-- Committed: No (in .gitignore)
+**`models/`:**
 
-## Route Structure
+- Purpose: Local model assets (`model.onnx`, tokenizer/config files).
+- Generated: Not detected as generated by app runtime; treated as static assets.
+- Committed: Yes.
 
-```
-/                           → Redirects to /dashboard
-/dashboard                  → Main dashboard (stats, recent transactions)
-/overview                   → Financial overview
-/accounts                   → Account list
-/accounts/[id]              → Account detail
-/expenses                   → Expense management
-/income                     → Income management
-/transfers                  → Transfer management
-/categories                 → Category management
-/analytics                  → Analytics and charts
-/settings                   → App settings
-/settings/categories        → Category settings
-/assistant                  → AI chat assistant
-/documents                  → Document management
-/api/chat                   → AI chat streaming endpoint
-/api/documents              → Document CRUD
-/api/documents/[id]         → Single document operations
-```
+**`.planning/`:**
 
-## Component Hierarchy
+- Purpose: Planning state, phases, and generated codebase mapping docs.
+- Generated: Mixed (human + agent-maintained planning artifacts).
+- Committed: Yes.
 
-```
-src/components/
-├── providers/          # Context providers
-│   ├── index.tsx           # Root Providers wrapper
-│   └── theme-provider.tsx  # Theme context
-├── layout/             # App structure
-│   ├── app-sidebar.tsx     # Navigation sidebar
-│   ├── header.tsx          # Top header
-│   └── theme-toggle.tsx    # Dark/light switch
-├── ui/                 # shadcn/ui primitives
-│   ├── button.tsx
-│   ├── card.tsx
-│   ├── dialog.tsx
-│   └── ... (many more)
-├── atoms/              # Basic components
-│   └── category-select.tsx
-├── molecules/          # Composed patterns
-│   ├── chat-message.tsx
-│   ├── chat-input.tsx
-│   ├── file-upload.tsx
-│   ├── document-list.tsx
-│   └── ... (more)
-├── organisms/          # Full features
-│   ├── chat-interface.tsx
-│   ├── expense-form.tsx
-│   ├── income-form.tsx
-│   ├── account-form.tsx
-│   └── ... (more)
-└── templates/          # Page layouts (if any)
-```
+---
+
+_Structure analysis: 2026-03-03_

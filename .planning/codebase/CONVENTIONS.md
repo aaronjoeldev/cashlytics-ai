@@ -1,362 +1,122 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-02-20
+**Analysis Date:** 2026-03-03
 
 ## Naming Patterns
 
 **Files:**
-- Use kebab-case for all source files
-- React components: `expense-form.tsx`, `chat-interface.tsx`
-- Server actions: `expense-actions.ts`, `account-actions.ts`
-- Hooks: `use-conversations.ts`, `use-toast.ts`
-- Utilities: `utils.ts`, `currency.ts`
-- Schemas: `schema.ts`, `expense.ts`
 
-**Functions and Variables:**
-- Use camelCase for functions and variables
-- React components use PascalCase: `ExpenseForm`, `ChatInterface`
-- Server action functions use camelCase: `getExpenses`, `createAccount`
-- Helper functions use camelCase: `formatDate`, `normalizeToMonthly`
+- Use kebab-case for most modules and components in `src/actions/auth-actions.ts`, `src/lib/auth/require-auth.ts`, `src/components/organisms/login-form.tsx`, and `src/components/ui/button.tsx`.
+- Use framework-conventional names for route handlers and app pages in `src/app/api/push/subscribe/route.ts`, `src/app/api/chat/route.ts`, and `src/app/layout.tsx`.
+- Keep duplicate domain files aligned by suffix when parallel implementations exist (for example `src/actions/account-actions.ts` and `src/actions/accounts-actions.ts`, plus `src/actions/expense-actions.ts` and `src/actions/expenses-actions.ts`).
+
+**Functions:**
+
+- Use camelCase for functions and handlers (`loginAction`, `requireAuth`, `sanitizeForPrompt`, `handleDailySubmit`) in `src/actions/auth-actions.ts`, `src/lib/auth/require-auth.ts`, `src/app/api/chat/route.ts`, and `src/components/organisms/expense-form.tsx`.
+- Use PascalCase only for React components (`LoginForm`, `SubmitButton`, `ExpensesClient`, `Button`) in `src/components/organisms/login-form.tsx`, `src/app/(dashboard)/expenses/client.tsx`, and `src/components/ui/button.tsx`.
+
+**Variables:**
+
+- Use camelCase for local variables and state (`shouldRedirect`, `initialCurrency`, `createdExpenseId`, `isSubmitting`) in `src/actions/auth-actions.ts`, `src/app/layout.tsx`, and `src/components/organisms/expense-form.tsx`.
+- Use UPPER_SNAKE_CASE for module constants (`MAX_MESSAGES`, `ALLOWED_FILE_TYPES`, `MAX_FILE_SIZE`) in `src/app/api/chat/route.ts` and `src/components/organisms/expense-form.tsx`.
 
 **Types:**
-- Use PascalCase for type names
-- Entity types: `Account`, `Expense`, `Category`
-- Input types: `ExpenseInput`, `CategoryInput`
-- Composite types: `ExpenseWithDetails`, `ApiResponse<T>`
-- Enum values: `recurrenceTypeEnum`, `accountTypeEnum`
 
-**Constants:**
-- UPPER_SNAKE_CASE for true constants: `MAX_FILE_SIZE`, `ALLOWED_FILE_TYPES`
-- camelCase for configuration objects
+- Use PascalCase with semantic suffixes for domain and payload types (`ApiResponse`, `AuthActionState`, `ExpenseInput`, `AuthResult`) in `src/types/database.ts`, `src/actions/auth-actions.ts`, `src/lib/validations/transaction.ts`, and `src/lib/auth/require-auth.ts`.
+- Co-locate inferred Zod types directly under schema definitions (`RegisterInput`, `ExpenseInput`, `DailyExpenseInput`) in `src/lib/validations/auth.ts` and `src/lib/validations/transaction.ts`.
 
 ## Code Style
 
 **Formatting:**
-- ESLint configured via `eslint.config.mjs` using `eslint-config-next`
-- TypeScript strict mode enabled
-- No Prettier configuration detected - relies on ESLint
 
-**TypeScript Configuration:**
-- Target: ES2017
-- Module: ESNext with bundler resolution
-- JSX: react-jsx
-- Path alias: `@/*` maps to `./src/*`
+- Use Prettier configured in `.prettierrc` with semicolons, double quotes, `tabWidth: 2`, `printWidth: 100`, and trailing commas (`es5`).
+- Keep Tailwind class order auto-sorted through `prettier-plugin-tailwindcss` in `.prettierrc`.
+- Run `prettier --write .` or `prettier --check .` from scripts in `package.json`.
+- Normalize quote style to double quotes for new files to match `.prettierrc`, while accounting for existing single-quote drift in files like `src/app/api/chat/route.ts`, `src/components/organisms/expense-form.tsx`, and `src/lib/db/index.ts`.
+
+**Linting:**
+
+- Use ESLint flat config from `eslint.config.mjs` with `eslint-config-next/core-web-vitals`, `eslint-config-next/typescript`, and `eslint-config-prettier`.
+- Run lint checks through `npm run lint` and autofix with `npm run lint:fix` from `package.json`.
+- Keep generated build outputs excluded by default (`.next/**`, `out/**`, `build/**`, `next-env.d.ts`) in `eslint.config.mjs`.
+- Enforce pre-commit quality gates with `lint-staged` in `package.json` triggered by `.husky/pre-commit`.
 
 ## Import Organization
 
 **Order:**
-1. React/Next.js imports
-2. Third-party libraries (sorted alphabetically)
-3. Internal imports via `@/` alias
-4. Type imports (using `import type`)
 
-**Example pattern from `src/actions/expense-actions.ts`:**
-```typescript
-'use server';
-
-import { db } from '@/lib/db';
-import { expenses, dailyExpenses, accounts } from '@/lib/db/schema';
-import { eq, and, gte, lte, desc, sql, ilike } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
-import type { ApiResponse, Expense, NewExpense, DailyExpense, NewDailyExpense, ExpenseWithDetails, DailyExpenseWithDetails } from '@/types/database';
-```
+1. Framework/runtime imports first (`next/*`, `react`, third-party SDKs) in `src/actions/auth-actions.ts`, `src/app/layout.tsx`, and `src/components/organisms/login-form.tsx`.
+2. Internal alias imports (`@/...`) second in `src/actions/account-actions.ts`, `src/app/api/push/subscribe/route.ts`, and `src/components/organisms/expense-form.tsx`.
+3. Type-only imports inline with domain imports (`import type ...`) as needed in `src/actions/account-actions.ts`, `src/app/layout.tsx`, and `src/app/(dashboard)/expenses/client.tsx`.
 
 **Path Aliases:**
-- `@/*` - maps to `./src/*`
-- Use for all internal imports
-- Never use relative paths like `../lib/` or `../../components/`
 
-## Client/Server Separation
-
-**Directives:**
-- `'use client'` - Top of client components
-- `'use server'` - Top of server action files
-
-**Pattern:**
-- `page.tsx` - Server component that fetches data
-- `client.tsx` - Client component with interactivity
-
-**Example from `src/app/(dashboard)/expenses/`:**
-```typescript
-// page.tsx (server)
-import { getAccounts } from '@/actions/account-actions';
-import { ExpensesClient } from './client';
-
-export default async function ExpensesPage() {
-  const accountsResult = await getAccounts();
-  const accounts = accountsResult.success ? accountsResult.data : [];
-  return <ExpensesClient accounts={accounts} />;
-}
-
-// client.tsx (client)
-'use client';
-import { useState } from 'react';
-// ... interactive code
-export function ExpensesClient({ accounts }: ExpensesClientProps) { ... }
-```
+- Use `@/* -> ./src/*` and `@/auth -> ./auth.ts` from `tsconfig.json`.
+- Prefer alias imports in app and server modules (`@/lib/db`, `@/components/ui/button`, `@/types/database`) across `src/actions/*`, `src/app/*`, and `src/components/*`.
 
 ## Error Handling
 
-**Server Actions Pattern:**
-```typescript
-// All server actions return ApiResponse<T>
-export type ApiResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: string };
+**Patterns:**
 
-// Example implementation
-export async function createExpense(data: NewExpense): Promise<ApiResponse<Expense>> {
-  try {
-    const [expense] = await db.insert(expenses).values(data).returning();
-    revalidatePath('/expenses');
-    return { success: true, data: expense };
-  } catch (error) {
-    console.error('Failed to create expense:', error);
-    return { success: false, error: 'Failed to create expense' };
-  }
-}
-```
-
-**Client-Side Error Handling:**
-```typescript
-// Check result.success before accessing data
-const result = await deleteExpense(id);
-if (result.success) {
-  setExpenses(prev => prev.filter(e => e.id !== id));
-  toast({ title: 'Deleted successfully' });
-} else {
-  toast({ title: 'Delete failed', variant: 'destructive' });
-}
-```
-
-## API Response Pattern
-
-**Standard Response Type:**
-```typescript
-// Defined in src/types/database.ts
-export type ApiResponse<T> =
-  | { success: true; data: T }
-  | { success: false; error: string };
-```
-
-**Usage Guidelines:**
-- All server actions return `ApiResponse<T>`
-- Client code checks `result.success` before accessing `result.data`
-- Error messages can be localized (German strings seen in codebase)
-
-## Form Handling
-
-**Pattern using react-hook-form + zod:**
-```typescript
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { expenseSchema, type ExpenseInput } from '@/lib/validations/expense';
-
-const form = useForm<ExpenseInput>({
-  resolver: zodResolver(expenseSchema),
-  defaultValues: {
-    accountId: '',
-    name: '',
-    amount: '',
-    recurrenceType: 'monthly',
-    startDate: new Date(),
-  },
-});
-
-// Submit handler
-const handleSubmit = async (data: ExpenseInput) => {
-  const result = await createExpense(data);
-  if (result.success) {
-    form.reset();
-    onSuccess?.(result.data);
-  }
-};
-```
-
-**Validation Schemas:**
-- Located in `src/lib/validations/`
-- Named to match entity: `expense.ts`, `category.ts`
-- Export schema and inferred type together
-
-## Internationalization (i18n)
-
-**Framework:** next-intl
-
-**Usage Pattern:**
-```typescript
-import { useTranslations } from 'next-intl';
-
-function Component() {
-  const t = useTranslations('expenses');
-  const tCommon = useTranslations('common');
-  
-  return (
-    <>
-      <h1>{t('title')}</h1>
-      <button>{tCommon('save')}</button>
-    </>
-  );
-}
-```
-
-**Translation Files:**
-- Located in `messages/` directory
-- JSON files: `en.json`, `de.json`
-- Nested structure by feature: `expenses`, `accounts`, `common`
+- Wrap server actions in `try/catch` and return typed failure objects instead of throwing raw errors in `src/actions/account-actions.ts` and similar files under `src/actions/`.
+- Use discriminated action results (`{ success: true, data } | { success: false, error }`) from `src/types/database.ts` for action-level error transport.
+- Gate auth at the top of server actions with `requireAuth()` from `src/lib/auth/require-auth.ts`; return `Unauthorized` early before DB access (pattern in `src/actions/account-actions.ts`).
+- Validate untrusted input using Zod `safeParse` before business logic in `src/actions/auth-actions.ts` and `src/app/api/push/subscribe/route.ts`.
+- In API routes, return explicit HTTP JSON responses with status codes (`400`, `401`, `429`, `500`) in `src/app/api/chat/route.ts` and `src/app/api/push/subscribe/route.ts`.
 
 ## Logging
 
-**Server-Side:**
-- Use `console.error()` for error logging in server actions
-- Pattern: `console.error('Failed to [action]:', error)`
+**Framework:** Custom logger wrapper with console backend in `src/lib/logger.ts`.
 
-**Client-Side:**
-- Use toast notifications via `useToast` hook or `sonner`
-- Import from `sonner` for simple toasts: `toast.success('Message')`
-- Use `useToast` hook for more control
+**Patterns:**
 
-## Toast Notifications
-
-**Pattern via shadcn/ui toast:**
-```typescript
-import { useToast } from '@/hooks/use-toast';
-
-function Component() {
-  const { toast } = useToast();
-  
-  const handleDelete = async (id: string) => {
-    const result = await deleteItem(id);
-    if (result.success) {
-      toast({ 
-        title: 'Deleted', 
-        description: 'Item was removed successfully' 
-      });
-    } else {
-      toast({ 
-        title: 'Error', 
-        description: 'Delete failed',
-        variant: 'destructive' 
-      });
-    }
-  };
-}
-```
-
-**Alternative via sonner:**
-```typescript
-import { toast } from 'sonner';
-
-// Simple usage
-toast.success('Operation completed');
-toast.error('Something went wrong');
-```
-
-## Component Organization
-
-**Atomic Design Structure:**
-- `src/components/atoms/` - Basic UI elements (category-select)
-- `src/components/molecules/` - Composed components (file-upload, chat-input)
-- `src/components/organisms/` - Complex components (expense-form, chat-interface)
-- `src/components/templates/` - Page layouts
-- `src/components/layout/` - Layout components (header, sidebar)
-- `src/components/ui/` - shadcn/ui primitives (button, dialog, input)
-- `src/components/providers/` - Context providers
-
-**Component Pattern:**
-```typescript
-// Props interface at top
-interface ExpenseFormProps {
-  accounts: Account[];
-  categories: Category[];
-  onSuccess?: (data: Expense) => void;
-  editExpense?: Expense | null;
-}
-
-// Named export for components
-export function ExpenseForm({ accounts, categories, onSuccess }: ExpenseFormProps) {
-  // Hooks at top
-  const t = useTranslations('expenses');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Event handlers
-  const handleSubmit = async (data: ExpenseInput) => { ... };
-  
-  // JSX return
-  return ( ... );
-}
-```
-
-## Database Access
-
-**Pattern via Drizzle ORM:**
-```typescript
-import { db } from '@/lib/db';
-import { expenses, accounts } from '@/lib/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
-
-// Query with relations
-const result = await db.query.expenses.findMany({
-  where: conditions.length > 0 ? and(...conditions) : undefined,
-  with: { account: true, category: true },
-  orderBy: [desc(expenses.startDate)],
-});
-
-// Insert
-const [expense] = await db.insert(expenses).values(data).returning();
-
-// Update with SQL
-await db.update(accounts)
-  .set({ balance: sql`${accounts.balance} - ${amount}` })
-  .where(eq(accounts.id, accountId));
-```
-
-## Cache Revalidation
-
-**Pattern in Server Actions:**
-```typescript
-import { revalidatePath } from 'next/cache';
-
-// After mutations
-revalidatePath('/expenses');
-revalidatePath('/dashboard');
-revalidatePath('/accounts');
-```
+- Use `logger.error(message, context, error)` for failed operations in server code (`src/actions/account-actions.ts`, `src/actions/auth-actions.ts`, `src/app/api/push/subscribe/route.ts`, `src/app/api/chat/route.ts`).
+- Keep context strings stable and action-oriented (`"getAccounts"`, `"POST /api/chat"`) as seen in `src/actions/account-actions.ts` and `src/app/api/chat/route.ts`.
+- Allow dev-only verbose console traces only behind `process.env.NODE_ENV === 'development'` in `src/app/api/chat/route.ts` and `src/lib/logger.ts`.
+- Prefer centralized `logger` over direct `console.*`; direct console calls still exist in `src/lib/push.ts`, `src/app/api/documents/[id]/route.ts`, and `src/app/(dashboard)/dashboard/client.tsx`.
 
 ## Comments
 
 **When to Comment:**
-- AI tool descriptions (German language used for AI context)
-- Complex business logic explanations
-- Security-sensitive data filtering (e.g., document exclusion from AI context)
+
+- Add short comments for non-obvious security and product constraints, as in `src/actions/auth-actions.ts` (enumeration-safe password reset behavior) and `src/app/api/chat/route.ts` (prompt and rate-limit constraints).
+- Keep UI comments lightweight and structural when splitting dense JSX sections, as in `src/components/organisms/login-form.tsx` and `src/app/(dashboard)/expenses/client.tsx`.
 
 **JSDoc/TSDoc:**
-- Not widely used
-- Comments primarily in German for AI tooling
+
+- Use JSDoc for reusable utility/auth helpers and security-sensitive logic in `src/lib/auth/require-auth.ts`, `src/lib/safe-parse.ts`, `src/lib/auth/reset-token.ts`, and `src/lib/auth/registration-mode.ts`.
+- Use sparse JSDoc in feature-heavy components; comments are mainly inline in `src/components/organisms/expense-form.tsx` and `src/app/api/chat/route.ts`.
 
 ## Function Design
 
-**Size:** Functions can be moderately long (50-100 lines) for complex components
+**Size:**
 
-**Parameters:** 
-- Use interfaces for props with 3+ parameters
-- Optional parameters use `?:` with undefined fallbacks
+- Keep utility functions compact (`cn`, `safeParseFloat`, `requireAuth`) in `src/lib/utils.ts`, `src/lib/safe-parse.ts`, and `src/lib/auth/require-auth.ts`.
+- Accept large orchestrator functions in feature-rich modules (`registerAction`, `POST`, `ExpensesClient`) in `src/actions/auth-actions.ts`, `src/app/api/chat/route.ts`, and `src/app/(dashboard)/expenses/client.tsx`.
+
+**Parameters:**
+
+- Prefer typed object parameters for rich payloads (`createAccount(data)`, `handleSuccess({ type, item })`) in `src/actions/account-actions.ts` and `src/app/(dashboard)/expenses/client.tsx`.
+- Use `FormData` for server actions invoked by form posts in `src/actions/auth-actions.ts`.
+- Use explicit primitive params for identifiers and narrow operations (`deleteAccount(id)`, `getConversationById(id)`) in `src/actions/account-actions.ts` and `src/actions/conversation-actions.ts`.
 
 **Return Values:**
-- Server actions always return `ApiResponse<T>`
-- Client components return JSX
-- Hooks return objects with named exports
+
+- Return typed unions for action stability and predictable UI handling (`ApiResponse<T>`, `AuthActionState`) in `src/types/database.ts` and `src/actions/auth-actions.ts`.
+- Use `Promise<void>` only for fire-and-forget operations (`logoutAction`) in `src/actions/auth-actions.ts`.
 
 ## Module Design
 
 **Exports:**
-- Prefer named exports over default exports
-- Server actions: multiple named exports per file
-- Components: single named export matching filename
+
+- Prefer named exports for functions, constants, and types across server and UI modules (`src/actions/account-actions.ts`, `src/lib/validations/transaction.ts`, `src/components/ui/button.tsx`).
+- Use default exports only where framework conventions require them (`src/app/layout.tsx`, route files under `src/app/api/**/route.ts` use named HTTP handlers).
 
 **Barrel Files:**
-- `src/components/providers/index.tsx` exports `Providers`
-- Use for grouping related exports
+
+- Use targeted barrels for cohesive domains such as emails (`src/emails/index.tsx`) and providers (`src/components/providers/index.tsx`).
+- Avoid broad root barrels; import directly from source modules (`@/actions/*`, `@/lib/*`, `@/components/*`) as shown throughout `src/app/` and `src/components/`.
 
 ---
 
-*Convention analysis: 2026-02-20*
+_Convention analysis: 2026-03-03_

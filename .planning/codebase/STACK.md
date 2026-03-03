@@ -1,107 +1,95 @@
 # Technology Stack
 
-**Analysis Date:** 2026-02-20
+**Analysis Date:** 2026-03-03
 
 ## Languages
 
 **Primary:**
-- TypeScript 5.x - All application code (frontend, backend, API routes)
-- Target: ES2017 with ESNext module resolution
+
+- TypeScript 5.x - Application code in `src/**/*.ts` and `src/**/*.tsx`, plus root config in `auth.ts` and `auth.config.ts`.
 
 **Secondary:**
-- SQL (PostgreSQL dialect) - Database migrations in `drizzle/`
-- Shell (sh) - Docker entrypoint script `entrypoint.sh`
+
+- JavaScript (ESM) - Tooling/config in `eslint.config.mjs`, `postcss.config.mjs`, and service worker code in `public/sw.js`.
+- SQL - Schema migrations in `drizzle/*.sql` and demo seed data in `scripts/seed-demo.sql`.
+- Shell - Container startup and helper scripts in `entrypoint.sh`, `start-postgres.sh`, and `scripts/demo-reset.sh`.
 
 ## Runtime
 
 **Environment:**
-- Node.js 20.x (Alpine Linux in production)
-- Next.js 16.1.6 (App Router)
+
+- Node.js 20 (container and CI baseline) in `Dockerfile` and `.github/workflows/release.yml`.
+- Next.js server runtime with an Edge middleware/proxy path in `src/proxy.ts`.
 
 **Package Manager:**
-- npm (with package-lock.json)
-- Lockfile: present
+
+- npm (invoked by `npm ci`, `npm run ...`) in `.github/workflows/release.yml` and `README.md`.
+- Lockfile: present (`package-lock.json`).
 
 ## Frameworks
 
 **Core:**
-- Next.js 16.1.6 - Full-stack React framework with App Router
-- React 19.2.3 - UI library
-- Tailwind CSS 4.x - Utility-first styling
+
+- Next.js 16.1.6 - App Router web framework (`package.json`, `src/app/**`, `next.config.ts`).
+- React 19.2.3 - UI runtime (`package.json`, `src/components/**`).
+- Tailwind CSS 4 - Styling pipeline (`package.json`, `postcss.config.mjs`, `src/app/globals.css`).
 
 **Testing:**
-- Not configured - No test framework detected
+
+- No dedicated test framework detected in `package.json` scripts; at least one test file exists at `src/lib/billing/subscriptions.test.ts`.
 
 **Build/Dev:**
-- Next.js built-in compiler (Turbopack/webpack)
-- Docker multi-stage builds for production
+
+- TypeScript compiler (`typescript`) with path aliases in `tsconfig.json`.
+- ESLint 9 + `eslint-config-next` + `eslint-config-prettier` in `eslint.config.mjs`.
+- Prettier 3 + Tailwind plugin in `package.json`.
+- Drizzle Kit for schema generation/migration in `package.json` and `drizzle.config.ts`.
+- Husky + lint-staged for pre-commit checks in `package.json` and `.husky/pre-commit`.
+- Semantic Release for versioning/changelog automation in `.releaserc.json`.
 
 ## Key Dependencies
 
 **Critical:**
-- `drizzle-orm` 0.45.1 - Type-safe ORM for PostgreSQL
-- `postgres` 3.4.8 - PostgreSQL client
-- `ai` 6.0.85 - Vercel AI SDK for streaming chat
-- `@ai-sdk/openai` 3.0.28 - OpenAI integration
-- `zod` 4.3.6 - Schema validation
 
-**UI Components:**
-- `radix-ui` 1.4.3 - Headless UI primitives
-- `@radix-ui/react-toast` 1.2.15 - Toast notifications
-- `@radix-ui/react-progress` 1.1.8 - Progress indicators
-- `lucide-react` 0.564.0 - Icon library
-- `recharts` 3.7.0 - Charting library
-- `sonner` 2.0.7 - Toast notifications
-- `class-variance-authority` 0.7.1 - CSS variant utilities
-- `shadcn` 3.8.4 - UI component generator
-
-**Form Handling:**
-- `react-hook-form` 7.71.1 - Form state management
-- `@hookform/resolvers` 5.2.2 - Zod integration for forms
-
-**Internationalization:**
-- `next-intl` 4.8.2 - i18n for Next.js App Router
-- `next-themes` 0.4.6 - Theme switching (dark/light)
-
-**Utilities:**
-- `date-fns` 4.1.0 - Date manipulation
-- `clsx` 2.1.1 - Conditional class names
-- `tailwind-merge` 3.4.0 - Tailwind class merging
+- `next`, `react`, `react-dom` - Core web app runtime in `package.json`.
+- `drizzle-orm` + `postgres` - Database access layer in `src/lib/db/index.ts`.
+- `next-auth` + `@auth/drizzle-adapter` - Auth/session and adapter wiring in `auth.ts`.
+- `zod` - Input validation in API/server actions (for example `src/app/api/push/subscribe/route.ts`, `src/actions/auth-actions.ts`).
+- `ai` + `@ai-sdk/openai` - LLM streaming/chat in `src/app/api/chat/route.ts`.
 
 **Infrastructure:**
-- `drizzle-kit` 0.31.9 - Database migrations and introspection
-- `dotenv` 17.3.1 - Environment variable loading
+
+- `nodemailer` + `@react-email/*` - Transactional email transport and templates in `src/lib/email/transporter.ts` and `src/emails/*.tsx`.
+- `web-push` - VAPID push notifications in `src/lib/push.ts`.
+- `next-intl` - Internationalization plugin and runtime in `next.config.ts` and `src/i18n/request.ts`.
+- `date-fns` - Date calculation for recurring-payment reminders in `src/lib/cron/upcoming-payments.ts`.
 
 ## Configuration
 
 **Environment:**
-- Required: `DATABASE_URL` - PostgreSQL connection string
-- Required: `NEXT_PUBLIC_APP_URL` - Public application URL
-- Optional: `OPENAI_API_KEY` - AI assistant feature (feature disabled without it)
-- Optional: `POSTGRES_PASSWORD` - Docker PostgreSQL password
-- Optional: `NEXT_PUBLIC_DEFAULT_LOCALE` - Default language (defaults to 'de')
+
+- Environment variables are consumed through `process.env` in `src/lib/db/index.ts`, `src/proxy.ts`, `src/lib/email/transporter.ts`, `src/lib/push.ts`, `src/actions/auth-actions.ts`, `src/app/api/cron/upcoming-payments/route.ts`, and `src/i18n/config.ts`.
+- `.env` and `.env.local` files are present for environment configuration.
+- Drizzle CLI loads env vars via `dotenv/config` in `drizzle.config.ts`.
 
 **Build:**
-- `tsconfig.json` - TypeScript configuration (strict mode enabled)
-- `next.config.ts` - Next.js config with next-intl plugin, standalone output
-- `drizzle.config.ts` - Drizzle Kit configuration
-- `components.json` - shadcn/ui configuration (new-york style)
-- `eslint.config.mjs` - ESLint flat config with Next.js presets
-- `postcss.config.mjs` - PostCSS with Tailwind CSS 4 plugin
+
+- Next.js build configuration and standalone output in `next.config.ts`.
+- Multi-stage production image build in `Dockerfile`.
+- Release/build pipeline in `.github/workflows/release.yml`.
 
 ## Platform Requirements
 
 **Development:**
-- Node.js 20.x
-- PostgreSQL 16 (via Docker or local)
-- npm for package management
+
+- Node.js + npm workflow (`README.md`, `package.json`).
+- PostgreSQL-compatible `DATABASE_URL` required for DB-backed features (`src/lib/db/index.ts`, `drizzle.config.ts`).
 
 **Production:**
-- Docker container runtime
-- PostgreSQL 16 database
-- Port 3000 exposed
-- Standalone Next.js build output
+
+- Container-first deployment path (GHCR image + Compose) in `docker-compose.selfhost.yml` and `.github/workflows/release.yml`.
+- Persistent PostgreSQL 16 service expected in `docker-compose.selfhost.yml`.
 
 ---
 
-*Stack analysis: 2026-02-20*
+_Stack analysis: 2026-03-03_

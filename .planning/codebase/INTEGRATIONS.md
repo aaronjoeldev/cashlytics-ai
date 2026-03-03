@@ -1,136 +1,115 @@
 # External Integrations
 
-**Analysis Date:** 2026-02-20
+**Analysis Date:** 2026-03-03
 
 ## APIs & External Services
 
 **AI/LLM:**
-- OpenAI API - AI-powered financial assistant
-  - SDK: `@ai-sdk/openai` + `ai` (Vercel AI SDK)
-  - Model: `gpt-4o`
-  - Auth: `OPENAI_API_KEY` environment variable
-  - Feature: Optional - assistant disabled without key
-  - Location: `src/app/api/chat/route.ts`
+
+- OpenAI - AI assistant responses for `/api/chat`.
+  - SDK/Client: `@ai-sdk/openai` with `ai` in `src/app/api/chat/route.ts`.
+  - Auth: `OPENAI_API_KEY` (documented in `README.md`, wired in `docker-compose.selfhost.yml`).
+
+**Email Delivery:**
+
+- SMTP server or local sendmail - welcome and password-reset emails.
+  - SDK/Client: `nodemailer` in `src/lib/email/transporter.ts`.
+  - Auth: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, optional `SMTP_FROM`; optional transport switch `EMAIL_TRANSPORT` in `src/lib/email/transporter.ts`.
+
+**Web Push Network:**
+
+- Browser Push Services (via VAPID) - scheduled payment reminder notifications.
+  - SDK/Client: `web-push` in `src/lib/push.ts`.
+  - Auth: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` in `src/lib/push.ts` and `src/app/api/push/vapid-public-key/route.ts`.
+
+**Auth Session Protocol:**
+
+- Auth.js HTTP endpoints - authentication/session callback handling.
+  - SDK/Client: `next-auth` in `auth.ts` and `src/app/api/auth/[...nextauth]/route.ts`.
+  - Auth: `AUTH_SECRET` in `src/proxy.ts`.
 
 ## Data Storage
 
 **Databases:**
-- PostgreSQL 16
-  - Connection: `DATABASE_URL` environment variable
-  - Format: `postgresql://[user]:[password]@[host]:[port]/[database]`
-  - Client: `postgres` (node-postgres) with Drizzle ORM
-  - Schema: `src/lib/db/schema.ts`
-  - Migrations: `drizzle/` directory (3 migrations present)
-  - Tables: `accounts`, `categories`, `expenses`, `incomes`, `daily_expenses`, `transfers`, `documents`, `conversations`, `messages`
+
+- PostgreSQL (self-hosted container by default).
+  - Connection: `DATABASE_URL` in `src/lib/db/index.ts` and `drizzle.config.ts`.
+  - Client: `drizzle-orm` + `postgres` in `src/lib/db/index.ts`; schema in `src/lib/db/schema.ts`.
 
 **File Storage:**
-- Database-embedded - Documents stored as base64 text in `documents` table
-  - Field: `documents.data` (text, base64-encoded)
-  - No external file storage service
+
+- Stored in PostgreSQL as base64 document payloads (`documents.data`) rather than object storage.
+  - Implementation: `src/app/api/documents/route.ts`, `src/app/api/documents/[id]/route.ts`, `src/lib/db/schema.ts`.
 
 **Caching:**
-- None detected - No Redis, Memcached, or similar
+
+- No external cache detected.
+- In-memory process cache/rate limit only (`Map`) in `src/lib/rate-limiter.ts`.
+- Browser/service-worker cache for static and API responses in `public/sw.js`.
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- None - Single-user self-hosted application
-  - No authentication layer
-  - Designed for personal/local deployment
-  - No user accounts or sessions
+
+- Custom credentials auth using Auth.js with Drizzle adapter (no OAuth provider configured).
+  - Implementation: credentials provider in `auth.ts`, adapter tables in `src/lib/db/schema.ts`, JWT session strategy in `auth.config.ts`.
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- Console logging only - `console.error()` in server actions and API routes
+
+- None detected for external SaaS trackers (no Sentry/Datadog/New Relic SDK usage in `src/**`).
 
 **Logs:**
-- Development: AI step logging in chat API when `NODE_ENV=development`
-- Production: Standard console output to Docker logs
 
-**Analytics:**
-- None - No analytics service integrated
+- Structured console logging through a local logger utility in `src/lib/logger.ts`.
+- API routes and actions use `logger.error/info/warn` (examples: `src/app/api/chat/route.ts`, `src/app/api/documents/route.ts`, `src/actions/auth-actions.ts`).
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Docker containers
-- GitHub Container Registry (`ghcr.io`)
-- Self-hosted deployment model
+
+- GitHub Container Registry image publication (`ghcr.io/...`) in `.github/workflows/release.yml`.
+- Self-host deployment via Docker Compose in `docker-compose.selfhost.yml`.
 
 **CI Pipeline:**
-- GitHub Actions (`.github/workflows/release.yml`)
-- Triggers: Push to `main` branch
-- Steps:
-  1. Semantic Release versioning
-  2. Version file update (`src/lib/version.ts`)
-  3. Docker image build and push to GHCR
 
-**Release Automation:**
-- Semantic Release (`.releaserc.json`)
-- Conventional commits preset
-- Auto-generated CHANGELOG.md
-- GitHub releases created automatically
-- Docker tags: `v{version}`, `latest`, `{sha}`
+- GitHub Actions for release orchestration, Docker build/push, and semantic-release in `.github/workflows/release.yml`.
 
 ## Environment Configuration
 
 **Required env vars:**
-- `DATABASE_URL` - PostgreSQL connection string
-- `NEXT_PUBLIC_APP_URL` - Public URL for the application
 
-**Optional env vars:**
-- `OPENAI_API_KEY` - Enable AI assistant (sk-proj-...)
-- `POSTGRES_PASSWORD` - Docker PostgreSQL password
-- `NEXT_PUBLIC_DEFAULT_LOCALE` - Default language ('de' or 'en')
+- `DATABASE_URL` (DB connection) in `src/lib/db/index.ts`.
+- `AUTH_SECRET` (JWT/session token secret) in `src/proxy.ts`.
+- `NEXT_PUBLIC_APP_URL` (public URL for links/runtime config) documented in `README.md` and set in `docker-compose.selfhost.yml`.
+
+**Feature-gated env vars:**
+
+- AI: `OPENAI_API_KEY` (`src/app/api/chat/route.ts`, `docker-compose.selfhost.yml`).
+- Email: `EMAIL_TRANSPORT`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `APP_URL` (`src/lib/email/transporter.ts`, `src/actions/auth-actions.ts`).
+- Push/Cron: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `CRON_SECRET` (`src/lib/push.ts`, `src/app/api/cron/upcoming-payments/route.ts`).
+- Registration/locale/currency: `SINGLE_USER_MODE`, `SINGLE_USER_EMAIL`, `NEXT_PUBLIC_DEFAULT_LOCALE`, `NEXT_PUBLIC_DEFAULT_CURRENCY` (`src/lib/auth/registration-mode.ts`, `src/lib/auth/user-id.ts`, `src/i18n/config.ts`, `src/lib/currency.ts`).
 
 **Secrets location:**
-- `.env` file (local development)
-- `.env.local` file (local overrides)
-- Docker environment variables (production)
-- GitHub Secrets (CI/CD - `GITHUB_TOKEN`)
+
+- `.env` and `.env.local` files are present for local/deployment secret injection.
+- GitHub Actions secrets are used in CI (`secrets.GITHUB_TOKEN`) in `.github/workflows/release.yml`.
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None - No webhook endpoints
+
+- Auth callback handler endpoint: `/api/auth/[...nextauth]` in `src/app/api/auth/[...nextauth]/route.ts`.
+- Scheduled internal callback endpoint protected by bearer token: `/api/cron/upcoming-payments` in `src/app/api/cron/upcoming-payments/route.ts`.
+- Push subscription registration endpoints: `/api/push/subscribe` and `/api/push/vapid-public-key` in `src/app/api/push/subscribe/route.ts` and `src/app/api/push/vapid-public-key/route.ts`.
 
 **Outgoing:**
-- None - No external API callbacks
 
-## Document Storage
-
-**Implementation:**
-- Documents attached to expenses (recurring and daily)
-- Stored as base64-encoded text in database
-- MIME type and filename preserved
-- Cascade delete with parent expense
-
-**Schema:**
-```typescript
-documents: {
-  id: uuid
-  expenseId: uuid?       // Links to expenses
-  dailyExpenseId: uuid?  // Links to daily_expenses
-  fileName: text
-  mimeType: text
-  size: integer
-  data: text             // Base64-encoded file content
-  createdAt: timestamp
-}
-```
-
-## Localization
-
-**Translation Files:**
-- `messages/de.json` - German (primary)
-- `messages/en.json` - English
-
-**Framework:**
-- next-intl with cookie-based locale detection
-- Server-side locale resolution via `getRequestConfig()`
-- Default: German ('de')
+- Outbound SMTP email through configured mail server from `src/lib/email/transporter.ts`.
+- Outbound web-push notification sends via `webpush.sendNotification` in `src/lib/push.ts`.
+- No third-party webhook POST targets detected in application code under `src/**`.
 
 ---
 
-*Integration audit: 2026-02-20*
+_Integration audit: 2026-03-03_
