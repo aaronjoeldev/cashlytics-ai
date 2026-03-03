@@ -9,9 +9,9 @@ import { auth } from "@/auth";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
 
-function isValidIntegerId(value: string | null): boolean {
+function isValidUuid(value: string | null): boolean {
   if (!value) return false;
-  return /^\d+$/.test(value) && Number.isInteger(Number(value)) && Number(value) > 0;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function hasPathTraversal(fileName: string): boolean {
@@ -54,16 +54,23 @@ export async function POST(req: Request) {
       );
     }
 
-    if (expenseId !== null && !isValidIntegerId(expenseId)) {
+    if (expenseId && dailyExpenseId) {
       return NextResponse.json(
-        { error: "Ungültige expenseId. Muss eine positive Ganzzahl sein." },
+        { error: "Nur eine von expenseId oder dailyExpenseId darf gesetzt sein" },
         { status: 400 }
       );
     }
 
-    if (dailyExpenseId !== null && !isValidIntegerId(dailyExpenseId)) {
+    if (expenseId !== null && !isValidUuid(expenseId)) {
       return NextResponse.json(
-        { error: "Ungültige dailyExpenseId. Muss eine positive Ganzzahl sein." },
+        { error: "Ungültige expenseId. Muss eine UUID sein." },
+        { status: 400 }
+      );
+    }
+
+    if (dailyExpenseId !== null && !isValidUuid(dailyExpenseId)) {
+      return NextResponse.json(
+        { error: "Ungültige dailyExpenseId. Muss eine UUID sein." },
         { status: 400 }
       );
     }

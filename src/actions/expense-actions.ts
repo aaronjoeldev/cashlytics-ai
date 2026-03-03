@@ -97,20 +97,24 @@ export async function createExpense(
       }
     }
 
-    const [expense] = await db
-      .insert(expenses)
-      .values({ ...data, userId })
-      .returning();
+    const expense = await db.transaction(async (tx) => {
+      const [createdExpense] = await tx
+        .insert(expenses)
+        .values({ ...data, userId })
+        .returning();
 
-    // Kontostand aktualisieren (abziehen) mit SQL
-    if (data.accountId) {
-      await db
-        .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} - ${data.amount}`,
-        })
-        .where(eq(accounts.id, data.accountId));
-    }
+      // Kontostand aktualisieren (abziehen) mit SQL
+      if (data.accountId) {
+        await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} - ${data.amount}`,
+          })
+          .where(eq(accounts.id, data.accountId));
+      }
+
+      return createdExpense;
+    });
 
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
@@ -158,22 +162,24 @@ export async function deleteExpense(id: string): Promise<ApiResponse<void>> {
     }
     const { userId } = authResult;
 
-    // Erst die Expense holen um den Betrag und Account zu kennen (userId filter ensures ownership)
-    const [expense] = await db
-      .select()
-      .from(expenses)
-      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)));
-    if (expense && expense.accountId) {
-      // Kontostand aktualisieren (zurückbuchen)
-      await db
-        .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} + ${expense.amount}`,
-        })
-        .where(eq(accounts.id, expense.accountId));
-    }
+    await db.transaction(async (tx) => {
+      // Erst die Expense holen um den Betrag und Account zu kennen (userId filter ensures ownership)
+      const [expense] = await tx
+        .select()
+        .from(expenses)
+        .where(and(eq(expenses.id, id), eq(expenses.userId, userId)));
+      if (expense && expense.accountId) {
+        // Kontostand aktualisieren (zurückbuchen)
+        await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} + ${expense.amount}`,
+          })
+          .where(eq(accounts.id, expense.accountId));
+      }
 
-    await db.delete(expenses).where(and(eq(expenses.id, id), eq(expenses.userId, userId)));
+      await tx.delete(expenses).where(and(eq(expenses.id, id), eq(expenses.userId, userId)));
+    });
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");
@@ -253,20 +259,24 @@ export async function createDailyExpense(
       }
     }
 
-    const [expense] = await db
-      .insert(dailyExpenses)
-      .values({ ...data, userId })
-      .returning();
+    const expense = await db.transaction(async (tx) => {
+      const [createdExpense] = await tx
+        .insert(dailyExpenses)
+        .values({ ...data, userId })
+        .returning();
 
-    // Kontostand aktualisieren (abziehen)
-    if (data.accountId) {
-      await db
-        .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} - ${data.amount}`,
-        })
-        .where(eq(accounts.id, data.accountId));
-    }
+      // Kontostand aktualisieren (abziehen)
+      if (data.accountId) {
+        await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} - ${data.amount}`,
+          })
+          .where(eq(accounts.id, data.accountId));
+      }
+
+      return createdExpense;
+    });
 
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
@@ -314,22 +324,24 @@ export async function deleteDailyExpense(id: string): Promise<ApiResponse<void>>
     }
     const { userId } = authResult;
 
-    const [expense] = await db
-      .select()
-      .from(dailyExpenses)
-      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)));
-    if (expense && expense.accountId) {
-      await db
-        .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} + ${expense.amount}`,
-        })
-        .where(eq(accounts.id, expense.accountId));
-    }
+    await db.transaction(async (tx) => {
+      const [expense] = await tx
+        .select()
+        .from(dailyExpenses)
+        .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)));
+      if (expense && expense.accountId) {
+        await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} + ${expense.amount}`,
+          })
+          .where(eq(accounts.id, expense.accountId));
+      }
 
-    await db
-      .delete(dailyExpenses)
-      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)));
+      await tx
+        .delete(dailyExpenses)
+        .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)));
+    });
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");

@@ -73,20 +73,24 @@ export async function createIncome(data: Omit<NewIncome, "userId">): Promise<Api
       }
     }
 
-    const [income] = await db
-      .insert(incomes)
-      .values({ ...data, userId })
-      .returning();
+    const income = await db.transaction(async (tx) => {
+      const [createdIncome] = await tx
+        .insert(incomes)
+        .values({ ...data, userId })
+        .returning();
 
-    // Kontostand aktualisieren (hinzufügen)
-    if (data.accountId) {
-      await db
-        .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} + ${data.amount}`,
-        })
-        .where(eq(accounts.id, data.accountId));
-    }
+      // Kontostand aktualisieren (hinzufügen)
+      if (data.accountId) {
+        await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} + ${data.amount}`,
+          })
+          .where(eq(accounts.id, data.accountId));
+      }
+
+      return createdIncome;
+    });
 
     revalidatePath("/income");
     revalidatePath("/dashboard");
@@ -134,22 +138,24 @@ export async function deleteIncome(id: string): Promise<ApiResponse<void>> {
     }
     const { userId } = authResult;
 
-    // Erst die Income holen um den Betrag und Account zu kennen (userId filter ensures ownership)
-    const [income] = await db
-      .select()
-      .from(incomes)
-      .where(and(eq(incomes.id, id), eq(incomes.userId, userId)));
-    if (income && income.accountId) {
-      // Kontostand aktualisieren (abziehen)
-      await db
-        .update(accounts)
-        .set({
-          balance: sql`${accounts.balance} - ${income.amount}`,
-        })
-        .where(eq(accounts.id, income.accountId));
-    }
+    await db.transaction(async (tx) => {
+      // Erst die Income holen um den Betrag und Account zu kennen (userId filter ensures ownership)
+      const [income] = await tx
+        .select()
+        .from(incomes)
+        .where(and(eq(incomes.id, id), eq(incomes.userId, userId)));
+      if (income && income.accountId) {
+        // Kontostand aktualisieren (abziehen)
+        await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} - ${income.amount}`,
+          })
+          .where(eq(accounts.id, income.accountId));
+      }
 
-    await db.delete(incomes).where(and(eq(incomes.id, id), eq(incomes.userId, userId)));
+      await tx.delete(incomes).where(and(eq(incomes.id, id), eq(incomes.userId, userId)));
+    });
     revalidatePath("/income");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");
