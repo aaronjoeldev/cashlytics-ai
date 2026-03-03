@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import {
@@ -420,8 +420,8 @@ export async function getAdminUserUsage(userId: string, query: z.infer<typeof us
     .where(
       and(
         eq(usageEvents.userId, userId),
-        sql`${usageEvents.occurredAt} >= ${range.from}`,
-        sql`${usageEvents.occurredAt} <= ${range.to}`
+        gte(usageEvents.occurredAt, range.from),
+        lte(usageEvents.occurredAt, range.to)
       )
     )
     .groupBy(daySql)
