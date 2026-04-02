@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { currencies } from '@/lib/currency';
+import { currencies, defaultCurrency } from '@/lib/currency';
 
 export const incomeRecurrenceTypeValues = ['once', 'monthly', 'yearly'] as const;
 
@@ -10,7 +10,7 @@ export const createIncomeSchema = z.object({
   recurrenceType: z.enum(incomeRecurrenceTypeValues),
   startDate: z.string().or(z.date()),
   info: z.string().optional(),
-  currency: z.enum(currencies).default('EUR'),
+  currency: z.enum(currencies).default(defaultCurrency),
   originalAmount: z.number().positive().optional(),
   exchangeRate: z.number().positive().optional(),
 });

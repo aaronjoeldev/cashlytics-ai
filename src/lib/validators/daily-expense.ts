@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { currencies } from '@/lib/currency';
+import { currencies, defaultCurrency } from '@/lib/currency';
 
 export const createDailyExpenseSchema = z.object({
   accountId: z.string().uuid('Ungültige Konto-ID'),
@@ -7,7 +7,7 @@ export const createDailyExpenseSchema = z.object({
   description: z.string().min(1, 'Beschreibung ist erforderlich').max(500),
   amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/, 'Ungültiger Betrag'),
   date: z.string().or(z.date()),
-  currency: z.enum(currencies).default('EUR'),
+  currency: z.enum(currencies).default(defaultCurrency),
   originalAmount: z.number().positive().optional(),
   exchangeRate: z.number().positive().optional(),
 });
