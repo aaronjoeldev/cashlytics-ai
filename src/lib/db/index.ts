@@ -9,5 +9,20 @@ if (!connectionString) {
   logger.warn('DATABASE_URL is not set', 'db');
 }
 
-const client = postgres(connectionString || '');
+// Singleton: reuse the same pool across hot-reloads in development
+// to avoid exhausting Postgres connection slots.
+const globalForDb = global as unknown as { pgClient: postgres.Sql | undefined };
+
+const client =
+  globalForDb.pgClient ??
+  postgres(connectionString || '', {
+    max: 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
+  });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForDb.pgClient = client;
+}
+
 export const db = drizzle(client, { schema });
