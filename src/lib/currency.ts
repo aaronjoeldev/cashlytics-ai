@@ -19,6 +19,7 @@ export const currencyLocales: Record<Currency, string> = {
   DKK: 'da-DK',
 };
 
+// TODO: Phase 7 — vollständig durch exchange-rates.ts ersetzen
 export const exchangeRates: Record<Currency, number> = {
   EUR: 1,
   USD: 1.08,

@@ -692,7 +692,10 @@
     "USD": "US-Dollar",
     "GBP": "Britisches Pfund",
     "CHF": "Schweizer Franken",
-    "DKK": "Dänische Krone"
+    "DKK": "Dänische Krone",
+    "selectLabel": "Währung",
+    "convertedAmount": "≈ {amount} {currency}",
+    "differentCurrencies": "Gemischte Währungen"
   },
   "recurrence": {
     "once": "Einmalig",
