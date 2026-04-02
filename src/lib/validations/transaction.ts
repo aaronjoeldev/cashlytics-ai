@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { currencies, defaultCurrency } from '@/lib/currency';
 
 export const recurrenceTypes = ['once', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'yearly', 'custom'] as const;
 export const incomeRecurrenceTypes = ['once', 'monthly', 'yearly'] as const;
@@ -13,6 +14,7 @@ export const expenseSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     'Betrag muss positiv sein'
   ),
+  currency: z.enum(currencies as [string, ...string[]]).default(defaultCurrency),
   recurrenceType: z.enum(recurrenceTypes),
   recurrenceInterval: z.number().optional(),
   startDate: z.date({ message: 'Startdatum ist erforderlich' }),
@@ -29,6 +31,7 @@ export const dailyExpenseSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     'Betrag muss positiv sein'
   ),
+  currency: z.enum(currencies as [string, ...string[]]).default(defaultCurrency),
   date: z.date({ message: 'Datum ist erforderlich' }),
   info: z.string().optional(),
 });
@@ -40,6 +43,7 @@ export const incomeSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     'Betrag muss positiv sein'
   ),
+  currency: z.enum(currencies as [string, ...string[]]).default(defaultCurrency),
   recurrenceType: z.enum(incomeRecurrenceTypes),
   startDate: z.date({ message: 'Startdatum ist erforderlich' }),
   endDate: z.any().optional().nullable(),
@@ -50,7 +54,7 @@ export const accountSchema = z.object({
   name: z.string().min(1, 'Name ist erforderlich').max(50),
   type: z.enum(accountTypes),
   balance: z.string().default('0'),
-  currency: z.string().default('EUR'),
+  currency: z.string().default(defaultCurrency),
 });
 
 export const transferSchema = z.object({

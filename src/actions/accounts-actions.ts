@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import type { ApiResponse, Account, NewAccount } from "@/types/database";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { defaultCurrency } from "@/lib/currency";
 
 export async function getAccounts(): Promise<ApiResponse<Account[]>> {
   try {
@@ -52,6 +53,7 @@ export async function createAccount(data: {
   name: string;
   type: "checking" | "savings" | "etf";
   initialBalance?: number;
+  currency?: string;
 }): Promise<ApiResponse<Account>> {
   try {
     const authResult = await requireAuth();
@@ -64,7 +66,7 @@ export async function createAccount(data: {
         name: data.name,
         type: data.type,
         balance: data.initialBalance?.toString() ?? "0",
-        currency: "EUR",
+        currency: data.currency ?? defaultCurrency,
       })
       .returning();
 

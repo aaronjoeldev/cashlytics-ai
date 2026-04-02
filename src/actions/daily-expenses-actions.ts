@@ -12,6 +12,7 @@ import type {
 } from "@/types/database";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { defaultCurrency } from "@/lib/currency";
 
 export async function getDailyExpenses(filters?: {
   accountId?: string;
@@ -120,6 +121,9 @@ export async function createDailyExpense(data: {
   description: string;
   amount: number;
   date: Date | string;
+  currency?: string;
+  originalAmount?: number | null;
+  exchangeRate?: number | null;
 }): Promise<ApiResponse<DailyExpense>> {
   try {
     const authResult = await requireAuth();
@@ -130,7 +134,7 @@ export async function createDailyExpense(data: {
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
     const [ownedAccount] = await db
-      .select({ id: accounts.id })
+      .select({ id: accounts.id, currency: accounts.currency })
       .from(accounts)
       .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
       .limit(1);
@@ -150,6 +154,11 @@ export async function createDailyExpense(data: {
       }
     }
 
+    const currency = data.currency ?? defaultCurrency;
+
+    // TODO (Phase 2): If currency !== ownedAccount.currency, call getExchangeRate(currency, ownedAccount.currency)
+    // to auto-populate exchangeRate for currency conversion at booking time.
+
     const [newDailyExpense] = await db
       .insert(dailyExpenses)
       .values({
@@ -159,6 +168,9 @@ export async function createDailyExpense(data: {
         description: data.description,
         amount: data.amount.toString(),
         date: typeof data.date === "string" ? new Date(data.date) : data.date,
+        currency,
+        originalAmount: data.originalAmount != null ? data.originalAmount.toString() : null,
+        exchangeRate: data.exchangeRate != null ? data.exchangeRate.toString() : null,
       })
       .returning();
 

@@ -7,6 +7,7 @@ import { getCategories, createCategory } from '@/actions/category-actions';
 import { getMonthlyOverview, getForecast, getCategoryBreakdown, getNormalizedMonthlyExpenses } from '@/actions/analytics-actions';
 import { updateDailyExpense } from '@/actions/daily-expenses-actions';
 import { getTransfers, createTransfer } from '@/actions/transfer-actions';
+import { defaultCurrency } from '@/lib/currency';
 
 export const tools = {
   createAccount: tool({
@@ -15,10 +16,10 @@ export const tools = {
       name: z.string().describe('Name des Kontos'),
       type: z.enum(['checking', 'savings', 'etf']).describe('Kontotyp: checking=Girokonto, savings=Sparkonto, etf=ETF-Portfolio'),
       balance: z.string().optional().describe('Aktueller Kontostand als String, z.B. "1000.00"'),
-      currency: z.string().optional().describe('Währung, Standard ist EUR'),
+      currency: z.string().optional().describe(`Währung, Standard ist ${defaultCurrency}`),
     }),
     needsApproval: true,
-    execute: async ({ name, type, balance = '0', currency = 'EUR' }) => {
+    execute: async ({ name, type, balance = '0', currency = defaultCurrency }) => {
       return createAccount({ name, type, balance, currency });
     },
   }),
@@ -71,9 +72,11 @@ export const tools = {
       recurrenceInterval: z.number().int().positive().optional().nullable().describe('Intervall für custom, z.B. alle 2 Wochen = 2'),
       startDate: z.string().describe('Startdatum im ISO-Format, z.B. "2024-01-01"'),
       endDate: z.string().optional().nullable().describe('Enddatum im ISO-Format, optional'),
+      currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'DKK']).optional().describe('Währungscode (ISO 4217). Nur setzen wenn explizit vom User erwähnt oder aus Kontext klar ersichtlich. Default: Kontowährung.'),
     }),
     needsApproval: true,
-    execute: async ({ accountId, categoryId, name, amount, recurrenceType, recurrenceInterval, startDate, endDate }) => {
+    execute: async ({ accountId, categoryId, name, amount, recurrenceType, recurrenceInterval, startDate, endDate, currency }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return createExpense({
         accountId,
         categoryId: categoryId ?? null,
@@ -83,7 +86,8 @@ export const tools = {
         recurrenceInterval: recurrenceInterval ?? null,
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
-      });
+        ...(currency !== undefined && { currency }),
+      } as any);
     },
   }),
 
@@ -166,16 +170,19 @@ export const tools = {
       description: z.string().describe('Beschreibung der Ausgabe'),
       amount: z.number().positive().describe('Betrag als Zahl'),
       date: z.string().describe('Datum im ISO-Format, z.B. "2024-01-15"'),
+      currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'DKK']).optional().describe('Währungscode (ISO 4217). Nur setzen wenn explizit vom User erwähnt oder aus Kontext klar ersichtlich. Default: Kontowährung.'),
     }),
     needsApproval: true,
-    execute: async ({ accountId, categoryId, description, amount, date }) => {
+    execute: async ({ accountId, categoryId, description, amount, date, currency }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return createDailyExpense({
         accountId,
         categoryId: categoryId ?? null,
         description,
         amount: amount.toString(),
         date: new Date(date),
-      });
+        ...(currency !== undefined && { currency }),
+      } as any);
     },
   }),
 
@@ -258,16 +265,19 @@ export const tools = {
       amount: z.number().positive().describe('Betrag als Zahl'),
       recurrenceType: z.enum(['once', 'monthly', 'yearly']).describe('Wiederholungstyp'),
       startDate: z.string().describe('Startdatum im ISO-Format'),
+      currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'DKK']).optional().describe('Währungscode (ISO 4217). Nur setzen wenn explizit vom User erwähnt oder aus Kontext klar ersichtlich. Default: Kontowährung.'),
     }),
     needsApproval: true,
-    execute: async ({ accountId, source, amount, recurrenceType, startDate }) => {
+    execute: async ({ accountId, source, amount, recurrenceType, startDate, currency }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return createIncome({
         accountId,
         source,
         amount: amount.toString(),
         recurrenceType,
         startDate: new Date(startDate),
-      });
+        ...(currency !== undefined && { currency }),
+      } as any);
     },
   }),
 

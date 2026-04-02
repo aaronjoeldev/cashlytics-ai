@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import type { ApiResponse, Income, IncomeWithAccount, NewIncome } from "@/types/database";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { defaultCurrency } from "@/lib/currency";
 
 export async function getIncomes(filters?: {
   accountId?: string;
@@ -95,6 +96,9 @@ export async function createIncome(data: {
   amount: number;
   recurrenceType: "once" | "monthly" | "yearly";
   startDate: Date | string;
+  currency?: string;
+  originalAmount?: number | null;
+  exchangeRate?: number | null;
 }): Promise<ApiResponse<Income>> {
   try {
     const authResult = await requireAuth();
@@ -105,13 +109,18 @@ export async function createIncome(data: {
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
     const [ownedAccount] = await db
-      .select({ id: accounts.id })
+      .select({ id: accounts.id, currency: accounts.currency })
       .from(accounts)
       .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
       .limit(1);
     if (!ownedAccount) {
       return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
     }
+
+    const currency = data.currency ?? defaultCurrency;
+
+    // TODO (Phase 2): If currency !== ownedAccount.currency, call getExchangeRate(currency, ownedAccount.currency)
+    // to auto-populate exchangeRate for currency conversion at booking time.
 
     const [newIncome] = await db
       .insert(incomes)
@@ -122,6 +131,9 @@ export async function createIncome(data: {
         amount: data.amount.toString(),
         recurrenceType: data.recurrenceType,
         startDate: typeof data.startDate === "string" ? new Date(data.startDate) : data.startDate,
+        currency,
+        originalAmount: data.originalAmount != null ? data.originalAmount.toString() : null,
+        exchangeRate: data.exchangeRate != null ? data.exchangeRate.toString() : null,
       })
       .returning();
 

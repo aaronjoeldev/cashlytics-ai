@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { currencies, defaultCurrency } from '@/lib/currency';
 
 export const accountTypeValues = ['checking', 'savings', 'etf'] as const;
 
@@ -9,7 +10,7 @@ export const createAccountSchema = z.object({
     .string()
     .regex(/^-?\d{1,10}(\.\d{1,2})?$/, 'Ungültiger Betrag')
     .default('0'),
-  currency: z.string().min(1).max(3).default('EUR'),
+  currency: z.enum(currencies).default(defaultCurrency),
 });
 
 export const updateAccountSchema = createAccountSchema.partial();

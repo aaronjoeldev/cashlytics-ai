@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { currencies } from '@/lib/currency';
 
 export const recurrenceTypeValues = ['once', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'] as const;
 
@@ -11,6 +12,9 @@ export const createExpenseSchema = z.object({
   recurrenceInterval: z.number().int().positive().nullable().optional(),
   startDate: z.string().or(z.date()),
   endDate: z.string().or(z.date()).nullable().optional(),
+  currency: z.enum(currencies).default('EUR'),
+  originalAmount: z.number().positive().optional(),
+  exchangeRate: z.number().positive().optional(),
 });
 
 export const updateExpenseSchema = createExpenseSchema.partial();
