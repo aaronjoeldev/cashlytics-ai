@@ -14,7 +14,7 @@ export const expenseSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     'Betrag muss positiv sein'
   ),
-  currency: z.enum(currencies as [string, ...string[]]),
+  currency: z.enum(currencies),
   recurrenceType: z.enum(recurrenceTypes),
   recurrenceInterval: z.number().optional(),
   startDate: z.date({ message: 'Startdatum ist erforderlich' }),
@@ -31,7 +31,7 @@ export const dailyExpenseSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     'Betrag muss positiv sein'
   ),
-  currency: z.enum(currencies as [string, ...string[]]),
+  currency: z.enum(currencies),
   date: z.date({ message: 'Datum ist erforderlich' }),
   info: z.string().optional(),
 });
@@ -43,7 +43,7 @@ export const incomeSchema = z.object({
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     'Betrag muss positiv sein'
   ),
-  currency: z.enum(currencies as [string, ...string[]]),
+  currency: z.enum(currencies),
   recurrenceType: z.enum(incomeRecurrenceTypes),
   startDate: z.date({ message: 'Startdatum ist erforderlich' }),
   endDate: z.any().optional().nullable(),
