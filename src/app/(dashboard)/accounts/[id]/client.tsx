@@ -24,6 +24,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import { useSettings } from "@/lib/settings-context";
+import { convertCurrency, currencies, type Currency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type {
   Account,
@@ -206,9 +207,15 @@ export function AccountDetailClient({
   initialTransfers,
 }: AccountDetailClientProps) {
   const router = useRouter();
-  const { formatCurrency: fmt } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
   const formatCurrency = (amount: string | number) =>
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
+  const toBase = (amount: number, entryCurrency?: string | null): number => {
+    const from = (entryCurrency && currencies.includes(entryCurrency as Currency))
+      ? (entryCurrency as Currency)
+      : baseCurrency;
+    return convertCurrency(amount, from, baseCurrency);
+  };
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -253,7 +260,7 @@ export function AccountDetailClient({
         id: e.id,
         type: "expense" as const,
         name: e.name,
-        amount: normalizedAmount.toString(),
+        amount: toBase(normalizedAmount, e.currency).toString(),
         date: getTransactionDateForMonth(e, startDate, endDate),
         category: e.category,
       };
@@ -270,7 +277,7 @@ export function AccountDetailClient({
         id: i.id,
         type: "income" as const,
         name: i.source,
-        amount: normalizedAmount.toString(),
+        amount: toBase(normalizedAmount, i.currency).toString(),
         date: getTransactionDateForMonth(i, startDate, endDate),
       };
     });
@@ -287,7 +294,7 @@ export function AccountDetailClient({
         type:
           t.targetAccountId === account.id ? ("transfer_in" as const) : ("transfer_out" as const),
         name: t.description || "Transfer",
-        amount: normalizedAmount.toString(),
+        amount: toBase(normalizedAmount, t.sourceCurrency).toString(),
         date: getTransactionDateForMonth(t, startDate, endDate),
         description:
           t.targetAccountId === account.id
@@ -306,6 +313,7 @@ export function AccountDetailClient({
     initialTransfers,
     account.id,
     calculationMode,
+    baseCurrency,
   ]);
 
   const summary = useMemo(() => {

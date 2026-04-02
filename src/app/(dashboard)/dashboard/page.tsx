@@ -18,6 +18,7 @@ export default async function DashboardPage() {
     ? statsResult.data
     : {
         totalAssets: 0,
+        hasMultiCurrency: false,
         reserveView: {
           monthlyIncome: 0,
           monthlyExpenses: 0,

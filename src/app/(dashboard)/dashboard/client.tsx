@@ -20,6 +20,7 @@ import type { Locale } from "@/i18n/config";
 
 interface DashboardStats {
   totalAssets: number;
+  hasMultiCurrency: boolean;
   reserveView: {
     monthlyIncome: number;
     monthlyExpenses: number;
@@ -229,7 +230,7 @@ export function DashboardClient({
             className="text-foreground text-xl font-bold tracking-[-0.03em]"
             style={{ fontFamily: "var(--font-syne)" }}
           >
-            {formatCurrency(portfolioMonthlyBalance)}
+            {stats.hasMultiCurrency ? "≈\u202f" : ""}{formatCurrency(portfolioMonthlyBalance)}
           </span>
         </div>
       </div>
@@ -276,7 +277,7 @@ export function DashboardClient({
 
         <KpiCard
           title={t("monthlyBalance")}
-          value={formatCurrency(portfolioMonthlyBalance)}
+          value={`${stats.hasMultiCurrency ? "≈\u202f" : ""}${formatCurrency(portfolioMonthlyBalance)}`}
           subtitle={t("allAccountsMonthly")}
           icon={<Wallet className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
           iconBg="linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.06))"

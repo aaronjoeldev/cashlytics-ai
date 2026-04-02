@@ -16,6 +16,7 @@ import { ExpenseForm } from "@/components/organisms/expense-form";
 import { deleteExpense, deleteDailyExpense } from "@/actions/expense-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
+import { currencySymbols, convertCurrency, type Currency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type {
   Account,
@@ -183,12 +184,20 @@ export function ExpensesClient({
   initialDailyExpenses,
 }: ExpensesClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
   const t = useTranslations("expenses");
   const tCommon = useTranslations("common");
   const tRecurrence = useTranslations("recurrence");
   const formatCurrency = (amount: string | number) =>
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
+  const formatEntryAmount = (amount: string | number, entryCurrency?: string | null) => {
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (entryCurrency && entryCurrency !== baseCurrency) {
+      const symbol = currencySymbols[entryCurrency as keyof typeof currencySymbols] ?? entryCurrency;
+      return `${num.toFixed(2)} ${symbol}`;
+    }
+    return formatCurrency(num);
+  };
   const [categories, setCategories] = useState(initialCategories);
   const [expenses, setExpenses] = useState(initialExpenses);
   const [dailyExpenses, setDailyExpenses] = useState(initialDailyExpenses);
@@ -217,10 +226,21 @@ export function ExpensesClient({
   );
   const oneTimeExpenses = filteredExpenses.filter((e) => e.recurrenceType === "once");
 
-  const totalMonthlyFixed = monthlyFixed.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  const toBase = (amount: number, entryCurrency?: string | null) =>
+    entryCurrency && entryCurrency !== baseCurrency
+      ? convertCurrency(amount, entryCurrency as Currency, baseCurrency)
+      : amount;
+
+  const totalMonthlyFixed = monthlyFixed.reduce(
+    (sum, e) => sum + toBase(parseFloat(e.amount), e.currency),
+    0
+  );
   const totalReserves = periodicReserves.reduce(
     (sum, e) =>
-      sum + normalizeToMonthly(parseFloat(e.amount), e.recurrenceType, e.recurrenceInterval),
+      sum + toBase(
+        normalizeToMonthly(parseFloat(e.amount), e.recurrenceType, e.recurrenceInterval),
+        e.currency
+      ),
     0
   );
   const totalNormalized = totalMonthlyFixed + totalReserves;
@@ -429,7 +449,7 @@ export function ExpensesClient({
               )}
             </div>
             <p className="flex-shrink-0 font-semibold whitespace-nowrap">
-              {formatCurrency(amount)}
+              {formatEntryAmount(amount, expense.currency)}
             </p>
           </div>
         </div>
@@ -735,7 +755,7 @@ export function ExpensesClient({
                             {expense.account?.name ?? t("unknownAccount")}
                           </p>
                           <p className="flex-shrink-0 font-semibold whitespace-nowrap">
-                            {formatCurrency(expense.amount)}
+                            {formatEntryAmount(expense.amount, expense.currency)}
                           </p>
                         </div>
                       </div>
