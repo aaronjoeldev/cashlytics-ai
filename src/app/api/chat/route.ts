@@ -74,6 +74,12 @@ BEISPIEL für "Ich habe 30€ getankt":
 → Benutzer fragen: "Soll ich das unter der Kategorie **Auto/Transport** einordnen?"
 → Nach Bestätigung: createDailyExpense({ accountId: "abc-123", categoryId: "cat-456", description: "Tanken", amount: 30, date: "HEUTE" })
 
+## WÄHRUNGS-REGELN
+
+Wenn der User eine Transaktion in einer fremden Währung erwähnt (z.B. "45 USD", "£20"), setze den currency-Parameter entsprechend.
+Unterstützte Währungen: EUR, USD, GBP, CHF, DKK.
+Ohne explizite Währungsangabe den currency-Parameter weglassen (Default: Kontowährung).
+
 ## DATUM-REGELN
 
 - "heute", "gerade", "jetzt" → Datum aus KONTEXT unten verwenden

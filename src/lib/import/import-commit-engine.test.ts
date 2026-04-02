@@ -10,6 +10,7 @@ type MemorySession = {
   id: string;
   userId: string;
   accountId: string;
+  accountCurrency: string;
   status: "draft" | "review" | "confirmed" | "cancelled";
 };
 
@@ -20,6 +21,7 @@ type MemoryRow = {
   rowIndex: number;
   bookingDate: Date | null;
   amount: string;
+  currency: string;
   description: string;
   excludedByUser: boolean;
 };
@@ -227,7 +229,7 @@ function createMemoryDeps(state: MemoryState): ImportCommitEngineDeps {
 test("commitApprovedRows persists approved rows and conflict outcomes", async () => {
   const state: MemoryState = {
     accountOwnership: { "user-1": ["acc-1"] },
-    sessions: [{ id: "session-1", userId: "user-1", accountId: "acc-1", status: "review" }],
+    sessions: [{ id: "session-1", userId: "user-1", accountId: "acc-1", accountCurrency: "EUR", status: "review" }],
     rows: [
       {
         id: "row-1",
@@ -236,6 +238,7 @@ test("commitApprovedRows persists approved rows and conflict outcomes", async ()
         rowIndex: 1,
         bookingDate: new Date("2026-03-01T10:00:00.000Z"),
         amount: "100.00",
+        currency: "EUR",
         description: "Salary",
         excludedByUser: false,
       },
@@ -246,6 +249,7 @@ test("commitApprovedRows persists approved rows and conflict outcomes", async ()
         rowIndex: 2,
         bookingDate: new Date("2026-03-02T10:00:00.000Z"),
         amount: "-15.99",
+        currency: "EUR",
         description: "Coffee Shop",
         excludedByUser: false,
       },
@@ -256,6 +260,7 @@ test("commitApprovedRows persists approved rows and conflict outcomes", async ()
         rowIndex: 3,
         bookingDate: new Date("2026-03-03T10:00:00.000Z"),
         amount: "-8.50",
+        currency: "EUR",
         description: "Parking",
         excludedByUser: false,
       },
@@ -329,7 +334,7 @@ test("commitApprovedRows persists approved rows and conflict outcomes", async ()
 test("commitApprovedRows rolls back all writes when one write fails", async () => {
   const state: MemoryState = {
     accountOwnership: { "user-1": ["acc-1"] },
-    sessions: [{ id: "session-rollback", userId: "user-1", accountId: "acc-1", status: "review" }],
+    sessions: [{ id: "session-rollback", userId: "user-1", accountId: "acc-1", accountCurrency: "EUR", status: "review" }],
     rows: [
       {
         id: "row-rollback",
@@ -338,6 +343,7 @@ test("commitApprovedRows rolls back all writes when one write fails", async () =
         rowIndex: 1,
         bookingDate: new Date("2026-03-04T10:00:00.000Z"),
         amount: "-20.00",
+        currency: "EUR",
         description: "Broken replacement",
         excludedByUser: false,
       },

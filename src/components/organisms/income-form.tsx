@@ -11,6 +11,7 @@ import {
   incomeRecurrenceTypes,
 } from "@/lib/validations/transaction";
 import { createIncome, updateIncome } from "@/actions/income-actions";
+import { currencies, type Currency, currencySymbols, defaultCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +63,7 @@ export function IncomeForm({
       accountId: "",
       source: "",
       amount: "",
+      currency: defaultCurrency,
       recurrenceType: "monthly",
       startDate: new Date(),
       endDate: null,
@@ -69,12 +71,25 @@ export function IncomeForm({
     },
   });
 
+  const selectedAccountId = form.watch("accountId");
+  const selectedCurrency = (form.watch("currency") as Currency) ?? defaultCurrency;
+
+  useEffect(() => {
+    const current = form.getValues("currency");
+    if (current && current !== defaultCurrency) return;
+    const account = accounts.find((a) => a.id === selectedAccountId);
+    if (account?.currency && currencies.includes(account.currency as Currency)) {
+      form.setValue("currency", account.currency as Currency);
+    }
+  }, [selectedAccountId, accounts]);
+
   useEffect(() => {
     if (editIncome) {
       form.reset({
         accountId: editIncome.accountId || "",
         source: editIncome.source,
         amount: editIncome.amount,
+        currency: (editIncome.currency as Currency) ?? defaultCurrency,
         recurrenceType: editIncome.recurrenceType as IncomeInput["recurrenceType"],
         startDate: new Date(editIncome.startDate),
         endDate: editIncome.endDate ? new Date(editIncome.endDate) : null,
@@ -85,6 +100,7 @@ export function IncomeForm({
         accountId: "",
         source: "",
         amount: "",
+        currency: defaultCurrency,
         recurrenceType: "monthly",
         startDate: new Date(),
         endDate: null,
@@ -108,6 +124,7 @@ export function IncomeForm({
           accountId: data.accountId,
           source: data.source,
           amount: data.amount,
+          currency: data.currency,
           recurrenceType: data.recurrenceType,
           startDate: data.startDate,
           endDate,
@@ -123,6 +140,7 @@ export function IncomeForm({
           accountId: data.accountId,
           source: data.source,
           amount: data.amount,
+          currency: data.currency,
           recurrenceType: data.recurrenceType,
           startDate: data.startDate,
           endDate,
@@ -169,7 +187,19 @@ export function IncomeForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>{t("amount")}</Label>
-              <Input {...form.register("amount")} placeholder="0.00" type="number" step="0.01" />
+              <div className="flex gap-1.5">
+                <Input {...form.register("amount")} placeholder="0.00" type="number" step="0.01" className="flex-1" />
+                <Select value={selectedCurrency} onValueChange={(v) => form.setValue("currency", v as Currency)}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencies.map((c) => (
+                      <SelectItem key={c} value={c}>{c} {currencySymbols[c]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>{t("recurrence")}</Label>

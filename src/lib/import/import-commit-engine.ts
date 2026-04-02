@@ -37,6 +37,7 @@ type ImportSessionRecord = {
   id: string;
   userId: string;
   accountId: string;
+  accountCurrency: string;
   status: "draft" | "review" | "confirmed" | "cancelled";
 };
 
@@ -47,6 +48,7 @@ type ImportRowRecord = {
   rowIndex: number;
   bookingDate: Date | null;
   amount: string;
+  currency: string;
   description: string;
   excludedByUser: boolean;
 };
@@ -89,6 +91,8 @@ type ImportCommitDataStore = {
     accountId: string;
     description: string;
     amount: string;
+    currency: string;
+    originalAmount: string | null;
     date: Date;
     info: string;
   }): Promise<void>;
@@ -110,6 +114,8 @@ type ImportCommitDataStore = {
       accountId: string;
       description: string;
       amount: string;
+      currency: string;
+      originalAmount: string | null;
       date: Date;
       info: string;
     }
@@ -196,6 +202,12 @@ async function applyRow(
   const rowDate = getRowDate(row);
   const info = buildAuditInfo(session.id, row.rowIndex);
 
+  // Resolve currency: row currency takes precedence, fallback to account currency
+  const rowCurrency = row.currency || session.accountCurrency;
+  const originalAmount =
+    row.currency && row.currency !== session.accountCurrency ? amount : null;
+  // exchangeRate: null — TODO: Phase 2 — getExchangeRate(row.currency, session.accountCurrency)
+
   const decision = rowResolution?.decision ?? "keep_both";
 
   if (decision === "skip_import_row") {
@@ -221,6 +233,8 @@ async function applyRow(
         accountId: session.accountId,
         description: row.description,
         amount,
+        currency: rowCurrency,
+        originalAmount,
         date: rowDate,
         info,
       });
@@ -249,6 +263,8 @@ async function applyRow(
     accountId: session.accountId,
     description: row.description,
     amount,
+    currency: rowCurrency,
+    originalAmount,
     date: rowDate,
     info,
   });
@@ -334,18 +350,27 @@ type TransactionClient = Pick<typeof db, "select" | "insert" | "update" | "delet
 function createTxStore(tx: TransactionClient): ImportCommitDataStore {
   return {
     async getSessionById(userId, sessionId) {
-      const [session] = await tx
+      const [row] = await tx
         .select({
           id: importSessions.id,
           userId: importSessions.userId,
           accountId: importSessions.accountId,
           status: importSessions.status,
+          accountCurrency: accounts.currency,
         })
         .from(importSessions)
+        .innerJoin(accounts, eq(accounts.id, importSessions.accountId))
         .where(and(eq(importSessions.id, sessionId), eq(importSessions.userId, userId)))
         .limit(1);
 
-      return session ?? null;
+      if (!row) return null;
+      return {
+        id: row.id,
+        userId: row.userId,
+        accountId: row.accountId,
+        status: row.status,
+        accountCurrency: row.accountCurrency ?? "EUR",
+      };
     },
 
     async isAccountOwnedByUser(userId, accountId) {
@@ -367,6 +392,7 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
           rowIndex: importRows.rowIndex,
           bookingDate: importRows.bookingDate,
           amount: importRows.amount,
+          currency: importRows.currency,
           description: importRows.description,
           excludedByUser: importRows.excludedByUser,
         })
@@ -444,6 +470,9 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
         accountId: params.accountId,
         description: params.description,
         amount: params.amount,
+        currency: params.currency,
+        originalAmount: params.originalAmount ?? null,
+        // exchangeRate: null, // TODO: Phase 2 — getExchangeRate(row.currency, account.currency)
         date: params.date,
         info: params.info,
       });

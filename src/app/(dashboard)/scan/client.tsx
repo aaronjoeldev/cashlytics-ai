@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { ScanLine, ChevronLeft, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ScanLine, ChevronLeft, Loader2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { createDailyExpense } from "@/actions/daily-expenses-actions";
 import { uploadDocument } from "@/actions/document-actions";
+import { currencies, type Currency, currencySymbols, convertCurrency } from "@/lib/currency";
 import type { Account, Category } from "@/types/database";
 import type { ReceiptScanResult } from "@/types/receipt";
 
@@ -48,6 +49,9 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
   const [date, setDate] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id ?? "");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("none");
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
+    (accounts[0]?.currency as Currency) ?? "EUR"
+  );
 
   useEffect(() => {
     return () => {
@@ -96,6 +100,11 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
       setAmount(result.amount?.toString() ?? "");
       setDate(result.date ?? new Date().toISOString().split("T")[0]);
 
+      // Pre-select scanned currency if recognized
+      if (result.currency && currencies.includes(result.currency as Currency)) {
+        setSelectedCurrency(result.currency as Currency);
+      }
+
       // Match suggested category
       if (result.suggestedCategoryName) {
         const matched = categories.find(
@@ -117,12 +126,22 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
 
     setStep("saving");
 
+    const account = accounts.find((a) => a.id === selectedAccountId);
+    const accountCurrency = (account?.currency as Currency) ?? "EUR";
+    const parsedAmount = parseFloat(amount);
+    const isForeignCurrency = selectedCurrency !== accountCurrency;
+
     const result = await createDailyExpense({
       accountId: selectedAccountId,
       categoryId: selectedCategoryId === "none" ? null : selectedCategoryId,
       description,
-      amount: parseFloat(amount),
+      amount: parsedAmount,
       date: new Date(date),
+      currency: selectedCurrency,
+      originalAmount: isForeignCurrency ? parsedAmount : undefined,
+      exchangeRate: isForeignCurrency
+        ? convertCurrency(1, selectedCurrency, accountCurrency)
+        : undefined,
     });
 
     if (!result.success) {
@@ -158,6 +177,7 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
     setDate("");
     setSelectedAccountId(accounts[0]?.id ?? "");
     setSelectedCategoryId("none");
+    setSelectedCurrency((accounts[0]?.currency as Currency) ?? "EUR");
   }
 
   function onDrop(e: React.DragEvent) {
@@ -282,16 +302,52 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="amount">{t("fields.amount")}</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    disabled={step === "saving"}
-                  />
+                  <div className="flex gap-1.5">
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      disabled={step === "saving"}
+                      className="flex-1"
+                    />
+                    <Select
+                      value={selectedCurrency}
+                      onValueChange={(v) => setSelectedCurrency(v as Currency)}
+                      disabled={step === "saving"}
+                    >
+                      <SelectTrigger className="w-[80px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c} {currencySymbols[c]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(() => {
+                    const account = accounts.find((a) => a.id === selectedAccountId);
+                    const accountCurrency = (account?.currency as Currency) ?? "EUR";
+                    const parsedAmt = parseFloat(amount || "0");
+                    if (selectedCurrency !== accountCurrency && parsedAmt > 0) {
+                      const converted = convertCurrency(parsedAmt, selectedCurrency, accountCurrency);
+                      return (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Info className="h-3 w-3 shrink-0" />
+                          <span>
+                            ≈ {converted.toFixed(2)} {accountCurrency}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 <div className="space-y-1.5">
