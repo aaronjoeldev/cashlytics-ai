@@ -7,6 +7,22 @@ import type { ApiResponse, Account, DailyExpenseWithDetails } from "@/types/data
 import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { cookies } from "next/headers";
+import { convertCurrency, defaultCurrency, currencies, type Currency } from "@/lib/currency";
+
+async function getBaseCurrency(): Promise<Currency> {
+  const cookieStore = await cookies();
+  const value = cookieStore.get("currency")?.value;
+  if (value && currencies.includes(value as Currency)) return value as Currency;
+  return defaultCurrency;
+}
+
+function toBase(amount: number, fromCurrency: string | null | undefined, baseCurrency: Currency): number {
+  const from = (fromCurrency && currencies.includes(fromCurrency as Currency))
+    ? (fromCurrency as Currency)
+    : baseCurrency;
+  return convertCurrency(amount, from, baseCurrency);
+}
 
 function normalizeToMonthly(
   amount: number,
@@ -35,6 +51,8 @@ function normalizeToMonthly(
 
 interface DashboardStats {
   totalAssets: number;
+  /** True when the user has accounts in more than one currency — used by UI to show ≈ prefix */
+  hasMultiCurrency: boolean;
   reserveView: {
     monthlyIncome: number;
     monthlyExpenses: number;
@@ -126,14 +144,24 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
   const { userId } = auth;
 
   try {
-    // Gesamtvermögen (Summe aller Konten des Users)
+    const baseCurrency = await getBaseCurrency();
+
+    // Gesamtvermögen: fetch per account and convert each balance to baseCurrency
     const accountsResult = await db
       .select({
-        total: sql<string>`COALESCE(SUM(balance), 0)`,
+        balance: accounts.balance,
+        currency: accounts.currency,
       })
       .from(accounts)
       .where(eq(accounts.userId, userId));
-    const totalAssets = safeParseFloat(accountsResult[0]?.total || "0");
+
+    const totalAssets = accountsResult.reduce((sum, acc) => {
+      return sum + toBase(safeParseFloat(acc.balance), acc.currency, baseCurrency);
+    }, 0);
+
+    // Check whether accounts have mixed currencies (used in client for ≈ indicator)
+    const uniqueAccountCurrencies = new Set(accountsResult.map((a) => a.currency));
+    const hasMultiCurrency = uniqueAccountCurrencies.size > 1;
 
     const now = new Date();
     const { monthStart: currentMonthStart, monthEnd: currentMonthEnd } = getMonthDateRange(now);
@@ -141,7 +169,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
       new Date(now.getFullYear(), now.getMonth() - 1, 1)
     );
 
-    const [allIncomes, allExpenses, currentMonthDailyExpenses, lastMonthDailyExpenses] =
+    const [allIncomes, allExpenses, currentMonthDailyRows, lastMonthDailyRows] =
       await Promise.all([
         db
           .select({
@@ -149,6 +177,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
             recurrenceType: incomes.recurrenceType,
             startDate: incomes.startDate,
             endDate: incomes.endDate,
+            entryCurrency: incomes.currency,
           })
           .from(incomes)
           .where(eq(incomes.userId, userId)),
@@ -160,13 +189,15 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
             recurrenceInterval: expenses.recurrenceInterval,
             startDate: expenses.startDate,
             endDate: expenses.endDate,
+            entryCurrency: expenses.currency,
           })
           .from(expenses)
           .where(eq(expenses.userId, userId)),
 
         db
           .select({
-            total: sql<string>`COALESCE(SUM(amount), 0)`,
+            amount: dailyExpenses.amount,
+            entryCurrency: dailyExpenses.currency,
           })
           .from(dailyExpenses)
           .where(
@@ -179,7 +210,8 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
 
         db
           .select({
-            total: sql<string>`COALESCE(SUM(amount), 0)`,
+            amount: dailyExpenses.amount,
+            entryCurrency: dailyExpenses.currency,
           })
           .from(dailyExpenses)
           .where(
@@ -191,33 +223,42 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
           ),
       ]);
 
-    const currentDailyExpensesTotal = safeParseFloat(currentMonthDailyExpenses[0]?.total || "0");
-    const lastDailyExpensesTotal = safeParseFloat(lastMonthDailyExpenses[0]?.total || "0");
+    // Convert each daily expense row to baseCurrency before summing
+    const currentDailyExpensesTotal = currentMonthDailyRows.reduce(
+      (sum, e) => sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency),
+      0
+    );
+    const lastDailyExpensesTotal = lastMonthDailyRows.reduce(
+      (sum, e) => sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency),
+      0
+    );
 
     const reserveMonthlyIncome = allIncomes.reduce((sum, inc) => {
-      const amount = safeParseFloat(inc.amount);
+      const rawAmount = safeParseFloat(inc.amount);
+      let normalizedAmount = 0;
       if (inc.recurrenceType === "once") {
-        return inc.startDate >= currentMonthStart && inc.startDate <= currentMonthEnd
-          ? sum + amount
-          : sum;
+        if (inc.startDate >= currentMonthStart && inc.startDate <= currentMonthEnd)
+          normalizedAmount = rawAmount;
+      } else {
+        const hasStarted = inc.startDate <= now;
+        const isActive = !inc.endDate || inc.endDate >= currentMonthStart;
+        if (hasStarted && isActive) normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
       }
-      const hasStarted = inc.startDate <= now;
-      const isActive = !inc.endDate || inc.endDate >= currentMonthStart;
-      if (!hasStarted || !isActive) return sum;
-      return sum + normalizeIncomeToMonthly(amount, inc.recurrenceType);
+      return sum + toBase(normalizedAmount, inc.entryCurrency, baseCurrency);
     }, 0);
 
     const reserveLastMonthlyIncome = allIncomes.reduce((sum, inc) => {
-      const amount = safeParseFloat(inc.amount);
+      const rawAmount = safeParseFloat(inc.amount);
+      let normalizedAmount = 0;
       if (inc.recurrenceType === "once") {
-        return inc.startDate >= lastMonthStart && inc.startDate <= lastMonthEnd
-          ? sum + amount
-          : sum;
+        if (inc.startDate >= lastMonthStart && inc.startDate <= lastMonthEnd)
+          normalizedAmount = rawAmount;
+      } else {
+        const hasStarted = inc.startDate <= lastMonthEnd;
+        const isActive = !inc.endDate || inc.endDate >= lastMonthStart;
+        if (hasStarted && isActive) normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
       }
-      const hasStarted = inc.startDate <= lastMonthEnd;
-      const isActive = !inc.endDate || inc.endDate >= lastMonthStart;
-      if (!hasStarted || !isActive) return sum;
-      return sum + normalizeIncomeToMonthly(amount, inc.recurrenceType);
+      return sum + toBase(normalizedAmount, inc.entryCurrency, baseCurrency);
     }, 0);
 
     const reserveMonthlyExpenses =
@@ -226,10 +267,8 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
         const hasStarted = exp.startDate <= now;
         const isActive = !exp.endDate || exp.endDate >= currentMonthStart;
         if (!hasStarted || !isActive) return sum;
-        return (
-          sum +
-          normalizeToMonthly(safeParseFloat(exp.amount), exp.recurrenceType, exp.recurrenceInterval)
-        );
+        const rawAmount = normalizeToMonthly(safeParseFloat(exp.amount), exp.recurrenceType, exp.recurrenceInterval);
+        return sum + toBase(rawAmount, exp.entryCurrency, baseCurrency);
       }, 0);
 
     const reserveLastMonthlyExpenses =
@@ -238,10 +277,8 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
         const hasStarted = exp.startDate <= lastMonthEnd;
         const isActive = !exp.endDate || exp.endDate >= lastMonthStart;
         if (!hasStarted || !isActive) return sum;
-        return (
-          sum +
-          normalizeToMonthly(safeParseFloat(exp.amount), exp.recurrenceType, exp.recurrenceInterval)
-        );
+        const rawAmount = normalizeToMonthly(safeParseFloat(exp.amount), exp.recurrenceType, exp.recurrenceInterval);
+        return sum + toBase(rawAmount, exp.entryCurrency, baseCurrency);
       }, 0);
 
     const cashflowMonthlyIncome = allIncomes.reduce((sum, inc) => {
@@ -254,7 +291,9 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
         currentMonthStart,
         currentMonthEnd
       );
-      return inCurrentMonth ? sum + safeParseFloat(inc.amount) : sum;
+      return inCurrentMonth
+        ? sum + toBase(safeParseFloat(inc.amount), inc.entryCurrency, baseCurrency)
+        : sum;
     }, 0);
 
     const cashflowLastMonthlyIncome = allIncomes.reduce((sum, inc) => {
@@ -267,7 +306,9 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
         lastMonthStart,
         lastMonthEnd
       );
-      return inLastMonth ? sum + safeParseFloat(inc.amount) : sum;
+      return inLastMonth
+        ? sum + toBase(safeParseFloat(inc.amount), inc.entryCurrency, baseCurrency)
+        : sum;
     }, 0);
 
     const cashflowMonthlyExpenses =
@@ -283,7 +324,9 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
           currentMonthStart,
           currentMonthEnd
         );
-        return inCurrentMonth ? sum + safeParseFloat(exp.amount) : sum;
+        return inCurrentMonth
+          ? sum + toBase(safeParseFloat(exp.amount), exp.entryCurrency, baseCurrency)
+          : sum;
       }, 0);
 
     const cashflowLastMonthlyExpenses =
@@ -299,7 +342,9 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
           lastMonthStart,
           lastMonthEnd
         );
-        return inLastMonth ? sum + safeParseFloat(exp.amount) : sum;
+        return inLastMonth
+          ? sum + toBase(safeParseFloat(exp.amount), exp.entryCurrency, baseCurrency)
+          : sum;
       }, 0);
 
     const reserveSavingsRate = reserveMonthlyIncome - reserveMonthlyExpenses;
@@ -330,6 +375,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
       success: true,
       data: {
         totalAssets,
+        hasMultiCurrency,
         reserveView: {
           monthlyIncome: reserveMonthlyIncome,
           monthlyExpenses: reserveMonthlyExpenses,
@@ -363,6 +409,7 @@ export async function getCategoryBreakdown(
   const { userId } = auth;
 
   try {
+    const baseCurrency = await getBaseCurrency();
     const categoryMap = new Map<
       string,
       {
@@ -380,6 +427,7 @@ export async function getCategoryBreakdown(
         categoryIcon: categories.icon,
         categoryColor: categories.color,
         amount: dailyExpenses.amount,
+        entryCurrency: dailyExpenses.currency,
       })
       .from(dailyExpenses)
       .leftJoin(categories, sql`${dailyExpenses.categoryId} = ${categories.id}`)
@@ -387,7 +435,7 @@ export async function getCategoryBreakdown(
 
     for (const row of dailyExpensesResult) {
       const categoryId = row.categoryId || "uncategorized";
-      const amount = safeParseFloat(row.amount);
+      const amount = toBase(safeParseFloat(row.amount), row.entryCurrency, baseCurrency);
       if (categoryMap.has(categoryId)) {
         categoryMap.get(categoryId)!.total += amount;
       } else {
@@ -410,6 +458,7 @@ export async function getCategoryBreakdown(
         recurrenceType: expenses.recurrenceType,
         recurrenceInterval: expenses.recurrenceInterval,
         endDate: expenses.endDate,
+        entryCurrency: expenses.currency,
       })
       .from(expenses)
       .leftJoin(categories, sql`${expenses.categoryId} = ${categories.id}`)
@@ -424,11 +473,12 @@ export async function getCategoryBreakdown(
       if (row.recurrenceType === "once") continue;
 
       const categoryId = row.categoryId || "uncategorized-periodic";
-      const monthlyAmount = normalizeToMonthly(
+      const rawMonthly = normalizeToMonthly(
         safeParseFloat(row.amount),
         row.recurrenceType,
         row.recurrenceInterval
       );
+      const monthlyAmount = toBase(rawMonthly, row.entryCurrency, baseCurrency);
 
       if (categoryMap.has(categoryId)) {
         categoryMap.get(categoryId)!.total += monthlyAmount;
@@ -602,6 +652,7 @@ export async function getUpcomingPayments(
   try {
     const now = new Date();
     const endDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    const baseCurrency = await getBaseCurrency();
 
     const payments: UpcomingPayment[] = [];
 
@@ -632,7 +683,7 @@ export async function getUpcomingPayments(
         payments.push({
           id: item.expense.id,
           name: item.expense.name,
-          amount: safeParseFloat(item.expense.amount),
+          amount: toBase(safeParseFloat(item.expense.amount), item.expense.currency, baseCurrency),
           date: nextDate,
           type: "expense",
           category: item.category
@@ -666,7 +717,7 @@ export async function getUpcomingPayments(
       payments.push({
         id: item.dailyExpense.id,
         name: item.dailyExpense.description,
-        amount: safeParseFloat(item.dailyExpense.amount),
+        amount: toBase(safeParseFloat(item.dailyExpense.amount), item.dailyExpense.currency, baseCurrency),
         date: new Date(item.dailyExpense.date),
         type: "daily_expense",
         category: item.category

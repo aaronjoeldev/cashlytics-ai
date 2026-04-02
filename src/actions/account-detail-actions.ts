@@ -13,6 +13,22 @@ import type {
 import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { cookies } from "next/headers";
+import { convertCurrency, defaultCurrency, currencies, type Currency } from "@/lib/currency";
+
+async function getBaseCurrency(): Promise<Currency> {
+  const cookieStore = await cookies();
+  const value = cookieStore.get("currency")?.value;
+  if (value && currencies.includes(value as Currency)) return value as Currency;
+  return defaultCurrency;
+}
+
+function toBase(amount: number, fromCurrency: string | null | undefined, baseCurrency: Currency): number {
+  const from = (fromCurrency && currencies.includes(fromCurrency as Currency))
+    ? (fromCurrency as Currency)
+    : baseCurrency;
+  return convertCurrency(amount, from, baseCurrency);
+}
 
 function getMonthDateRange(month: number, year: number): { startDate: Date; endDate: Date } {
   const startDate = new Date(year, month - 1, 1, 0, 0, 0, 0);
@@ -117,16 +133,18 @@ export async function getAccountTransactions(
       account: r.account,
     }));
 
+    const baseCurrency = await getBaseCurrency();
+
     const totalIncome = incomesWithAccount.reduce(
-      (sum, income) => sum + safeParseFloat(income.amount),
+      (sum, income) => sum + toBase(safeParseFloat(income.amount), income.currency, baseCurrency),
       0
     );
     const totalExpenses = expensesWithDetails.reduce(
-      (sum, expense) => sum + safeParseFloat(expense.amount),
+      (sum, expense) => sum + toBase(safeParseFloat(expense.amount), expense.currency, baseCurrency),
       0
     );
     const totalDailyExpenses = dailyExpensesWithDetails.reduce(
-      (sum, expense) => sum + safeParseFloat(expense.amount),
+      (sum, expense) => sum + toBase(safeParseFloat(expense.amount), expense.currency, baseCurrency),
       0
     );
     const balance = totalIncome - totalExpenses - totalDailyExpenses;
