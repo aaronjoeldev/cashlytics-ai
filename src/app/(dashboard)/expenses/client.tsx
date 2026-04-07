@@ -420,7 +420,7 @@ export function ExpensesClient({
             </span>
             {!isMonthly && !isOnce && (
               <span className="text-xs font-medium whitespace-nowrap text-violet-500 dark:text-violet-400">
-                {formatCurrency(monthly)}/Mo {t("reserve") || "Rücklage"}
+                {formatCurrency(toBase(monthly, expense.currency))}/Mo {t("reserve") || "Rücklage"}
               </span>
             )}
           </div>
