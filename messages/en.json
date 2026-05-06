@@ -724,7 +724,7 @@
       "openTool": "Open",
       "converter": {
         "title": "Currency converter",
-        "description": "Live conversion with euro as the base currency."
+        "description": "Live conversion between the 20 most traded currencies."
       },
       "comingSoon": {
         "title": "More tools soon",
@@ -734,14 +734,15 @@
     },
     "converter": {
       "title": "Currency converter",
-      "subtitle": "Euro is always the base currency. Target currencies use the 20 most traded currencies worldwide.",
-      "amountLabel": "Amount in euro",
+      "subtitle": "Freely selectable source and target currency from the 20 most traded currencies worldwide.",
+      "amountLabel": "Amount",
       "targetLabel": "Target currency",
       "allCurrencies": "All currencies",
       "fullListHint": "A currency outside the quick picks is currently selected.",
       "baseCurrency": "Base amount",
       "convertedAmount": "Converted amount",
-      "rate": "1 EUR = {rate} {target}",
+      "rate": "1 {source} = {rate} {target}",
+      "swap": "Swap currencies",
       "liveRates": "Live rates via the connected API",
       "fallbackRates": "Fallback rates active",
       "scope": "20 most traded currencies worldwide"

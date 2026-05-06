@@ -724,7 +724,7 @@
       "openTool": "Öffnen",
       "converter": {
         "title": "Währungsrechner",
-        "description": "Live-Umrechnung mit Euro als Basiswährung."
+        "description": "Live-Umrechnung zwischen den 20 meistgehandelten Währungen."
       },
       "comingSoon": {
         "title": "Weitere Tools folgen",
@@ -734,14 +734,15 @@
     },
     "converter": {
       "title": "Währungsrechner",
-      "subtitle": "Basis ist immer Euro. Die Zielwährung basiert auf den 20 weltweit meistgehandelten Währungen.",
-      "amountLabel": "Betrag in Euro",
+      "subtitle": "Frei wählbare Quell- und Zielwährung aus den 20 meistgehandelten Währungen weltweit.",
+      "amountLabel": "Betrag",
       "targetLabel": "Zielwährung",
       "allCurrencies": "Alle Währungen",
       "fullListHint": "Aktuell ist eine Währung außerhalb der Schnellwahl ausgewählt.",
       "baseCurrency": "Ausgangsbetrag",
       "convertedAmount": "Umgerechneter Betrag",
-      "rate": "1 EUR = {rate} {target}",
+      "rate": "1 {source} = {rate} {target}",
+      "swap": "Währungen tauschen",
       "liveRates": "Live-Kurse über die angebundene API",
       "fallbackRates": "Fallback-Kurse aktiv",
       "scope": "20 meistgehandelte Währungen weltweit"

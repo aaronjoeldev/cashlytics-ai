@@ -23,19 +23,28 @@ import {
 
 type RatesResponse = Partial<Record<Currency, number>>;
 
-const TARGET_CURRENCIES = popularConverterCurrencies.filter((currency) => currency !== "EUR");
 const QUICK_CURRENCIES: Currency[] = ["USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "PLN"];
 
 export default function ToolsPage() {
   const t = useTranslations("tools");
   const tCurrency = useTranslations("currency");
-  const { locale } = useSettings();
+  const { locale, currency: baseCurrency } = useSettings();
 
   const [amount, setAmount] = useState("100");
+  const [sourceCurrency, setSourceCurrency] = useState<Currency>(baseCurrency);
   const [targetCurrency, setTargetCurrency] = useState<Currency>("USD");
   const [rates, setRates] = useState<RatesResponse>(fallbackRates);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLiveRates, setHasLiveRates] = useState(false);
+  const [sourceSynced, setSourceSynced] = useState(false);
+
+  // One-time sync: once DB settings load and override cookie value, align sourceCurrency
+  useEffect(() => {
+    if (!sourceSynced) {
+      setSourceCurrency(baseCurrency);
+      setSourceSynced(true);
+    }
+  }, [baseCurrency, sourceSynced]);
 
   useEffect(() => {
     let isMounted = true;
@@ -66,20 +75,37 @@ export default function ToolsPage() {
     };
   }, []);
 
+  function handleSourceChange(value: Currency) {
+    setSourceCurrency(value);
+    if (value === targetCurrency) setTargetCurrency(sourceCurrency);
+  }
+
+  function handleTargetChange(value: Currency) {
+    setTargetCurrency(value);
+    if (value === sourceCurrency) setSourceCurrency(targetCurrency);
+  }
+
+  function handleSwap() {
+    setSourceCurrency(targetCurrency);
+    setTargetCurrency(sourceCurrency);
+  }
+
   const parsedAmount = Number.parseFloat(amount.replace(",", "."));
   const safeAmount = Number.isFinite(parsedAmount) ? parsedAmount : 0;
-  const exchangeRate = rates[targetCurrency] ?? fallbackRates[targetCurrency];
+  const sourceRate = rates[sourceCurrency] ?? fallbackRates[sourceCurrency] ?? 1;
+  const targetRate = rates[targetCurrency] ?? fallbackRates[targetCurrency] ?? 1;
+  const exchangeRate = targetRate / sourceRate;
   const convertedAmount = safeAmount * exchangeRate;
 
   const numberLocale = locale === "de" ? "de-DE" : "en-US";
 
-  const eurFormatted = useMemo(
+  const sourceFormatted = useMemo(
     () =>
       new Intl.NumberFormat(numberLocale, {
         style: "currency",
-        currency: "EUR",
+        currency: sourceCurrency,
       }).format(safeAmount),
-    [numberLocale, safeAmount]
+    [numberLocale, safeAmount, sourceCurrency]
   );
 
   const targetFormatted = useMemo(
@@ -100,7 +126,7 @@ export default function ToolsPage() {
     [exchangeRate, numberLocale]
   );
 
-  const isQuickCurrency = QUICK_CURRENCIES.includes(targetCurrency);
+  const isQuickTargetCurrency = QUICK_CURRENCIES.includes(targetCurrency);
 
   return (
     <div className="space-y-6">
@@ -168,11 +194,11 @@ export default function ToolsPage() {
           <CardDescription>{t("converter.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
             <div className="grid gap-2">
-              <Label htmlFor="eur-amount">{t("converter.amountLabel")}</Label>
+              <Label htmlFor="amount">{t("converter.amountLabel")}</Label>
               <Input
-                id="eur-amount"
+                id="amount"
                 type="number"
                 min="0"
                 step="0.01"
@@ -181,10 +207,32 @@ export default function ToolsPage() {
                 onChange={(event) => setAmount(event.target.value)}
                 placeholder="100"
               />
+              <Select
+                value={sourceCurrency}
+                onValueChange={(value) => handleSourceChange(value as Currency)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {popularConverterCurrencies.map((currency) => (
+                    <SelectItem key={currency} value={currency}>
+                      {currency} · {tCurrency(currency)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="text-muted-foreground flex h-10 items-center justify-center">
-              <ArrowRightLeft className="h-4 w-4" />
+            <div className="flex items-center justify-center self-center">
+              <button
+                type="button"
+                onClick={handleSwap}
+                className="text-muted-foreground hover:text-foreground rounded-xl p-2 transition-colors hover:bg-white/[0.06]"
+                aria-label={t("converter.swap")}
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+              </button>
             </div>
 
             <div className="grid gap-2">
@@ -197,7 +245,7 @@ export default function ToolsPage() {
                     <button
                       key={currency}
                       type="button"
-                      onClick={() => setTargetCurrency(currency)}
+                      onClick={() => handleTargetChange(currency)}
                       className={[
                         "rounded-xl border px-3 py-2 text-sm transition-all duration-200",
                         isActive
@@ -218,20 +266,20 @@ export default function ToolsPage() {
               </div>
               <Select
                 value={targetCurrency}
-                onValueChange={(value) => setTargetCurrency(value as Currency)}
+                onValueChange={(value) => handleTargetChange(value as Currency)}
               >
                 <SelectTrigger id="target-currency-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TARGET_CURRENCIES.map((currency) => (
+                  {popularConverterCurrencies.map((currency) => (
                     <SelectItem key={currency} value={currency}>
                       {currency} · {tCurrency(currency)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {!isQuickCurrency ? (
+              {!isQuickTargetCurrency ? (
                 <p className="text-muted-foreground text-xs">{t("converter.fullListHint")}</p>
               ) : null}
             </div>
@@ -242,8 +290,8 @@ export default function ToolsPage() {
               <p className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
                 {t("converter.baseCurrency")}
               </p>
-              <p className="mt-2 text-3xl font-semibold">{eurFormatted}</p>
-              <p className="text-muted-foreground mt-2 text-sm">{tCurrency("EUR")}</p>
+              <p className="mt-2 text-3xl font-semibold">{sourceFormatted}</p>
+              <p className="text-muted-foreground mt-2 text-sm">{tCurrency(sourceCurrency)}</p>
             </div>
 
             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-5">
@@ -256,6 +304,7 @@ export default function ToolsPage() {
               </div>
               <p className="text-muted-foreground mt-2 text-sm">
                 {t("converter.rate", {
+                  source: sourceCurrency,
                   target: targetCurrency,
                   rate: rateFormatted,
                 })}
