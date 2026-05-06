@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { eq } from "drizzle-orm";
 
 const FRANKFURTER_URL =
-  "https://api.frankfurter.app/latest?base=EUR&symbols=USD,GBP,CHF,DKK";
+  "https://api.frankfurter.app/latest?base=EUR&symbols=USD,JPY,GBP,CNY,CHF,AUD,CAD,HKD,SGD,KRW,MXN,INR,NZD,SEK,NOK,PLN,TRY,ZAR,BRL,DKK";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -25,10 +25,7 @@ async function fetchRatesFromApi(): Promise<Record<string, number> | null> {
     });
 
     if (!response.ok) {
-      logger.warn(
-        `Frankfurter API returned status ${response.status}`,
-        "fetchRatesFromApi"
-      );
+      logger.warn(`Frankfurter API returned status ${response.status}`, "fetchRatesFromApi");
       return null;
     }
 
@@ -156,10 +153,7 @@ export async function getAllRates(): Promise<Record<Currency, number>> {
     }
 
     // API unreachable → try stale DB data
-    logger.warn(
-      "Frankfurter API unavailable — falling back to DB cache",
-      "getAllRates"
-    );
+    logger.warn("Frankfurter API unavailable — falling back to DB cache", "getAllRates");
     const staleDbRates = await loadRatesFromDb();
     if (staleDbRates) return staleDbRates;
 
@@ -184,10 +178,7 @@ export async function getExchangeRate(from: Currency, to: Currency): Promise<num
     const toRate = rates[to];
 
     if (!fromRate || !toRate) {
-      logger.warn(
-        `Missing rate for ${from} or ${to} — using fallback`,
-        "getExchangeRate"
-      );
+      logger.warn(`Missing rate for ${from} or ${to} — using fallback`, "getExchangeRate");
       return fallbackRates[to] / fallbackRates[from];
     }
 
@@ -203,11 +194,7 @@ export async function getExchangeRate(from: Currency, to: Currency): Promise<num
 /**
  * Converts `amount` from one currency to another using live rates.
  */
-export async function convertAmount(
-  amount: number,
-  from: Currency,
-  to: Currency
-): Promise<number> {
+export async function convertAmount(amount: number, from: Currency, to: Currency): Promise<number> {
   const rate = await getExchangeRate(from, to);
   return amount * rate;
 }
@@ -220,10 +207,7 @@ export async function refreshExchangeRates(): Promise<void> {
   const apiRates = await fetchRatesFromApi();
 
   if (!apiRates) {
-    logger.warn(
-      "refreshExchangeRates: API unavailable, cache not updated",
-      "refreshExchangeRates"
-    );
+    logger.warn("refreshExchangeRates: API unavailable, cache not updated", "refreshExchangeRates");
     return;
   }
 
