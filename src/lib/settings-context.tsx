@@ -100,21 +100,19 @@ export function SettingsProvider({
       });
   }, []);
 
-  const setLocale = useCallback((newLocale: Locale) => {
+  const setLocale = useCallback(async (newLocale: Locale) => {
     setLocaleState(newLocale);
     setCookie(LOCALE_COOKIE, newLocale);
-    // Persist to DB (fire-and-forget, cookie is already updated)
-    updateLocale(newLocale).catch(() => {});
-    // Reload the page to apply new locale
+    // Await DB write before reloading — reload cancels inflight requests
+    try { await updateLocale(newLocale); } catch { /* cookie already set */ }
     window.location.reload();
   }, []);
 
-  const setCurrency = useCallback((newCurrency: Currency) => {
+  const setCurrency = useCallback(async (newCurrency: Currency) => {
     setCurrencyState(newCurrency);
     setCookie(CURRENCY_COOKIE, newCurrency);
-    // Persist to DB (fire-and-forget, cookie is already updated for fast SSR)
-    updateBaseCurrency(newCurrency).catch(() => {});
-    // Reload so server-rendered pages re-fetch with the new currency cookie
+    // Await DB write before reloading — reload cancels inflight requests
+    try { await updateBaseCurrency(newCurrency); } catch { /* cookie already set */ }
     window.location.reload();
   }, []);
 
