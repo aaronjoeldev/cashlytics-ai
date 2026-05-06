@@ -10,6 +10,7 @@ import {
   Building2,
   Settings,
   Bot,
+  Calculator,
   ChevronRight,
   ArrowRightLeft,
   FolderOpen,
@@ -68,6 +69,7 @@ export function getMainNavItems(aiEnabled: boolean): NavItem[] {
 }
 
 const bottomNavItems: NavItem[] = [
+  { titleKey: "tools", url: "/tools", icon: Calculator },
   { titleKey: "settings", url: "/settings", icon: Settings },
   { titleKey: "assistant", url: "/assistant", icon: Bot },
 ];

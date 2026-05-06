@@ -169,6 +169,11 @@ export function AnalyticsClient({
   const hasCategories = categoryBreakdown.length > 0;
   const noDataLabel = t('noDataChart');
 
+  // Detect mixed account currencies — shown as hint in chart headers
+  const uniqueAccountCurrencies = new Set(accounts.map(a => a.currency));
+  const hasMultiCurrency = uniqueAccountCurrencies.size > 1;
+  const baseCurrencyHint = hasMultiCurrency ? ` (≈ ${currency})` : '';
+
   const cardCls = 'bg-card/80 dark:bg-white/[0.03] backdrop-blur-xl border-border/50 dark:border-white/[0.08]';
   const iconWrapCls = 'bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl p-2';
 
@@ -258,7 +263,7 @@ export function AnalyticsClient({
               <div className={iconWrapCls}><BarChart3 className="h-4 w-4 text-primary" /></div>
               <div>
                 <CardTitle>{t('incomeVsExpenses')}</CardTitle>
-                <CardDescription>{t('incomeVsExpensesDescription')}</CardDescription>
+                <CardDescription>{t('incomeVsExpensesDescription')}{baseCurrencyHint}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -285,7 +290,7 @@ export function AnalyticsClient({
               <div className={iconWrapCls}><PieChart className="h-4 w-4 text-primary" /></div>
               <div>
                 <CardTitle>{t('expensesByCategory')}</CardTitle>
-                <CardDescription>{t('expensesByCategoryDescription')}</CardDescription>
+                <CardDescription>{t('expensesByCategoryDescription')}{baseCurrencyHint}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -331,7 +336,7 @@ export function AnalyticsClient({
             <div className={iconWrapCls}><LineChart className="h-4 w-4 text-primary" /></div>
             <div>
               <CardTitle>{t('monthlyTrend')}</CardTitle>
-              <CardDescription>{t('monthlyTrendDescription')}</CardDescription>
+              <CardDescription>{t('monthlyTrendDescription')}{baseCurrencyHint}</CardDescription>
             </div>
           </div>
         </CardHeader>

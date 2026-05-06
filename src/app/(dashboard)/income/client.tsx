@@ -15,6 +15,7 @@ import { IncomeForm } from "@/components/organisms/income-form";
 import { deleteIncome } from "@/actions/income-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
+import { currencySymbols } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type { Account, IncomeWithAccount, Income } from "@/types/database";
 
@@ -29,12 +30,20 @@ function formatDate(date: Date | string) {
 
 export function IncomeClient({ accounts, initialIncomes }: IncomeClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
   const t = useTranslations("income");
   const tCommon = useTranslations("common");
   const tRecurrence = useTranslations("recurrence");
   const formatCurrency = (amount: string | number) =>
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
+  const formatEntryAmount = (amount: string | number, entryCurrency?: string | null) => {
+    const num = typeof amount === "string" ? parseFloat(amount) : amount;
+    if (entryCurrency && entryCurrency !== baseCurrency) {
+      const symbol = currencySymbols[entryCurrency as keyof typeof currencySymbols] ?? entryCurrency;
+      return `${num.toFixed(2)} ${symbol}`;
+    }
+    return formatCurrency(num);
+  };
   const [incomes, setIncomes] = useState(initialIncomes);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -191,7 +200,7 @@ export function IncomeClient({ accounts, initialIncomes }: IncomeClientProps) {
                         </p>
                       </div>
                       <p className="flex-shrink-0 font-semibold whitespace-nowrap text-emerald-500">
-                        {formatCurrency(income.amount)}
+                        {formatEntryAmount(income.amount, income.currency)}
                       </p>
                     </div>
                   </div>

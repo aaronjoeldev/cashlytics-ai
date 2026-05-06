@@ -64,6 +64,34 @@
       "when": 1772632682538,
       "tag": "0008_careful_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775042666053,
+      "tag": "0009_typical_lizard",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775042700000,
+      "tag": "0010_user_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775042800000,
+      "tag": "0011_drop_user_settings_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778048935827,
+      "tag": "0012_fix_user_settings_defaults",
+      "breakpoints": true
     }
   ]
 }

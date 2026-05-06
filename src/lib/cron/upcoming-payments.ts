@@ -3,6 +3,7 @@ import { differenceInDays, startOfDay, addDays } from "date-fns";
 import { db } from "@/lib/db";
 import { expenses, accounts } from "@/lib/db/schema";
 import { sendPushNotification } from "@/lib/push";
+import { defaultCurrency } from "@/lib/currency";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -188,7 +189,7 @@ export async function checkUpcomingPayments(): Promise<{
     recurrenceInterval: r.recurrenceInterval,
     startDate: r.startDate,
     endDate: r.endDate ?? null,
-    currency: r.currency ?? "EUR",
+    currency: r.currency ?? defaultCurrency,
   }));
 
   // Filter to expenses due tomorrow

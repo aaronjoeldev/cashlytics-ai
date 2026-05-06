@@ -7,6 +7,7 @@ import { Plus, Check, Upload, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { expenseSchema, dailyExpenseSchema, type ExpenseInput, type DailyExpenseInput, recurrenceTypes } from '@/lib/validations/transaction';
 import { createExpense, createDailyExpense, updateExpense, updateDailyExpense } from '@/actions/expense-actions';
+import { currencies, type Currency, currencySymbols, convertCurrency, defaultCurrency } from '@/lib/currency';
 import { createCategory } from '@/actions/category-actions';
 import { uploadDocument } from '@/actions/document-actions';
 import type { CategoryInput } from '@/lib/validations/category';
@@ -53,6 +54,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
   const t = useTranslations('expenses');
   const tCommon = useTranslations('common');
   const tRecurrence = useTranslations('recurrence');
+  const tCurrency = useTranslations('currency');
   const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'periodic' | 'daily'>('periodic');
@@ -68,7 +70,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [isUploadingPending, setIsUploadingPending] = useState(false);
   const [pendingFileError, setPendingFileError] = useState<string | null>(null);
-  
+
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
 
@@ -150,6 +152,9 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
     },
   });
 
+  const periodicCurrency = (periodicForm.watch('currency') as Currency) ?? defaultCurrency;
+  const dailyCurrency = (dailyForm.watch('currency') as Currency) ?? defaultCurrency;
+
   useEffect(() => {
     if (editExpense) {
       setActiveTab('periodic');
@@ -158,6 +163,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
         categoryId: editExpense.categoryId || '',
         name: editExpense.name,
         amount: editExpense.amount,
+        currency: (editExpense.currency as Currency) ?? defaultCurrency,
         recurrenceType: editExpense.recurrenceType as ExpenseInput['recurrenceType'],
         recurrenceInterval: editExpense.recurrenceInterval || undefined,
         startDate: new Date(editExpense.startDate),
@@ -172,6 +178,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
         categoryId: editDailyExpense.categoryId || '',
         description: editDailyExpense.description,
         amount: editDailyExpense.amount,
+        currency: (editDailyExpense.currency as Currency) ?? defaultCurrency,
         date: new Date(editDailyExpense.date),
         info: editDailyExpense.info || '',
       });
@@ -201,6 +208,27 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
       setPendingFileError(null);
     }
   }, [editExpense, editDailyExpense, periodicForm, dailyForm]);
+
+  const periodicAccountId = periodicForm.watch('accountId');
+  const dailyAccountId = dailyForm.watch('accountId');
+
+  useEffect(() => {
+    const current = periodicForm.getValues('currency');
+    if (current && current !== defaultCurrency) return;
+    const account = accounts.find(a => a.id === periodicAccountId);
+    if (account?.currency && currencies.includes(account.currency as Currency)) {
+      periodicForm.setValue('currency', account.currency as Currency);
+    }
+  }, [periodicAccountId, accounts]);
+
+  useEffect(() => {
+    const current = dailyForm.getValues('currency');
+    if (current && current !== defaultCurrency) return;
+    const account = accounts.find(a => a.id === dailyAccountId);
+    if (account?.currency && currencies.includes(account.currency as Currency)) {
+      dailyForm.setValue('currency', account.currency as Currency);
+    }
+  }, [dailyAccountId, accounts]);
 
   const handleCreateCategory = async () => {
     if (!newCatName.trim()) return;
@@ -244,6 +272,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           categoryId: data.categoryId || undefined,
           name: data.name,
           amount: data.amount,
+          currency: data.currency,
           recurrenceType: data.recurrenceType,
           recurrenceInterval: data.recurrenceInterval,
           startDate: data.startDate,
@@ -268,6 +297,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           endDate,
           isSubscription: data.isSubscription,
           info: data.info,
+          currency: data.currency,
         });
         if (result.success) {
           if (pendingFile) {
@@ -293,6 +323,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           categoryId: data.categoryId || undefined,
           description: data.description,
           amount: data.amount,
+          currency: data.currency,
           date: data.date,
           info: data.info,
         });
@@ -309,6 +340,7 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
           amount: data.amount,
           date: data.date,
           info: data.info,
+          currency: data.currency,
         });
         if (result.success) {
           if (pendingFile) {
@@ -362,7 +394,33 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t('amount')}</Label>
-                  <Input {...periodicForm.register('amount')} placeholder="0.00" type="number" step="0.01" />
+                  <div className="flex gap-1.5">
+                    <Input {...periodicForm.register('amount')} placeholder="0.00" type="number" step="0.01" className="flex-1" />
+                    <Select value={periodicCurrency} onValueChange={(v) => periodicForm.setValue('currency', v as Currency)}>
+                      <SelectTrigger className="w-[90px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map(c => (
+                          <SelectItem key={c} value={c}>{c} {currencySymbols[c]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(() => {
+                    const account = accounts.find(a => a.id === periodicForm.watch('accountId'));
+                    const accountCurrency = (account?.currency as Currency) || defaultCurrency;
+                    const rawAmount = parseFloat(periodicForm.watch('amount') || '0');
+                    if (periodicCurrency !== accountCurrency && rawAmount > 0) {
+                      const converted = convertCurrency(rawAmount, periodicCurrency, accountCurrency);
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          {tCurrency('convertedAmount', { amount: converted.toFixed(2), currency: accountCurrency })}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 <div className="space-y-2">
                   <Label>{t('recurrence')}</Label>
@@ -555,7 +613,33 @@ export function ExpenseForm({ accounts, categories: initialCategories, onSuccess
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{t('amount')}</Label>
-                  <Input {...dailyForm.register('amount')} placeholder="0.00" type="number" step="0.01" />
+                  <div className="flex gap-1.5">
+                    <Input {...dailyForm.register('amount')} placeholder="0.00" type="number" step="0.01" className="flex-1" />
+                    <Select value={dailyCurrency} onValueChange={(v) => dailyForm.setValue('currency', v as Currency)}>
+                      <SelectTrigger className="w-[90px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map(c => (
+                          <SelectItem key={c} value={c}>{c} {currencySymbols[c]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(() => {
+                    const account = accounts.find(a => a.id === dailyForm.watch('accountId'));
+                    const accountCurrency = (account?.currency as Currency) || defaultCurrency;
+                    const rawAmount = parseFloat(dailyForm.watch('amount') || '0');
+                    if (dailyCurrency !== accountCurrency && rawAmount > 0) {
+                      const converted = convertCurrency(rawAmount, dailyCurrency, accountCurrency);
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          {tCurrency('convertedAmount', { amount: converted.toFixed(2), currency: accountCurrency })}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 <div className="space-y-2">
                   <Label>{t('date')}</Label>

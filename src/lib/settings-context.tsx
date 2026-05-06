@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from "react";
 import { type Locale, defaultLocale, locales } from "@/i18n/config";
 import {
   type Currency,
@@ -8,6 +15,11 @@ import {
   currencies,
   formatCurrency as formatCurrencyUtil,
 } from "@/lib/currency";
+import {
+  getUserSettings,
+  updateBaseCurrency,
+  updateLocale,
+} from "@/actions/settings-actions";
 
 export interface SettingsContextType {
   locale: Locale;
@@ -66,16 +78,42 @@ export function SettingsProvider({
     getInitialCurrency(initialCurrency || defaultCurrency)
   );
 
-  const setLocale = useCallback((newLocale: Locale) => {
+  // On mount: load DB settings and override cookie values (DB is source of truth)
+  useEffect(() => {
+    getUserSettings()
+      .then((dbSettings) => {
+        const dbCurrency = dbSettings.baseCurrency as Currency;
+        const dbLocale = dbSettings.locale as Locale;
+
+        if (currencies.includes(dbCurrency)) {
+          setCurrencyState(dbCurrency);
+          setCookie(CURRENCY_COOKIE, dbCurrency);
+        }
+
+        if (locales.includes(dbLocale)) {
+          setLocaleState(dbLocale);
+          setCookie(LOCALE_COOKIE, dbLocale);
+        }
+      })
+      .catch(() => {
+        // If DB is unavailable, keep cookie/default values silently
+      });
+  }, []);
+
+  const setLocale = useCallback(async (newLocale: Locale) => {
     setLocaleState(newLocale);
     setCookie(LOCALE_COOKIE, newLocale);
-    // Reload the page to apply new locale
+    // Await DB write before reloading — reload cancels inflight requests
+    try { await updateLocale(newLocale); } catch { /* cookie already set */ }
     window.location.reload();
   }, []);
 
-  const setCurrency = useCallback((newCurrency: Currency) => {
+  const setCurrency = useCallback(async (newCurrency: Currency) => {
     setCurrencyState(newCurrency);
     setCookie(CURRENCY_COOKIE, newCurrency);
+    // Await DB write before reloading — reload cancels inflight requests
+    try { await updateBaseCurrency(newCurrency); } catch { /* cookie already set */ }
+    window.location.reload();
   }, []);
 
   const formatCurrency = useCallback(
@@ -84,7 +122,9 @@ export function SettingsProvider({
         de: "de-DE",
         en: "en-US",
       };
-      return formatCurrencyUtil(amount, currency, localeMap[locale]);
+      // Amount is already in baseCurrency (post-toBase conversion), so pass currency
+      // as baseCurrency too — convertCurrency(amount, currency, currency) = no-op.
+      return formatCurrencyUtil(amount, currency, localeMap[locale], currency);
     },
     [currency, locale]
   );

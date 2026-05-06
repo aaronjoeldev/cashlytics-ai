@@ -3,11 +3,14 @@ import {
   uuid,
   text,
   decimal,
+  numeric,
   timestamp,
   integer,
+  serial,
   pgEnum,
   boolean,
   primaryKey,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -113,7 +116,7 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 });
 
 // User relations - enables querying user's data with Drizzle relational queries
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   accounts: many(accounts),
   categories: many(categories),
   expenses: many(expenses),
@@ -127,6 +130,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   importRows: many(importRows),
   importConflicts: many(importConflicts),
   importDecisions: many(importDecisions),
+  settings: one(userSettings, {
+    fields: [users.id],
+    references: [userSettings.userId],
+  }),
 }));
 
 export const accounts = pgTable("accounts", {
@@ -166,6 +173,9 @@ export const expenses = pgTable("expenses", {
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
   isSubscription: boolean("is_subscription").default(false).notNull(),
+  currency: text("currency").default("EUR").notNull(),
+  originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
+  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
   info: text("info"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -181,6 +191,9 @@ export const incomes = pgTable("incomes", {
   recurrenceType: incomeRecurrenceTypeEnum("recurrence_type").notNull(),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
+  currency: text("currency").default("EUR").notNull(),
+  originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
+  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
   info: text("info"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -195,6 +208,9 @@ export const dailyExpenses = pgTable("daily_expenses", {
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   date: timestamp("date").notNull(),
+  currency: text("currency").default("EUR").notNull(),
+  originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
+  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
   info: text("info"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -215,6 +231,10 @@ export const transfers = pgTable("transfers", {
   recurrenceType: transferRecurrenceTypeEnum("recurrence_type").notNull(),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date"),
+  sourceCurrency: text("source_currency").default("EUR").notNull(),
+  targetCurrency: text("target_currency").default("EUR").notNull(),
+  targetAmount: numeric("target_amount", { precision: 12, scale: 2 }),
+  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -538,3 +558,46 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
     references: [users.id],
   }),
 }));
+
+// Exchange rate cache (for Phase 2 — Live-Rate-Cache)
+export const exchangeRates = pgTable("exchange_rates", {
+  id: serial("id").primaryKey(),
+  baseCurrency: text("base_currency").notNull(),
+  targetCurrency: text("target_currency").notNull(),
+  rate: numeric("rate", { precision: 10, scale: 6 }).notNull(),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+}, (table) => ({
+  uniquePair: unique().on(table.baseCurrency, table.targetCurrency),
+}));
+
+export const userSettings = pgTable("user_settings", {
+  userId: uuid("user_id").primaryKey(),
+  baseCurrency: text("base_currency").notNull(),
+  locale: text("locale").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userSettingsRelations = relations(userSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [userSettings.userId],
+    references: [users.id],
+  }),
+}));
+
+// Type exports for all tables
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type Category = typeof categories.$inferSelect;
+export type NewCategory = typeof categories.$inferInsert;
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = typeof expenses.$inferInsert;
+export type Income = typeof incomes.$inferSelect;
+export type NewIncome = typeof incomes.$inferInsert;
+export type DailyExpense = typeof dailyExpenses.$inferSelect;
+export type NewDailyExpense = typeof dailyExpenses.$inferInsert;
+export type Transfer = typeof transfers.$inferSelect;
+export type NewTransfer = typeof transfers.$inferInsert;
+export type ExchangeRate = typeof exchangeRates.$inferSelect;
+export type NewExchangeRate = typeof exchangeRates.$inferInsert;

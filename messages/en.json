@@ -38,6 +38,7 @@
     "accounts": "Accounts",
     "analytics": "Analytics",
     "goals": "Goals",
+    "tools": "Tools",
     "settings": "Settings",
     "assistant": "AI Assistant"
   },
@@ -690,9 +691,62 @@
   "currency": {
     "EUR": "Euro",
     "USD": "US Dollar",
+    "JPY": "Japanese Yen",
     "GBP": "British Pound",
+    "CNY": "Chinese Yuan",
     "CHF": "Swiss Franc",
-    "DKK": "Danish Krone"
+    "AUD": "Australian Dollar",
+    "CAD": "Canadian Dollar",
+    "HKD": "Hong Kong Dollar",
+    "SGD": "Singapore Dollar",
+    "KRW": "South Korean Won",
+    "MXN": "Mexican Peso",
+    "INR": "Indian Rupee",
+    "NZD": "New Zealand Dollar",
+    "SEK": "Swedish Krona",
+    "NOK": "Norwegian Krone",
+    "PLN": "Polish Złoty",
+    "TRY": "Turkish Lira",
+    "ZAR": "South African Rand",
+    "BRL": "Brazilian Real",
+    "DKK": "Danish Krone",
+    "selectLabel": "Currency",
+    "convertedAmount": "≈ {amount} {currency}",
+    "differentCurrencies": "Mixed currencies"
+  },
+  "tools": {
+    "title": "Tools",
+    "description": "Useful helpers for quick financial tasks.",
+    "hub": {
+      "title": "Tools Hub",
+      "subtitle": "Fast utilities for everyday finance tasks.",
+      "availableNow": "{count} tool available",
+      "openTool": "Open",
+      "converter": {
+        "title": "Currency converter",
+        "description": "Live conversion between the 20 most traded currencies."
+      },
+      "comingSoon": {
+        "title": "More tools soon",
+        "description": "This area will expand over time.",
+        "examples": "Coming soon: budget splitter, VAT helper, and recurring cost estimator"
+      }
+    },
+    "converter": {
+      "title": "Currency converter",
+      "subtitle": "Freely selectable source and target currency from the 20 most traded currencies worldwide.",
+      "amountLabel": "Amount",
+      "targetLabel": "Target currency",
+      "allCurrencies": "All currencies",
+      "fullListHint": "A currency outside the quick picks is currently selected.",
+      "baseCurrency": "Base amount",
+      "convertedAmount": "Converted amount",
+      "rate": "1 {source} = {rate} {target}",
+      "swap": "Swap currencies",
+      "liveRates": "Live rates via the connected API",
+      "fallbackRates": "Fallback rates active",
+      "scope": "20 most traded currencies worldwide"
+    }
   },
   "recurrence": {
     "once": "One-time",

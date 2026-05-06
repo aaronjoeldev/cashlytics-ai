@@ -9,6 +9,7 @@ import { AccountForm } from "@/components/organisms/account-form";
 import { deleteAccount, updateAccount } from "@/actions/account-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
+import { convertCurrency, currencies, type Currency } from "@/lib/currency";
 import { Trash2, Pencil, Building2, PiggyBank, TrendingUp, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type {
@@ -76,9 +77,16 @@ export function AccountsClient({
 }: AccountsClientProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { formatCurrency: fmt } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
   const formatCurrency = (amount: string | number) =>
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
+
+  const toBase = (amount: number, entryCurrency?: string | null): number => {
+    const from = (entryCurrency && currencies.includes(entryCurrency as Currency))
+      ? (entryCurrency as Currency)
+      : baseCurrency;
+    return convertCurrency(amount, from, baseCurrency);
+  };
   const [accounts, setAccounts] = useState(initialAccounts);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBalance, setEditBalance] = useState("");
@@ -147,12 +155,12 @@ export function AccountsClient({
     const incomeTotal = initialIncomes
       .filter((income) => income.accountId === account.id)
       .filter((income) => isTransactionInMonth(income, monthStart, monthEnd))
-      .reduce((sum, income) => sum + parseFloat(income.amount), 0);
+      .reduce((sum, income) => sum + toBase(parseFloat(income.amount), income.currency), 0);
 
     const expenseTotal = initialExpenses
       .filter((expense) => expense.accountId === account.id)
       .filter((expense) => isTransactionInMonth(expense, monthStart, monthEnd))
-      .reduce((sum, expense) => sum + parseFloat(expense.amount), 0);
+      .reduce((sum, expense) => sum + toBase(parseFloat(expense.amount), expense.currency), 0);
 
     const transferDelta = initialTransfers
       .filter(
@@ -161,7 +169,7 @@ export function AccountsClient({
           isTransactionInMonth(transfer, monthStart, monthEnd)
       )
       .reduce((sum, transfer) => {
-        const amount = parseFloat(transfer.amount);
+        const amount = toBase(parseFloat(transfer.amount), transfer.sourceCurrency);
         if (transfer.targetAccountId === account.id) return sum + amount;
         if (transfer.sourceAccountId === account.id) return sum - amount;
         return sum;

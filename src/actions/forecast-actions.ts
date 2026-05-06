@@ -7,6 +7,22 @@ import type { ApiResponse, Account, Expense, Income, Transfer } from "@/types/da
 import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { cookies } from "next/headers";
+import { convertCurrency, defaultCurrency, currencies, type Currency } from "@/lib/currency";
+
+async function getBaseCurrency(): Promise<Currency> {
+  const cookieStore = await cookies();
+  const value = cookieStore.get("currency")?.value;
+  if (value && currencies.includes(value as Currency)) return value as Currency;
+  return defaultCurrency;
+}
+
+function toBase(amount: number, fromCurrency: string | null | undefined, baseCurrency: Currency): number {
+  const from = (fromCurrency && currencies.includes(fromCurrency as Currency))
+    ? (fromCurrency as Currency)
+    : baseCurrency;
+  return convertCurrency(amount, from, baseCurrency);
+}
 
 export type AccountForecast = {
   account: Account;
@@ -236,6 +252,7 @@ export async function getAccountForecast(
 
     const isCumulativeAccount = account.type === "savings" || account.type === "etf";
     let cumulativeBalance = isCumulativeAccount ? currentBalance : 0;
+    const baseCurrency = await getBaseCurrency();
 
     for (let i = 1; i <= months; i++) {
       const targetDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
@@ -244,19 +261,22 @@ export async function getAccountForecast(
 
       let monthIncome = 0;
       for (const income of accountIncomes) {
-        monthIncome += calculateIncomeForMonth(income, targetMonth, targetYear);
+        const rawAmount = calculateIncomeForMonth(income, targetMonth, targetYear);
+        monthIncome += toBase(rawAmount, income.currency, baseCurrency);
       }
 
       let monthExpenses = 0;
       for (const expense of accountExpenses) {
-        monthExpenses += calculateExpenseForMonth(expense, targetMonth, targetYear);
+        const rawAmount = calculateExpenseForMonth(expense, targetMonth, targetYear);
+        monthExpenses += toBase(rawAmount, expense.currency, baseCurrency);
       }
 
       let transfersIn = 0;
       let transfersOut = 0;
       for (const transfer of accountTransfers) {
-        const amount = calculateTransferForMonth(transfer, targetMonth, targetYear);
-        if (amount > 0) {
+        const rawAmount = calculateTransferForMonth(transfer, targetMonth, targetYear);
+        if (rawAmount > 0) {
+          const amount = toBase(rawAmount, transfer.sourceCurrency, baseCurrency);
           if (transfer.targetAccountId === accountId) {
             transfersIn += amount;
           } else if (transfer.sourceAccountId === accountId) {

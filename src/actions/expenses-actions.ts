@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import type { ApiResponse, Expense, ExpenseWithDetails, NewExpense } from "@/types/database";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { defaultCurrency } from "@/lib/currency";
 
 export async function getExpenses(filters?: {
   accountId?: string;
@@ -108,6 +109,9 @@ export async function createExpense(data: {
   recurrenceInterval?: number | null;
   startDate: Date | string;
   endDate?: Date | string | null;
+  currency?: string;
+  originalAmount?: number | null;
+  exchangeRate?: number | null;
 }): Promise<ApiResponse<Expense>> {
   try {
     const authResult = await requireAuth();
@@ -118,7 +122,7 @@ export async function createExpense(data: {
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
     const [ownedAccount] = await db
-      .select({ id: accounts.id })
+      .select({ id: accounts.id, currency: accounts.currency })
       .from(accounts)
       .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
       .limit(1);
@@ -138,6 +142,11 @@ export async function createExpense(data: {
       }
     }
 
+    const currency = data.currency ?? defaultCurrency;
+
+    // TODO (Phase 2): If currency !== ownedAccount.currency, call getExchangeRate(currency, ownedAccount.currency)
+    // to auto-populate exchangeRate for currency conversion at booking time.
+
     const [newExpense] = await db
       .insert(expenses)
       .values({
@@ -154,6 +163,9 @@ export async function createExpense(data: {
             ? new Date(data.endDate)
             : data.endDate
           : null,
+        currency,
+        originalAmount: data.originalAmount != null ? data.originalAmount.toString() : null,
+        exchangeRate: data.exchangeRate != null ? data.exchangeRate.toString() : null,
       })
       .returning();
 

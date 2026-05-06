@@ -8,6 +8,7 @@ import { TransferForm } from '@/components/organisms/transfer-form';
 import { deleteTransfer } from '@/actions/transfer-actions';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/lib/settings-context';
+import { convertCurrency, currencies, type Currency } from '@/lib/currency';
 import { useTranslations } from 'next-intl';
 import type { Account, TransferWithDetails } from '@/types/database';
 
@@ -25,10 +26,17 @@ export function TransfersClient({
   initialTransfers,
 }: TransfersClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
   const t = useTranslations('transfers');
   const tRecurrence = useTranslations('recurrence');
   const formatCurrency = (amount: string | number) => fmt(typeof amount === 'string' ? parseFloat(amount) : amount);
+
+  const toBase = (amount: number, entryCurrency?: string | null): number => {
+    const from = (entryCurrency && currencies.includes(entryCurrency as Currency))
+      ? (entryCurrency as Currency)
+      : baseCurrency;
+    return convertCurrency(amount, from, baseCurrency);
+  };
   const [transfers, setTransfers] = useState(initialTransfers);
 
   const getDebitLabel = (transfer: { recurrenceType: string; startDate: Date | string }): string => {
@@ -53,7 +61,7 @@ export function TransfersClient({
 
   const totalMonthlyRecurring = recurringTransfers
     .filter(t => t.recurrenceType === 'monthly')
-    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    .reduce((sum, t) => sum + toBase(parseFloat(t.amount), t.sourceCurrency), 0);
 
   const handleSuccess = (data: { sourceAccountId: string; targetAccountId: string; [key: string]: unknown }) => {
     const newTransfer: TransferWithDetails = {
