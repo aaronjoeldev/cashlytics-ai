@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, Coins, Loader2, Sparkles, WandSparkles } from "lucide-react";
+import { ArrowRightLeft, Coins, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +34,6 @@ export default function ToolsPage() {
   const [targetCurrency, setTargetCurrency] = useState<Currency>("USD");
   const [rates, setRates] = useState<RatesResponse>(fallbackRates);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasLiveRates, setHasLiveRates] = useState(false);
   const [sourceSynced, setSourceSynced] = useState(false);
 
   // One-time sync: once DB settings load and override cookie value, align sourceCurrency
@@ -58,11 +56,9 @@ export default function ToolsPage() {
         if (!isMounted) return;
 
         setRates({ ...fallbackRates, ...data, EUR: 1 });
-        setHasLiveRates(true);
       } catch {
         if (!isMounted) return;
         setRates(fallbackRates);
-        setHasLiveRates(false);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -136,54 +132,6 @@ export default function ToolsPage() {
         </h2>
         <p className="text-muted-foreground/60 mt-1.5 text-sm">{t("description")}</p>
       </div>
-
-      <Card className="border-white/10 bg-gradient-to-br from-white/[0.04] via-transparent to-amber-500/[0.04]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            {t("hub.title")}
-          </CardTitle>
-          <CardDescription>{t("hub.subtitle")}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-foreground font-medium">{t("hub.converter.title")}</p>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t("hub.converter.description")}
-                </p>
-              </div>
-              <div className="rounded-xl bg-amber-500/15 p-2">
-                <Coins className="h-4 w-4 text-amber-500" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
-                {t("hub.availableNow", { count: 1 })}
-              </span>
-              <Button asChild size="sm" className="rounded-xl">
-                <a href="#currency-converter">{t("hub.openTool")}</a>
-              </Button>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 opacity-85">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-foreground font-medium">{t("hub.comingSoon.title")}</p>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {t("hub.comingSoon.description")}
-                </p>
-              </div>
-              <div className="rounded-xl bg-white/[0.05] p-2">
-                <WandSparkles className="text-muted-foreground h-4 w-4" />
-              </div>
-            </div>
-            <p className="text-muted-foreground mt-4 text-xs">{t("hub.comingSoon.examples")}</p>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card id="currency-converter">
         <CardHeader>
@@ -312,11 +260,6 @@ export default function ToolsPage() {
             </div>
           </div>
 
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            <span>{hasLiveRates ? t("converter.liveRates") : t("converter.fallbackRates")}</span>
-            <span>•</span>
-            <span>{t("converter.scope")}</span>
-          </div>
         </CardContent>
       </Card>
     </div>
