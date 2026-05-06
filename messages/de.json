@@ -38,6 +38,7 @@
     "accounts": "Konten",
     "analytics": "Analysen",
     "goals": "Ziele",
+    "tools": "Tools",
     "settings": "Einstellungen",
     "assistant": "KI Assistent"
   },
@@ -690,12 +691,61 @@
   "currency": {
     "EUR": "Euro",
     "USD": "US-Dollar",
+    "JPY": "Japanischer Yen",
     "GBP": "Britisches Pfund",
+    "CNY": "Chinesischer Yuan",
     "CHF": "Schweizer Franken",
+    "AUD": "Australischer Dollar",
+    "CAD": "Kanadischer Dollar",
+    "HKD": "Hongkong-Dollar",
+    "SGD": "Singapur-Dollar",
+    "KRW": "Südkoreanischer Won",
+    "MXN": "Mexikanischer Peso",
+    "INR": "Indische Rupie",
+    "NZD": "Neuseeland-Dollar",
+    "SEK": "Schwedische Krone",
+    "NOK": "Norwegische Krone",
+    "PLN": "Polnischer Złoty",
+    "TRY": "Türkische Lira",
+    "ZAR": "Südafrikanischer Rand",
+    "BRL": "Brasilianischer Real",
     "DKK": "Dänische Krone",
     "selectLabel": "Währung",
     "convertedAmount": "≈ {amount} {currency}",
     "differentCurrencies": "Gemischte Währungen"
+  },
+  "tools": {
+    "title": "Tools",
+    "description": "Praktische Helfer für schnelle Finanzaufgaben.",
+    "hub": {
+      "title": "Tools Hub",
+      "subtitle": "Schnelle Utilities für alltägliche Finanzaufgaben.",
+      "availableNow": "{count} Tool verfügbar",
+      "openTool": "Öffnen",
+      "converter": {
+        "title": "Währungsrechner",
+        "description": "Live-Umrechnung mit Euro als Basiswährung."
+      },
+      "comingSoon": {
+        "title": "Weitere Tools folgen",
+        "description": "Der Bereich wird nach und nach erweitert.",
+        "examples": "Demnächst z. B. Budget-Splitter, MwSt.-Helfer und Abo-Rechner"
+      }
+    },
+    "converter": {
+      "title": "Währungsrechner",
+      "subtitle": "Basis ist immer Euro. Die Zielwährung basiert auf den 20 weltweit meistgehandelten Währungen.",
+      "amountLabel": "Betrag in Euro",
+      "targetLabel": "Zielwährung",
+      "allCurrencies": "Alle Währungen",
+      "fullListHint": "Aktuell ist eine Währung außerhalb der Schnellwahl ausgewählt.",
+      "baseCurrency": "Ausgangsbetrag",
+      "convertedAmount": "Umgerechneter Betrag",
+      "rate": "1 EUR = {rate} {target}",
+      "liveRates": "Live-Kurse über die angebundene API",
+      "fallbackRates": "Fallback-Kurse aktiv",
+      "scope": "20 meistgehandelte Währungen weltweit"
+    }
   },
   "recurrence": {
     "once": "Einmalig",
