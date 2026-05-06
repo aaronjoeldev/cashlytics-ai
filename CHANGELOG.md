@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.6.1...v0.7.0) (2026-05-06)
+
+### ✨ Features
+
+- **ai:** derive supported currency list dynamically from currencies constant ([78ae71e](https://github.com/aaronjoeldev/cashlytics-ai/commit/78ae71e81c2d54a39b02eb9f61ee5c284ef90976))
+- **currency:** expand supported currencies to top 20 globally traded ([5edf2ed](https://github.com/aaronjoeldev/cashlytics-ai/commit/5edf2ed277084387d3d6dc3a4f0062eebdb9da30))
+- **scan:** receipt scanner and import engine multi-currency support ([0a37a1c](https://github.com/aaronjoeldev/cashlytics-ai/commit/0a37a1ca37b12cdc151e8f2708c16a06353cd141))
+- **schema:** add per-entry currency fields and user settings table ([a371296](https://github.com/aaronjoeldev/cashlytics-ai/commit/a371296dce37fb7e98d91630e4112324f842fca9))
+- **settings:** persist user currency and locale preferences to database ([808079b](https://github.com/aaronjoeldev/cashlytics-ai/commit/808079b7f642f28ecff9d860550d3a1dcea4e8b3))
+- **tools:** add tools hub with live currency converter ([8b9273c](https://github.com/aaronjoeldev/cashlytics-ai/commit/8b9273c3b9de4a74650149c8d8ae0764abae5fa0))
+- **tools:** remove tools hub card and rate footer from converter ([ea04c78](https://github.com/aaronjoeldev/cashlytics-ai/commit/ea04c78512a5a3a9b68e2ed67b214c2fccdec3ef))
+- **tools:** variable source currency in converter with swap button ([170f9e0](https://github.com/aaronjoeldev/cashlytics-ai/commit/170f9e0c24be604187bcdd8eb6ef1c0975fef41a))
+
+### 🐛 Bug Fixes
+
+- **currency:** convert all client-side aggregations to user's base currency ([a466234](https://github.com/aaronjoeldev/cashlytics-ai/commit/a466234733d98d900f270045af82607f3b199545))
+- **currency:** convert all server-side aggregations to user's base currency ([b7c5c0b](https://github.com/aaronjoeldev/cashlytics-ai/commit/b7c5c0bd26c4d776430eab84313fbb558626a47a))
+- **currency:** replace hardcoded EUR fallbacks with defaultCurrency ([145ac8f](https://github.com/aaronjoeldev/cashlytics-ai/commit/145ac8f8d5806c882a96eb527191aae4f0ff285d))
+- **db:** use singleton connection pool to prevent hot-reload exhaustion ([70c9b37](https://github.com/aaronjoeldev/cashlytics-ai/commit/70c9b371803d88227d88ba9f46c3460290421617))
+- **expenses:** convert periodic reserve badge to base currency ([d7df0ae](https://github.com/aaronjoeldev/cashlytics-ai/commit/d7df0aef34744c7c99afd6bd87c63e0bf6e5b58f))
+- **forms:** resolve zod resolver type mismatch for currency field ([fd757bf](https://github.com/aaronjoeldev/cashlytics-ai/commit/fd757bfa8f2f85bb88145f5e44024399f0b88563))
+- **migration:** remove hardcoded EUR/de defaults from user_settings columns ([5d3a777](https://github.com/aaronjoeldev/cashlytics-ai/commit/5d3a777636c2142cf75694e86cbb1f799e64dd2e))
+- **schema:** use env-driven defaultCurrency and defaultLocale in userSettings ([1b23237](https://github.com/aaronjoeldev/cashlytics-ai/commit/1b23237e9e2c2390b9253d970087444ba2148ef5))
+- **settings:** await DB write before page reload to prevent currency reset ([4fef17a](https://github.com/aaronjoeldev/cashlytics-ai/commit/4fef17a7c5da7c0dd74f55deb858e1e09fd25717))
+
 ## [0.6.1](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.6.0...v0.6.1) (2026-03-29)
 
 ### 🐛 Bug Fixes
