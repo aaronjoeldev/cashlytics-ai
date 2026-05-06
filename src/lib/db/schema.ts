@@ -13,8 +13,6 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { defaultCurrency } from "@/lib/currency";
-import { defaultLocale } from "@/i18n/config";
 
 export const accountTypeEnum = pgEnum("account_type", ["checking", "savings", "etf"]);
 export const recurrenceTypeEnum = pgEnum("recurrence_type", [
@@ -574,8 +572,8 @@ export const exchangeRates = pgTable("exchange_rates", {
 
 export const userSettings = pgTable("user_settings", {
   userId: uuid("user_id").primaryKey(),
-  baseCurrency: text("base_currency").default(defaultCurrency).notNull(),
-  locale: text("locale").default(defaultLocale).notNull(),
+  baseCurrency: text("base_currency").notNull(),
+  locale: text("locale").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
