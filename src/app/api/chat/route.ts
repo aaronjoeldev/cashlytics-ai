@@ -1,28 +1,30 @@
-import { openai } from '@ai-sdk/openai';
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
-import { tools } from '@/lib/ai/tools';
-import { getAccounts } from '@/actions/account-actions';
-import { getCategories } from '@/actions/category-actions';
-import { getExpenses } from '@/actions/expense-actions';
-import { rateLimit } from '@/lib/rate-limiter';
-import { logger } from '@/lib/logger';
+import { openai } from "@ai-sdk/openai";
+import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from "ai";
+import { tools } from "@/lib/ai/tools";
+import { getAccounts } from "@/actions/account-actions";
+import { getCategories } from "@/actions/category-actions";
+import { getExpenses } from "@/actions/expense-actions";
+import { currencies } from "@/lib/currency";
+import { rateLimit } from "@/lib/rate-limiter";
+import { logger } from "@/lib/logger";
 
 const MAX_MESSAGES = 100;
+const supportedCurrencyList = currencies.join(", ");
 
 /**
  * Strips characters that could break LLM prompt structure or enable injection attacks.
  */
 function sanitizeForPrompt(str: string): string {
   return str
-    .replace(/`{1,3}/g, '')
-    .replace(/"{3}/g, '')
-    .replace(/'{3}/g, '')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\[INST\]/gi, '')
-    .replace(/<<SYS>>/gi, '')
-    .replace(/<\/s>/gi, '')
-    .replace(/\[\/INST\]/gi, '')
+    .replace(/`{1,3}/g, "")
+    .replace(/"{3}/g, "")
+    .replace(/'{3}/g, "")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\[INST\]/gi, "")
+    .replace(/<<SYS>>/gi, "")
+    .replace(/<\/s>/gi, "")
+    .replace(/\[\/INST\]/gi, "")
     .trim();
 }
 
@@ -77,7 +79,7 @@ BEISPIEL für "Ich habe 30€ getankt":
 ## WÄHRUNGS-REGELN
 
 Wenn der User eine Transaktion in einer fremden Währung erwähnt (z.B. "45 USD", "£20"), setze den currency-Parameter entsprechend.
-Unterstützte Währungen: EUR, USD, GBP, CHF, DKK.
+Unterstützte Währungen: ${supportedCurrencyList}.
 Ohne explizite Währungsangabe den currency-Parameter weglassen (Default: Kontowährung).
 
 ## DATUM-REGELN
@@ -110,13 +112,13 @@ Weise den Nutzer freundlich darauf hin, falls er dich bittet, ein Dokument zu le
 
 async function buildSystemPrompt(): Promise<string> {
   const today = new Date();
-  const dateStr = today.toLocaleDateString('de-DE', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  const dateStr = today.toLocaleDateString("de-DE", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
-  const isoDate = today.toISOString().split('T')[0];
+  const isoDate = today.toISOString().split("T")[0];
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
 
@@ -129,28 +131,31 @@ async function buildSystemPrompt(): Promise<string> {
   const accountsContext =
     accountsResult.success && accountsResult.data.length > 0
       ? accountsResult.data
-          .map((a) => `  - "${sanitizeForPrompt(a.name)}" | Typ: ${sanitizeForPrompt(a.type)} | Stand: ${a.balance} ${sanitizeForPrompt(a.currency)} | ID: ${a.id}`)
-          .join('\n')
-      : '  (Keine Konten vorhanden – zuerst createAccount aufrufen)';
+          .map(
+            (a) =>
+              `  - "${sanitizeForPrompt(a.name)}" | Typ: ${sanitizeForPrompt(a.type)} | Stand: ${a.balance} ${sanitizeForPrompt(a.currency)} | ID: ${a.id}`
+          )
+          .join("\n")
+      : "  (Keine Konten vorhanden – zuerst createAccount aufrufen)";
 
   const categoriesContext =
     categoriesResult.success && categoriesResult.data.length > 0
       ? categoriesResult.data
-          .map((c) => `  - "${sanitizeForPrompt(c.name)}" ${c.icon ?? ''} | ID: ${c.id}`)
-          .join('\n')
-      : '  (Keine Kategorien vorhanden)';
+          .map((c) => `  - "${sanitizeForPrompt(c.name)}" ${c.icon ?? ""} | ID: ${c.id}`)
+          .join("\n")
+      : "  (Keine Kategorien vorhanden)";
 
   const expensesContext =
     expensesResult.success && expensesResult.data.length > 0
       ? expensesResult.data
           .map((e) => {
-            const cat = e.category?.name ? ` [${sanitizeForPrompt(e.category.name)}]` : '';
-            const start = new Date(e.startDate).toLocaleDateString('de-DE');
-            const end = e.endDate ? ` bis ${new Date(e.endDate).toLocaleDateString('de-DE')}` : '';
+            const cat = e.category?.name ? ` [${sanitizeForPrompt(e.category.name)}]` : "";
+            const start = new Date(e.startDate).toLocaleDateString("de-DE");
+            const end = e.endDate ? ` bis ${new Date(e.endDate).toLocaleDateString("de-DE")}` : "";
             return `  - "${sanitizeForPrompt(e.name)}"${cat} | ${e.amount}€ | ${e.recurrenceType} | ab ${start}${end} | ID: ${e.id}`;
           })
-          .join('\n')
-      : '  (Keine periodischen Ausgaben vorhanden)';
+          .join("\n")
+      : "  (Keine periodischen Ausgaben vorhanden)";
 
   return `${BASE_SYSTEM_PROMPT}
 
@@ -171,17 +176,14 @@ ${expensesContext}`;
 
 export async function POST(req: Request) {
   // Rate limiting: 20 requests per minute per IP
-  const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'local';
+  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "local";
   const rl = rateLimit(`chat:${ip}`, 20, 60_000);
   if (!rl.allowed) {
     const retryAfterSecs = Math.ceil((rl.resetAt - Date.now()) / 1000);
-    return new Response(
-      JSON.stringify({ error: 'Zu viele Anfragen. Bitte warte einen Moment.' }),
-      {
-        status: 429,
-        headers: { 'Content-Type': 'application/json', 'Retry-After': String(retryAfterSecs) },
-      }
-    );
+    return new Response(JSON.stringify({ error: "Zu viele Anfragen. Bitte warte einen Moment." }), {
+      status: 429,
+      headers: { "Content-Type": "application/json", "Retry-After": String(retryAfterSecs) },
+    });
   }
 
   try {
@@ -189,16 +191,16 @@ export async function POST(req: Request) {
     try {
       body = await req.json();
     } catch {
-      return new Response(JSON.stringify({ error: 'Ungültiger JSON-Body.' }), {
+      return new Response(JSON.stringify({ error: "Ungültiger JSON-Body." }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
-    if (!body || typeof body !== 'object' || !('messages' in body)) {
+    if (!body || typeof body !== "object" || !("messages" in body)) {
       return new Response(
         JSON.stringify({ error: 'Fehlende "messages"-Eigenschaft im Request-Body.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
@@ -207,24 +209,24 @@ export async function POST(req: Request) {
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(
         JSON.stringify({ error: '"messages" muss ein nicht-leeres Array sein.' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
     if (messages.length > MAX_MESSAGES) {
       return new Response(
         JSON.stringify({ error: `Zu viele Nachrichten. Maximum: ${MAX_MESSAGES}.` }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
-      if (!msg || typeof msg !== 'object' || !('role' in msg)) {
-        return new Response(
-          JSON.stringify({ error: `Nachricht ${i} fehlt "role".` }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
+      if (!msg || typeof msg !== "object" || !("role" in msg)) {
+        return new Response(JSON.stringify({ error: `Nachricht ${i} fehlt "role".` }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
     }
 
@@ -232,14 +234,16 @@ export async function POST(req: Request) {
     const systemPrompt = await buildSystemPrompt();
 
     const result = streamText({
-      model: openai('gpt-4o'),
+      model: openai("gpt-4o"),
       system: systemPrompt,
-      messages: await convertToModelMessages(validatedMessages, { ignoreIncompleteToolCalls: true }),
+      messages: await convertToModelMessages(validatedMessages, {
+        ignoreIncompleteToolCalls: true,
+      }),
       tools,
       stopWhen: stepCountIs(10),
-      toolChoice: 'auto',
+      toolChoice: "auto",
       onStepFinish: ({ toolCalls, toolResults, finishReason }) => {
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.log(`[AI Step] finish=${finishReason}`);
           if (toolCalls?.length) {
             for (const call of toolCalls) {
@@ -258,10 +262,10 @@ export async function POST(req: Request) {
 
     return result.toUIMessageStreamResponse();
   } catch (error) {
-    logger.error('Chat API error', 'POST /api/chat', error);
+    logger.error("Chat API error", "POST /api/chat", error);
     return new Response(
-      JSON.stringify({ error: 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: "Ein Fehler ist aufgetreten. Bitte versuche es erneut." }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }

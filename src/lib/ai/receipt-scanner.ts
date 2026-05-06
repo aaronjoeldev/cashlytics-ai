@@ -1,13 +1,19 @@
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { currencies } from "@/lib/currency";
 import type { ReceiptScanResult } from "@/types/receipt";
+
+const supportedCurrencyList = currencies.join(", ");
 
 const receiptSchema = z.object({
   merchant: z.string().nullable().describe("Name des Händlers/Geschäfts"),
   amount: z.number().nullable().describe("Gesamtbetrag inkl. MwSt"),
   date: z.string().nullable().describe("Kaufdatum als YYYY-MM-DD"),
-  currency: z.enum(["EUR", "USD", "GBP", "CHF", "DKK"]).nullable().describe("Währungscode als ISO-4217: EUR, USD, GBP, CHF oder DKK. Falls nicht erkennbar: null."),
+  currency: z
+    .enum(currencies)
+    .nullable()
+    .describe(`Währungscode als ISO-4217: ${supportedCurrencyList}. Falls nicht erkennbar: null.`),
   description: z.string().nullable().describe("Kurze Beschreibung was gekauft wurde"),
   suggestedCategoryName: z
     .string()
@@ -28,7 +34,7 @@ export async function scanReceipt(
 Extrahiere alle relevanten Daten präzise und strukturiert.
 Für das Datum: Nutze immer das Kaufdatum (nicht Druckdatum), Format YYYY-MM-DD.
 Für amount: Immer der finale Gesamtbetrag (inkl. MwSt/Steuer).
-Für currency: Gib den ISO-4217-Code zurück (EUR, USD, GBP, CHF oder DKK). Falls keine Währung erkennbar ist oder die Währung nicht in dieser Liste ist: null.
+Für currency: Gib den ISO-4217-Code zurück (${supportedCurrencyList}). Falls keine Währung erkennbar ist oder die Währung nicht in dieser Liste ist: null.
 Für suggestedCategoryName: Wähle die am besten passende aus dieser Liste: ${categoryList}. Wenn keine passt oder die Liste leer ist, null.
 Für confidence: "high" wenn alle Kernfelder (merchant, amount, date) klar lesbar sind, "medium" wenn 1-2 Felder unsicher, "low" wenn Beleg sehr schlecht lesbar.`;
 
