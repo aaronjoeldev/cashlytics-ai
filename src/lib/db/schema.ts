@@ -130,6 +130,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   importRows: many(importRows),
   importConflicts: many(importConflicts),
   importDecisions: many(importDecisions),
+  merchantCategories: many(merchantCategories),
   settings: one(userSettings, {
     fields: [users.id],
     references: [userSettings.userId],
@@ -584,6 +585,33 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
   }),
 }));
 
+export const merchantCategories = pgTable("merchant_categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  merchantPattern: text("merchant_pattern").notNull(),
+  categoryId: uuid("category_id")
+    .references(() => categories.id, { onDelete: "cascade" })
+    .notNull(),
+  usageCount: integer("usage_count").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserMerchant: unique().on(table.userId, table.merchantPattern),
+}));
+
+export const merchantCategoriesRelations = relations(merchantCategories, ({ one }) => ({
+  user: one(users, {
+    fields: [merchantCategories.userId],
+    references: [users.id],
+  }),
+  category: one(categories, {
+    fields: [merchantCategories.categoryId],
+    references: [categories.id],
+  }),
+}));
+
 // Type exports for all tables
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -601,3 +629,5 @@ export type Transfer = typeof transfers.$inferSelect;
 export type NewTransfer = typeof transfers.$inferInsert;
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type NewExchangeRate = typeof exchangeRates.$inferInsert;
+export type MerchantCategory = typeof merchantCategories.$inferSelect;
+export type NewMerchantCategory = typeof merchantCategories.$inferInsert;
