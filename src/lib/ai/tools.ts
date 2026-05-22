@@ -27,6 +27,7 @@ import {
 } from "@/actions/analytics-actions";
 import { updateDailyExpense } from "@/actions/daily-expenses-actions";
 import { getTransfers, createTransfer } from "@/actions/transfer-actions";
+import { getActiveInsights, markInsightRead } from "@/actions/insights-actions";
 import { currencies, defaultCurrency } from "@/lib/currency";
 
 export const tools = {
@@ -713,6 +714,26 @@ export const tools = {
           remainingAfterPurchase: Math.round((remainingBudget - amount) * 100) / 100,
         },
       };
+    },
+  }),
+
+  getInsights: tool({
+    description:
+      "Gibt aktuelle Finanz-Insights und Warnungen zurück (Ausgaben-Anomalien, Budget-Warnungen, Spar-Chancen). Nutze dies bei Fragen wie 'Gibt es etwas Auffälliges?' oder 'Was sollte ich beachten?'",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return getActiveInsights();
+    },
+  }),
+
+  markInsightRead: tool({
+    description: "Markiert einen Insight als gelesen/erledigt.",
+    inputSchema: z.object({
+      insightId: z.uuid().describe("ID des Insights"),
+    }),
+    needsApproval: true,
+    execute: async ({ insightId }) => {
+      return markInsightRead(insightId);
     },
   }),
 

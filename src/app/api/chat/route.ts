@@ -6,6 +6,7 @@ import { getCategories } from "@/actions/category-actions";
 import { getExpenses, getDailyExpenses } from "@/actions/expense-actions";
 import { getIncomes } from "@/actions/income-actions";
 import { getDashboardStats } from "@/actions/dashboard-actions";
+import { getActiveInsights } from "@/actions/insights-actions";
 import { currencies } from "@/lib/currency";
 import { rateLimit } from "@/lib/rate-limiter";
 import { logger } from "@/lib/logger";
@@ -102,6 +103,7 @@ Ohne explizite Währungsangabe den currency-Parameter weglassen (Default: Kontow
 - "Vergleiche Mai mit April" / "Mehr ausgegeben als letzten Monat?" → compareMonths
 - "Kann ich mir X leisten?" / "Habe ich Budget für Y?" → checkAffordability
 - "Zusammenfassung" / "Wie sieht es finanziell aus?" → getSpendingSummary
+- "Gibt es etwas Auffälliges?" / "Was sollte ich beachten?" → getInsights
 
 ## DOKUMENTE
 
@@ -113,7 +115,7 @@ Weise den Nutzer freundlich darauf hin, falls er dich bittet, ein Dokument zu le
 
 1. Sprache: Deutsch, kurz und prägnant
 2. Fehler: Freundlich erklären, Alternativen anbieten
-3. Proaktiv: Bei Ausgaben-Erwähnung sofort das passende Tool aufrufen und dem Benutzer zur Bestätigung vorlegen
+3. Proaktiv: Bei Ausgaben-Erwähnung sofort das passende Tool aufrufen und dem Benutzer zur Bestätigung vorlegen. Wenn Insights im Kontext vorhanden sind, erwähne relevante Insights proaktiv zu Beginn des Gesprächs oder wenn sie zur Frage des Benutzers passen. Beispiel: "Übrigens, deine Restaurant-Ausgaben liegen 50% über dem Durchschnitt diesen Monat."
 4. Bestätigung: Alle Schreib-Operationen (erstellen, ändern, löschen) erfordern eine Bestätigung durch den Benutzer – rufe das Tool auf und warte auf die Genehmigung
 5. Nach Genehmigung: Kurz bestätigen was durchgeführt wurde
 6. Bei Ablehnung: Akzeptiere die Entscheidung und biete ggf. Alternativen an`;
@@ -130,13 +132,14 @@ async function buildSystemPrompt(): Promise<string> {
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
 
-  const [accountsResult, categoriesResult, expensesResult, dashboardResult, recentDailyResult, incomesResult] = await Promise.all([
+  const [accountsResult, categoriesResult, expensesResult, dashboardResult, recentDailyResult, incomesResult, insightsResult] = await Promise.all([
     getAccounts(),
     getCategories(),
     getExpenses(),
     getDashboardStats(),
     getDailyExpenses({ startDate: new Date(today.getFullYear(), today.getMonth(), 1) }),
     getIncomes(),
+    getActiveInsights(),
   ]);
 
   const accountsContext =
@@ -196,6 +199,14 @@ ${incomesResult.data
   .join("\n")}`
       : "";
 
+  const insightsContext =
+    insightsResult.success && insightsResult.data.length > 0
+      ? `### Aktuelle Finanz-Insights (proaktiv erwähnen wenn relevant):
+${insightsResult.data
+  .map((i) => `  - [${i.severity.toUpperCase()}] ${sanitizeForPrompt(i.title)}: ${sanitizeForPrompt(i.message)}`)
+  .join("\n")}`
+      : "";
+
   return `${BASE_SYSTEM_PROMPT}
 
 ## AKTUELLER KONTEXT
@@ -216,7 +227,9 @@ ${incomesContext}
 
 ${dashboardContext}
 
-${recentExpensesContext}`;
+${recentExpensesContext}
+
+${insightsContext}`;
 }
 
 export async function POST(req: Request) {
