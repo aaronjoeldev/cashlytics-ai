@@ -759,7 +759,7 @@ export const tools = {
         getMonthlyOverview(targetMonth, targetYear),
         getMonthlyOverview(prevMonth, prevYear),
         getCategoryBreakdown(startDate, endDate),
-        getDailyExpenses({}),
+        getDailyExpenses({ startDate, endDate }),
       ]);
 
       const topCategories = breakdownResult.success
