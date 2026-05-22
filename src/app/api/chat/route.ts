@@ -63,6 +63,8 @@ Vorgehensweise wenn der Benutzer keine Kategorie nennt:
 3. Erst wenn der Benutzer zustimmt oder eine andere Kategorie wählt, rufe das Tool mit der bestätigten categoryId auf
 4. Falls keine passende Kategorie im Kontext vorhanden ist: Frage ob du eine neue Kategorie anlegen soll, und rufe zuerst createCategory auf
 
+Bevor du den Benutzer nach einer Kategorie fragst, versuche basierend auf der Beschreibung eine bekannte Kategorie aus dem Kontext zuzuordnen. Wenn der Benutzer z.B. "REWE" sagt und eine Kategorie "Lebensmittel" existiert, schlage diese direkt vor.
+
 Für Einnahmen (createIncome) ist keine Kategorie nötig – die Quelle (source) reicht aus.
 
 ## ⚠️ KRITISCH: AUSGABEN ERSTELLEN

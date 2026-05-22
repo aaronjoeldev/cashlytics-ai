@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { learnMerchantCategory } from "@/actions/merchant-category-actions";
 import {
   getAccounts,
   createAccount,
@@ -255,7 +256,7 @@ export const tools = {
     needsApproval: true,
     execute: async ({ accountId, categoryId, description, amount, date, currency }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return createDailyExpense({
+      const result = await createDailyExpense({
         accountId,
         categoryId: categoryId ?? null,
         description,
@@ -263,6 +264,13 @@ export const tools = {
         date: new Date(date),
         ...(currency !== undefined && { currency }),
       } as any);
+
+      // Learn merchant→category mapping for future suggestions
+      if (result.success && categoryId) {
+        await learnMerchantCategory(description, categoryId).catch(() => {});
+      }
+
+      return result;
     },
   }),
 
