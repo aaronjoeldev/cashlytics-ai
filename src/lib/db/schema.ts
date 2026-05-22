@@ -131,6 +131,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   importConflicts: many(importConflicts),
   importDecisions: many(importDecisions),
   merchantCategories: many(merchantCategories),
+  insights: many(insights),
   settings: one(userSettings, {
     fields: [users.id],
     references: [userSettings.userId],
@@ -612,6 +613,36 @@ export const merchantCategoriesRelations = relations(merchantCategories, ({ one 
   }),
 }));
 
+export const insightTypeEnum = pgEnum("insight_type", [
+  "spending_anomaly",
+  "budget_warning",
+  "saving_opportunity",
+  "subscription_alert",
+  "trend_info",
+]);
+
+export const insights = pgTable("insights", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  type: insightTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  severity: text("severity", { enum: ["info", "warning", "critical"] }).notNull().default("info"),
+  isRead: boolean("is_read").default(false).notNull(),
+  expiresAt: timestamp("expires_at"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insightsRelations = relations(insights, ({ one }) => ({
+  user: one(users, {
+    fields: [insights.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports for all tables
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -631,3 +662,5 @@ export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type NewExchangeRate = typeof exchangeRates.$inferInsert;
 export type MerchantCategory = typeof merchantCategories.$inferSelect;
 export type NewMerchantCategory = typeof merchantCategories.$inferInsert;
+export type Insight = typeof insights.$inferSelect;
+export type NewInsight = typeof insights.$inferInsert;
