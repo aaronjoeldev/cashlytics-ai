@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { learnMerchantCategory } from "@/actions/merchant-category-actions";
 import {
   getAccounts,
   createAccount,
@@ -22,9 +23,11 @@ import {
   getForecast,
   getCategoryBreakdown,
   getNormalizedMonthlyExpenses,
+  getSubscriptions,
 } from "@/actions/analytics-actions";
 import { updateDailyExpense } from "@/actions/daily-expenses-actions";
 import { getTransfers, createTransfer } from "@/actions/transfer-actions";
+import { getActiveInsights, markInsightRead } from "@/actions/insights-actions";
 import { currencies, defaultCurrency } from "@/lib/currency";
 
 export const tools = {
@@ -254,7 +257,7 @@ export const tools = {
     needsApproval: true,
     execute: async ({ accountId, categoryId, description, amount, date, currency }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return createDailyExpense({
+      const result = await createDailyExpense({
         accountId,
         categoryId: categoryId ?? null,
         description,
@@ -262,6 +265,13 @@ export const tools = {
         date: new Date(date),
         ...(currency !== undefined && { currency }),
       } as any);
+
+      // Learn merchant→category mapping for future suggestions
+      if (result.success && categoryId) {
+        await learnMerchantCategory(description, categoryId).catch(() => {});
+      }
+
+      return result;
     },
   }),
 
@@ -614,6 +624,188 @@ export const tools = {
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
       });
+    },
+  }),
+
+  getSubscriptions: tool({
+    description:
+      "Gibt alle Abonnements/Subscriptions des Benutzers zurück mit monatlichen und jährlichen Kosten. Nutze dies bei Fragen wie 'Welche Abos habe ich?' oder 'Was kosten meine Subscriptions?'",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const result = await getSubscriptions();
+      if (!result.success) return result;
+      const monthlyTotal = result.data.reduce((sum, s) => sum + s.monthlyAmount, 0);
+      return {
+        success: true,
+        data: {
+          subscriptions: result.data.map((s) => ({
+            name: s.expense.name,
+            amount: Number(s.expense.amount),
+            monthlyAmount: Math.round(s.monthlyAmount * 100) / 100,
+            recurrenceType: s.expense.recurrenceType,
+            category: s.expense.category?.name ?? null,
+          })),
+          monthlyTotal: Math.round(monthlyTotal * 100) / 100,
+          yearlyTotal: Math.round(monthlyTotal * 12 * 100) / 100,
+        },
+      };
+    },
+  }),
+
+  compareMonths: tool({
+    description:
+      "Vergleicht zwei Monate miteinander: Einnahmen, Ausgaben, Saldo und Veränderung in Prozent. Nutze dies bei Fragen wie 'Vergleiche Mai mit April' oder 'Gebe ich mehr aus als letzten Monat?'",
+    inputSchema: z.object({
+      month1: z.number().int().min(1).max(12).describe("Erster Monat (1-12)"),
+      year1: z.number().int().min(2020).max(2100).describe("Jahr des ersten Monats"),
+      month2: z.number().int().min(1).max(12).describe("Zweiter Monat (1-12)"),
+      year2: z.number().int().min(2020).max(2100).describe("Jahr des zweiten Monats"),
+    }),
+    execute: async ({ month1, year1, month2, year2 }) => {
+      const [result1, result2] = await Promise.all([
+        getMonthlyOverview(month1, year1),
+        getMonthlyOverview(month2, year2),
+      ]);
+      if (!result1.success || !result2.success) {
+        return { success: false, error: "Monatsdaten konnten nicht geladen werden." };
+      }
+      const d1 = result1.data;
+      const d2 = result2.data;
+      const pctChange = (a: number, b: number) =>
+        b === 0 ? (a > 0 ? 100 : 0) : Math.round(((a - b) / b) * 10000) / 100;
+      return {
+        success: true,
+        data: {
+          month1: { month: month1, year: year1, income: d1.totalIncome, expenses: d1.totalExpenses, balance: d1.balance },
+          month2: { month: month2, year: year2, income: d2.totalIncome, expenses: d2.totalExpenses, balance: d2.balance },
+          changes: {
+            incomeChange: pctChange(d1.totalIncome, d2.totalIncome),
+            expensesChange: pctChange(d1.totalExpenses, d2.totalExpenses),
+            balanceChange: pctChange(d1.balance, d2.balance),
+          },
+        },
+      };
+    },
+  }),
+
+  checkAffordability: tool({
+    description:
+      "Prüft ob sich der Benutzer eine bestimmte Ausgabe leisten kann. Vergleicht den gewünschten Betrag mit dem verfügbaren Budget (Einnahmen minus Ausgaben) des aktuellen Monats. Nutze dies bei Fragen wie 'Kann ich mir X leisten?' oder 'Habe ich noch Budget für Y?'",
+    inputSchema: z.object({
+      amount: z.number().positive().describe("Gewünschter Betrag"),
+      description: z.string().optional().describe("Wofür das Geld ausgegeben werden soll"),
+    }),
+    execute: async ({ amount, description }) => {
+      const now = new Date();
+      const result = await getMonthlyOverview(now.getMonth() + 1, now.getFullYear());
+      if (!result.success) return { success: false, error: "Monatsdaten nicht verfügbar." };
+      const { totalIncome, totalExpenses, balance } = result.data;
+      const remainingBudget = Math.round(balance * 100) / 100;
+      const affordable = remainingBudget >= amount;
+      return {
+        success: true,
+        data: {
+          description: description ?? "Geplante Ausgabe",
+          requestedAmount: amount,
+          monthlyIncome: Math.round(totalIncome * 100) / 100,
+          monthlyExpenses: Math.round(totalExpenses * 100) / 100,
+          remainingBudget,
+          affordable,
+          remainingAfterPurchase: Math.round((remainingBudget - amount) * 100) / 100,
+        },
+      };
+    },
+  }),
+
+  getInsights: tool({
+    description:
+      "Gibt aktuelle Finanz-Insights und Warnungen zurück (Ausgaben-Anomalien, Budget-Warnungen, Spar-Chancen). Nutze dies bei Fragen wie 'Gibt es etwas Auffälliges?' oder 'Was sollte ich beachten?'",
+    inputSchema: z.object({}),
+    execute: async () => {
+      return getActiveInsights();
+    },
+  }),
+
+  markInsightRead: tool({
+    description: "Markiert einen Insight als gelesen/erledigt.",
+    inputSchema: z.object({
+      insightId: z.uuid().describe("ID des Insights"),
+    }),
+    needsApproval: true,
+    execute: async ({ insightId }) => {
+      return markInsightRead(insightId);
+    },
+  }),
+
+  getSpendingSummary: tool({
+    description:
+      "Gibt eine kompakte Ausgaben-Zusammenfassung: Top-5-Kategorien, größte Einzelausgaben, und Vergleich zum Vormonat. Nutze dies für allgemeine Fragen wie 'Wie sieht es finanziell aus?' oder 'Zusammenfassung meiner Ausgaben'.",
+    inputSchema: z.object({
+      month: z.number().int().min(1).max(12).optional().describe("Monat (1-12), Standard: aktuell"),
+      year: z.number().int().min(2020).max(2100).optional().describe("Jahr, Standard: aktuell"),
+    }),
+    execute: async ({ month, year }) => {
+      const now = new Date();
+      const targetMonth = month ?? now.getMonth() + 1;
+      const targetYear = year ?? now.getFullYear();
+
+      const prevMonth = targetMonth === 1 ? 12 : targetMonth - 1;
+      const prevYear = targetMonth === 1 ? targetYear - 1 : targetYear;
+
+      const startDate = new Date(Date.UTC(targetYear, targetMonth - 1, 1));
+      const endDate = new Date(Date.UTC(targetYear, targetMonth, 0, 23, 59, 59));
+
+      const [overviewResult, prevOverviewResult, breakdownResult, dailyResult] = await Promise.all([
+        getMonthlyOverview(targetMonth, targetYear),
+        getMonthlyOverview(prevMonth, prevYear),
+        getCategoryBreakdown(startDate, endDate),
+        getDailyExpenses({ startDate, endDate }),
+      ]);
+
+      const topCategories = breakdownResult.success
+        ? breakdownResult.data.slice(0, 5).map((c) => ({
+            name: c.category.name,
+            amount: Math.round(c.amount * 100) / 100,
+            percentage: Math.round(c.percentage * 100) / 100,
+          }))
+        : [];
+
+      const topExpenses = dailyResult.success
+        ? dailyResult.data
+            .filter((e) => {
+              const d = new Date(e.date);
+              return d >= startDate && d <= endDate;
+            })
+            .sort((a, b) => Number(b.amount) - Number(a.amount))
+            .slice(0, 5)
+            .map((e) => ({
+              description: e.description,
+              amount: Number(e.amount),
+              date: new Date(e.date).toISOString().split("T")[0],
+              category: e.category?.name ?? null,
+            }))
+        : [];
+
+      const currentExpenses = overviewResult.success ? overviewResult.data.totalExpenses : 0;
+      const prevExpenses = prevOverviewResult.success ? prevOverviewResult.data.totalExpenses : 0;
+      const expenseChange =
+        prevExpenses > 0
+          ? Math.round(((currentExpenses - prevExpenses) / prevExpenses) * 10000) / 100
+          : 0;
+
+      return {
+        success: true,
+        data: {
+          month: targetMonth,
+          year: targetYear,
+          totalExpenses: Math.round(currentExpenses * 100) / 100,
+          totalIncome: overviewResult.success ? Math.round(overviewResult.data.totalIncome * 100) / 100 : 0,
+          balance: overviewResult.success ? Math.round(overviewResult.data.balance * 100) / 100 : 0,
+          expenseChangeVsPrevMonth: expenseChange,
+          topCategories,
+          topExpenses,
+        },
+      };
     },
   }),
 };

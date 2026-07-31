@@ -92,6 +92,20 @@
       "when": 1778048935827,
       "tag": "0012_fix_user_settings_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1779434198322,
+      "tag": "0013_next_mad_thinker",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1779434432930,
+      "tag": "0014_public_ezekiel",
+      "breakpoints": true
     }
   ]
 }

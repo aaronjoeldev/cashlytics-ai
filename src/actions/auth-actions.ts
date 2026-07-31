@@ -143,6 +143,9 @@ const forgotPasswordSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
 });
 
+const passwordResetRequestMessage =
+  "If an account exists with this email, you will receive a reset link.";
+
 export async function forgotPasswordAction(
   _prevState: ForgotPasswordState,
   formData: FormData
@@ -160,11 +163,20 @@ export async function forgotPasswordAction(
   const { email } = result.data;
 
   // Look up user by email
-  const [user] = await db
-    .select({ id: users.id, email: users.email })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  let user: { id: string; email: string } | undefined;
+  try {
+    [user] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+  } catch (error) {
+    logger.error("Failed to look up user for password reset", "auth", error);
+    return {
+      success: true,
+      message: passwordResetRequestMessage,
+    };
+  }
 
   // Only send email if user exists AND SMTP is configured
   if (user && isEmailConfigured()) {
@@ -189,7 +201,7 @@ export async function forgotPasswordAction(
   // ALWAYS return identical message regardless of user existence
   return {
     success: true,
-    message: "If an account exists with this email, you will receive a reset link.",
+    message: passwordResetRequestMessage,
   };
 }
 

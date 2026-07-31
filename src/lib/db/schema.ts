@@ -130,6 +130,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   importRows: many(importRows),
   importConflicts: many(importConflicts),
   importDecisions: many(importDecisions),
+  merchantCategories: many(merchantCategories),
+  insights: many(insights),
   settings: one(userSettings, {
     fields: [users.id],
     references: [userSettings.userId],
@@ -584,6 +586,63 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
   }),
 }));
 
+export const merchantCategories = pgTable("merchant_categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  merchantPattern: text("merchant_pattern").notNull(),
+  categoryId: uuid("category_id")
+    .references(() => categories.id, { onDelete: "cascade" })
+    .notNull(),
+  usageCount: integer("usage_count").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserMerchant: unique().on(table.userId, table.merchantPattern),
+}));
+
+export const merchantCategoriesRelations = relations(merchantCategories, ({ one }) => ({
+  user: one(users, {
+    fields: [merchantCategories.userId],
+    references: [users.id],
+  }),
+  category: one(categories, {
+    fields: [merchantCategories.categoryId],
+    references: [categories.id],
+  }),
+}));
+
+export const insightTypeEnum = pgEnum("insight_type", [
+  "spending_anomaly",
+  "budget_warning",
+  "saving_opportunity",
+  "subscription_alert",
+  "trend_info",
+]);
+
+export const insights = pgTable("insights", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  type: insightTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  severity: text("severity", { enum: ["info", "warning", "critical"] }).notNull().default("info"),
+  isRead: boolean("is_read").default(false).notNull(),
+  expiresAt: timestamp("expires_at"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insightsRelations = relations(insights, ({ one }) => ({
+  user: one(users, {
+    fields: [insights.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports for all tables
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -601,3 +660,7 @@ export type Transfer = typeof transfers.$inferSelect;
 export type NewTransfer = typeof transfers.$inferInsert;
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type NewExchangeRate = typeof exchangeRates.$inferInsert;
+export type MerchantCategory = typeof merchantCategories.$inferSelect;
+export type NewMerchantCategory = typeof merchantCategories.$inferInsert;
+export type Insight = typeof insights.$inferSelect;
+export type NewInsight = typeof insights.$inferInsert;

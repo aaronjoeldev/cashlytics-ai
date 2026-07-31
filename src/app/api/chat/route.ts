@@ -3,7 +3,10 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 
 import { tools } from "@/lib/ai/tools";
 import { getAccounts } from "@/actions/account-actions";
 import { getCategories } from "@/actions/category-actions";
-import { getExpenses } from "@/actions/expense-actions";
+import { getExpenses, getDailyExpenses } from "@/actions/expense-actions";
+import { getIncomes } from "@/actions/income-actions";
+import { getDashboardStats } from "@/actions/dashboard-actions";
+import { getActiveInsights } from "@/actions/insights-actions";
 import { currencies } from "@/lib/currency";
 import { rateLimit } from "@/lib/rate-limiter";
 import { logger } from "@/lib/logger";
@@ -61,6 +64,8 @@ Vorgehensweise wenn der Benutzer keine Kategorie nennt:
 3. Erst wenn der Benutzer zustimmt oder eine andere Kategorie wählt, rufe das Tool mit der bestätigten categoryId auf
 4. Falls keine passende Kategorie im Kontext vorhanden ist: Frage ob du eine neue Kategorie anlegen soll, und rufe zuerst createCategory auf
 
+Bevor du den Benutzer nach einer Kategorie fragst, versuche basierend auf der Beschreibung eine bekannte Kategorie aus dem Kontext zuzuordnen. Wenn der Benutzer z.B. "REWE" sagt und eine Kategorie "Lebensmittel" existiert, schlage diese direkt vor.
+
 Für Einnahmen (createIncome) ist keine Kategorie nötig – die Quelle (source) reicht aus.
 
 ## ⚠️ KRITISCH: AUSGABEN ERSTELLEN
@@ -94,6 +99,11 @@ Ohne explizite Währungsangabe den currency-Parameter weglassen (Default: Kontow
 - "Wie viel Geld habe ich diesen Monat?" → getMonthlyOverview mit aktuellem Monat/Jahr aus Kontext
 - "Wie viel ausgegeben?" → getMonthlyOverview
 - "Alle Konten zeigen" → Kontext-Abschnitt direkt nutzen, kein Tool nötig
+- "Welche Abos habe ich?" / "Meine Subscriptions" → getSubscriptions
+- "Vergleiche Mai mit April" / "Mehr ausgegeben als letzten Monat?" → compareMonths
+- "Kann ich mir X leisten?" / "Habe ich Budget für Y?" → checkAffordability
+- "Zusammenfassung" / "Wie sieht es finanziell aus?" → getSpendingSummary
+- "Gibt es etwas Auffälliges?" / "Was sollte ich beachten?" → getInsights
 
 ## DOKUMENTE
 
@@ -105,7 +115,7 @@ Weise den Nutzer freundlich darauf hin, falls er dich bittet, ein Dokument zu le
 
 1. Sprache: Deutsch, kurz und prägnant
 2. Fehler: Freundlich erklären, Alternativen anbieten
-3. Proaktiv: Bei Ausgaben-Erwähnung sofort das passende Tool aufrufen und dem Benutzer zur Bestätigung vorlegen
+3. Proaktiv: Bei Ausgaben-Erwähnung sofort das passende Tool aufrufen und dem Benutzer zur Bestätigung vorlegen. Wenn Insights im Kontext vorhanden sind, erwähne relevante Insights proaktiv zu Beginn des Gesprächs oder wenn sie zur Frage des Benutzers passen. Beispiel: "Übrigens, deine Restaurant-Ausgaben liegen 50% über dem Durchschnitt diesen Monat."
 4. Bestätigung: Alle Schreib-Operationen (erstellen, ändern, löschen) erfordern eine Bestätigung durch den Benutzer – rufe das Tool auf und warte auf die Genehmigung
 5. Nach Genehmigung: Kurz bestätigen was durchgeführt wurde
 6. Bei Ablehnung: Akzeptiere die Entscheidung und biete ggf. Alternativen an`;
@@ -122,10 +132,14 @@ async function buildSystemPrompt(): Promise<string> {
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
 
-  const [accountsResult, categoriesResult, expensesResult] = await Promise.all([
+  const [accountsResult, categoriesResult, expensesResult, dashboardResult, recentDailyResult, incomesResult, insightsResult] = await Promise.all([
     getAccounts(),
     getCategories(),
     getExpenses(),
+    getDashboardStats(),
+    getDailyExpenses({ startDate: new Date(today.getFullYear(), today.getMonth(), 1) }),
+    getIncomes(),
+    getActiveInsights(),
   ]);
 
   const accountsContext =
@@ -157,6 +171,42 @@ async function buildSystemPrompt(): Promise<string> {
           .join("\n")
       : "  (Keine periodischen Ausgaben vorhanden)";
 
+  const dashboardContext = dashboardResult.success
+    ? `### Budget-Status (aktueller Monat):
+  - Einnahmen: ${Math.round(dashboardResult.data.reserveView.monthlyIncome * 100) / 100}
+  - Ausgaben: ${Math.round(dashboardResult.data.reserveView.monthlyExpenses * 100) / 100}
+  - Sparrate: ${Math.round(dashboardResult.data.reserveView.savingsRate * 100) / 100}
+  - Gesamtvermögen: ${Math.round(dashboardResult.data.totalAssets * 100) / 100}
+  - Einnahmen-Trend: ${dashboardResult.data.reserveView.incomeTrend > 0 ? "+" : ""}${Math.round(dashboardResult.data.reserveView.incomeTrend * 100) / 100}%
+  - Ausgaben-Trend: ${dashboardResult.data.reserveView.expenseTrend > 0 ? "+" : ""}${Math.round(dashboardResult.data.reserveView.expenseTrend * 100) / 100}%`
+    : "";
+
+  const recentExpensesContext =
+    recentDailyResult.success && recentDailyResult.data.length > 0
+      ? `### Letzte Ausgaben (aktueller Monat):
+${recentDailyResult.data
+  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  .slice(0, 10)
+  .map((e) => `  - ${new Date(e.date).toLocaleDateString("de-DE")}: "${sanitizeForPrompt(e.description)}" ${e.amount}€${e.category ? ` [${sanitizeForPrompt(e.category.name)}]` : ""}`)
+  .join("\n")}`
+      : "";
+
+  const incomesContext =
+    incomesResult.success && incomesResult.data.length > 0
+      ? `### Bestehende Einnahmen:
+${incomesResult.data
+  .map((i) => `  - "${sanitizeForPrompt(i.source)}" | ${i.amount}€ | ${i.recurrenceType} | ID: ${i.id}`)
+  .join("\n")}`
+      : "";
+
+  const insightsContext =
+    insightsResult.success && insightsResult.data.length > 0
+      ? `### Aktuelle Finanz-Insights (proaktiv erwähnen wenn relevant):
+${insightsResult.data
+  .map((i) => `  - [${i.severity.toUpperCase()}] ${sanitizeForPrompt(i.title)}: ${sanitizeForPrompt(i.message)}`)
+  .join("\n")}`
+      : "";
+
   return `${BASE_SYSTEM_PROMPT}
 
 ## AKTUELLER KONTEXT
@@ -171,7 +221,15 @@ ${accountsContext}
 ${categoriesContext}
 
 ### Bestehende periodische Ausgaben (für Updates/Löschungen direkt ID verwenden, kein getExpenses nötig):
-${expensesContext}`;
+${expensesContext}
+
+${incomesContext}
+
+${dashboardContext}
+
+${recentExpensesContext}
+
+${insightsContext}`;
 }
 
 export async function POST(req: Request) {

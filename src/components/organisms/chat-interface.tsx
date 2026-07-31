@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
+import { MessageSquare, RefreshCw, Sparkles, TrendingUp, CreditCard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChatMessage, ChatMessageLoading } from '@/components/molecules/chat-message';
@@ -11,11 +11,13 @@ import { useConversations } from '@/hooks/use-conversations';
 
 const WELCOME_TEXT = `Hallo! Ich bin dein Cashlytics Assistent.
 
-Du kannst mir Fragen zu deinen Finanzen stellen oder Schnellbefehle nutzen:
+Ich kann dir bei deinen Finanzen helfen:
 
-• "45€ Tanken" - Erstellt eine Ausgabe
-• "Wie viel habe ich diesen Monat ausgegeben?" - Zeigt Übersicht
-• "Zeige meine Einnahmen" - Listet Einnahmen auf
+• Ausgaben erfassen: "45€ Tanken"
+• Budget prüfen: "Kann ich mir X leisten?"
+• Trends analysieren: "Vergleiche Mai mit April"
+• Abos überblicken: "Welche Subscriptions habe ich?"
+• Insights zeigen: "Gibt es etwas Auffälliges?"
 
 Wie kann ich dir helfen?`;
 
@@ -26,9 +28,11 @@ const WELCOME_MESSAGE = {
 };
 
 const SUGGESTED_PROMPTS = [
-  { icon: Sparkles, text: 'Wie sieht mein Budget aus?' },
+  { icon: Sparkles, text: 'Wie sieht es finanziell aus?' },
+  { icon: CreditCard, text: 'Welche Abos habe ich?' },
+  { icon: TrendingUp, text: 'Vergleiche diesen Monat mit dem letzten' },
+  { icon: AlertCircle, text: 'Gibt es etwas Auffälliges bei meinen Ausgaben?' },
   { icon: MessageSquare, text: 'Ich habe 45€ bei REWE ausgegeben' },
-  { icon: MessageSquare, text: 'Zeige meine Ausgaben diesen Monat' },
 ];
 
 export function ChatInterface() {
