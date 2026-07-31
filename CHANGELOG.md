@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.7.0...v0.8.0) (2026-07-31)
+
+### ✨ Features
+
+- **ai:** add insights cron endpoint, prompt injection, and AI tools ([8fa10fb](https://github.com/aaronjoeldev/cashlytics-ai/commit/8fa10fb3ca7dfb249acc68d039b03b84870eefce))
+- **ai:** add insights table and generation engine with anomaly detection ([5da1512](https://github.com/aaronjoeldev/cashlytics-ai/commit/5da151267e50bcafc6d3ccab80dd21ebe823037b))
+- **ai:** add merchant_categories schema and learning actions ([1620606](https://github.com/aaronjoeldev/cashlytics-ai/commit/16206067330e9b177dbd3d3e0cd49869202a2104))
+- **ai:** add query tools for subscriptions, month comparison, affordability, and spending summary ([2c4f981](https://github.com/aaronjoeldev/cashlytics-ai/commit/2c4f981555dff4cf4e15189a84ff38c046a95986))
+- **ai:** enrich system prompt with budget context and new tool routing ([4a0d50f](https://github.com/aaronjoeldev/cashlytics-ai/commit/4a0d50f934602b381a8eae73e13adea2eeecbe77))
+- **ai:** integrate merchant-category learning into expense creation ([29eaaf0](https://github.com/aaronjoeldev/cashlytics-ai/commit/29eaaf06bc28e8cb48e01b6b3d45e03e7710d5a3))
+- **ui:** update chat suggested prompts and welcome text for new AI capabilities ([38731c0](https://github.com/aaronjoeldev/cashlytics-ai/commit/38731c055ce86cd392a0485f866e57085923ebae))
+
+### 🐛 Bug Fixes
+
+- **ai:** harden cron security guard and scope daily expenses query ([5d3d820](https://github.com/aaronjoeldev/cashlytics-ai/commit/5d3d820367e6a01d0bd71dedfc6aeb7bfa949a47))
+- solve password recovery issue ([3aefb43](https://github.com/aaronjoeldev/cashlytics-ai/commit/3aefb43c6ce9db3f6238ea02ee5617eaaabdc494))
+
 ## [0.7.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.6.1...v0.7.0) (2026-05-06)
 
 ### ✨ Features
