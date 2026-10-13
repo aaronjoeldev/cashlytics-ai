@@ -16,10 +16,7 @@ import {
 } from "@/lib/db/schema";
 
 export type ImportConflictSuggestion =
-  | "keep_both"
-  | "replace_existing"
-  | "skip_import_row"
-  | "needs_user_review";
+  "keep_both" | "replace_existing" | "skip_import_row" | "needs_user_review";
 
 export type ImportConflictDecisionOption = "replace_existing" | "keep_both" | "skip_import_row";
 
@@ -447,7 +444,14 @@ function createDbReconciliationStore(): ReconciliationStore {
             description: incomes.source,
           })
           .from(incomes)
-          .where(and(eq(incomes.userId, userId), eq(incomes.accountId, accountId))),
+          // Only one-off incomes are bookings; a recurring income must not be matched and replaced
+          .where(
+            and(
+              eq(incomes.userId, userId),
+              eq(incomes.accountId, accountId),
+              eq(incomes.recurrenceType, "once")
+            )
+          ),
         db
           .select({
             id: dailyExpenses.id,
