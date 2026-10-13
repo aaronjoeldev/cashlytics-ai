@@ -1,11 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import {
-  insights,
-  dailyExpenses,
-  categories,
-} from "@/lib/db/schema";
+import { insights, dailyExpenses, categories } from "@/lib/db/schema";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { safeParseFloat } from "@/lib/safe-parse";
@@ -36,8 +32,8 @@ export async function getActiveInsights(): Promise<ApiResponse<Insight[]>> {
       .limit(10);
 
     return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: `Fehler: ${error instanceof Error ? error.message : String(error)}` };
+  } catch {
+    return { success: false, error: "Aktion fehlgeschlagen." };
   }
 }
 
@@ -55,8 +51,8 @@ export async function markInsightRead(insightId: string): Promise<ApiResponse<{ 
       .set({ isRead: true })
       .where(and(eq(insights.id, insightId), eq(insights.userId, userId)));
     return { success: true, data: { ok: true } };
-  } catch (error) {
-    return { success: false, error: `Fehler: ${error instanceof Error ? error.message : String(error)}` };
+  } catch {
+    return { success: false, error: "Aktion fehlgeschlagen." };
   }
 }
 
@@ -110,7 +106,9 @@ export async function generateInsights(userId: string): Promise<{ generated: num
     )
     .groupBy(dailyExpenses.categoryId, categories.name);
 
-  const avgMap = new Map(avgDailyByCategory.map((a) => [a.categoryId, safeParseFloat(a.avgMonthly)]));
+  const avgMap = new Map(
+    avgDailyByCategory.map((a) => [a.categoryId, safeParseFloat(a.avgMonthly)])
+  );
 
   for (const current of currentDailyByCategory) {
     const avg = avgMap.get(current.categoryId) ?? 0;
@@ -134,17 +132,18 @@ export async function generateInsights(userId: string): Promise<{ generated: num
   const monthProgress = dayOfMonth / daysInMonth;
 
   const totalCurrentExpenses = currentDailyByCategory.reduce(
-    (sum, c) => sum + safeParseFloat(c.total), 0
+    (sum, c) => sum + safeParseFloat(c.total),
+    0
   );
   const totalAvgExpenses = Array.from(avgMap.values()).reduce((sum, v) => sum + v, 0);
 
   if (totalAvgExpenses > 0 && totalCurrentExpenses > totalAvgExpenses * monthProgress * 1.2) {
-    const projected = Math.round((totalCurrentExpenses / monthProgress));
+    const projected = Math.round(totalCurrentExpenses / monthProgress);
     newInsights.push({
       userId,
       type: "budget_warning",
       title: "Ausgaben-Tempo über Plan",
-      message: `Bei aktuellem Tempo wirst du diesen Monat ca. ${projected}€ ausgeben — ${Math.round(((projected / totalAvgExpenses) - 1) * 100)}% mehr als üblich (${Math.round(totalAvgExpenses)}€).`,
+      message: `Bei aktuellem Tempo wirst du diesen Monat ca. ${projected}€ ausgeben — ${Math.round((projected / totalAvgExpenses - 1) * 100)}% mehr als üblich (${Math.round(totalAvgExpenses)}€).`,
       severity: "warning",
       expiresAt,
     });

@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Category, NewCategory } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getCategories(): Promise<ApiResponse<Category[]>> {
@@ -57,7 +58,7 @@ export async function updateCategory(
 
     const [category] = await db
       .update(categories)
-      .set(data)
+      .set(pickFields(data, ["name", "icon", "color"]))
       .where(and(eq(categories.id, id), eq(categories.userId, authResult.userId)))
       .returning();
     if (!category) {

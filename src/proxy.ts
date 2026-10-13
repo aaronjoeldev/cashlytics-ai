@@ -56,5 +56,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.svg$|.*\\.png$|.*\\.ico$|.*\\.webmanifest$|public/).*)",
+    // The pattern above skips paths with an asset extension; API routes must never be skipped
+    "/api/((?!auth).*)",
   ],
 };

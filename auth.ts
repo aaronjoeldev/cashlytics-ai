@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { users, authAccounts, authSessions, authVerificationTokens } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword } from "@/lib/auth/password";
+import { rateLimit } from "@/lib/rate-limiter";
 import { signInSchema } from "@/lib/validations/auth";
 import { ZodError } from "zod";
 import { authConfig } from "./auth.config";
@@ -37,8 +38,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           const { email, password } = await signInSchema.parseAsync(credentials);
 
-          // TODO: Users table will be created in Phase 2
-          // For now, this will return null until users exist
+          // 10 attempts per 15 minutes per account
+          if (!rateLimit(`login:${email.toLowerCase()}`, 10, 15 * 60_000).allowed) {
+            return null;
+          }
+
           const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
           if (!user?.password) {

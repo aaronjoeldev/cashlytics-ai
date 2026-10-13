@@ -7,7 +7,8 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword } from "@/lib/auth/password";
-import { registerSchema } from "@/lib/validations/auth";
+import { MAX_PASSWORD_LENGTH, registerSchema } from "@/lib/validations/auth";
+import { rateLimit } from "@/lib/rate-limiter";
 import { isRegistrationOpen } from "@/lib/auth/registration-mode";
 import { isEmailConfigured, sendEmail } from "@/lib/email/transporter";
 import {
@@ -162,6 +163,11 @@ export async function forgotPasswordAction(
 
   const { email } = result.data;
 
+  // Limit reset mails per address; the response stays identical so nothing is revealed
+  if (!rateLimit(`forgot-password:${email.toLowerCase()}`, 3, 60 * 60_000).allowed) {
+    return { success: true, message: passwordResetRequestMessage };
+  }
+
   // Look up user by email
   let user: { id: string; email: string } | undefined;
   try {
@@ -205,13 +211,23 @@ export async function forgotPasswordAction(
   };
 }
 
+const invalidResetLinkMessage =
+  "This reset link is invalid or has expired. Please request a new one.";
+
 export async function resetPasswordAction(
   _prevState: ResetPasswordState,
   formData: FormData
 ): Promise<ResetPasswordState> {
-  const token = formData.get("token") as string;
-  const password = formData.get("password") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
+  const token = formData.get("token");
+  const password = formData.get("password");
+  const confirmPassword = formData.get("confirmPassword");
+
+  if (typeof token !== "string" || !token) {
+    return { error: invalidResetLinkMessage };
+  }
+  if (typeof password !== "string" || typeof confirmPassword !== "string") {
+    return { fieldErrors: { password: "Password must be at least 8 characters" } };
+  }
 
   // Validate password match
   if (password !== confirmPassword) {
@@ -223,6 +239,10 @@ export async function resetPasswordAction(
     return { fieldErrors: { password: "Password must be at least 8 characters" } };
   }
 
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    return { fieldErrors: { password: "Password is too long" } };
+  }
+
   if (!/\d/.test(password)) {
     return { fieldErrors: { password: "Password must contain at least one number" } };
   }
@@ -230,17 +250,19 @@ export async function resetPasswordAction(
   // Validate token
   const validation = await validateResetToken(token);
   if (!validation.valid) {
-    return { error: "This reset link is invalid or has expired. Please request a new one." };
+    return { error: invalidResetLinkMessage };
   }
 
   // Hash new password
   const hashedPassword = await hashPassword(password);
 
+  // Mark the token as used first; only the request that wins this update may set the password
+  if (!(await consumeResetToken(validation.tokenId))) {
+    return { error: invalidResetLinkMessage };
+  }
+
   // Update user password
   await db.update(users).set({ password: hashedPassword }).where(eq(users.id, validation.userId));
-
-  // Mark token as used
-  await consumeResetToken(validation.tokenId);
 
   // Invalidate all other tokens for this user
   await invalidateUserTokens(validation.userId);
