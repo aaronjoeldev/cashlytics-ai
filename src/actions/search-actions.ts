@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { accounts, expenses, incomes, transfers, dailyExpenses, categories } from "@/lib/db/schema";
-import { or, and, ilike, sql, eq } from "drizzle-orm";
+import { and, ilike, sql, eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export interface SearchResult {

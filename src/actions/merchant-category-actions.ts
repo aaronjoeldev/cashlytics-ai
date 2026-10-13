@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { merchantCategories, categories } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth/require-auth";
 import type { ApiResponse } from "@/types/database";
 
@@ -51,7 +51,10 @@ export async function suggestCategoryForMerchant(
 
     return { success: true, data: bestMatch };
   } catch (error) {
-    return { success: false, error: `Fehler: ${error instanceof Error ? error.message : String(error)}` };
+    return {
+      success: false,
+      error: `Fehler: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
@@ -85,6 +88,9 @@ export async function learnMerchantCategory(
 
     return { success: true, data: { learned: true } };
   } catch (error) {
-    return { success: false, error: `Fehler: ${error instanceof Error ? error.message : String(error)}` };
+    return {
+      success: false,
+      error: `Fehler: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }

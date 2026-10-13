@@ -1,5 +1,5 @@
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -8,7 +8,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # Stage 2: Build
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 # Copy dependencies from deps stage
@@ -23,14 +23,14 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Stage 3: Migration dependencies (separate stage to keep runner lean)
-FROM node:20-alpine AS migrate-deps
+FROM node:24-alpine AS migrate-deps
 WORKDIR /migrate
 RUN echo '{"name":"migrate","private":true}' > package.json && \
-    npm install --no-package-lock drizzle-kit drizzle-orm postgres && \
+    npm install --no-package-lock drizzle-kit@0.31.11 drizzle-orm@0.45.4 postgres@3.4.9 && \
     npm cache clean --force
 
 # Stage 4: Production
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

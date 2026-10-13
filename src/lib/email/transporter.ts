@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 import { logger } from "@/lib/logger";
 import type { SendEmailOptions, SendEmailResult } from "./types";
 
@@ -10,7 +10,7 @@ interface SmtpConfig {
   from: string;
 }
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 let configChecked = false;
 let isConfigured = false;
 let fromAddress: string = "";
@@ -38,7 +38,7 @@ function getSmtpConfig(): SmtpConfig | null {
 }
 
 function isSendmailConfigured(): boolean {
-  const { EMAIL_TRANSPORT, SMTP_HOST } = process.env;
+  const { EMAIL_TRANSPORT } = process.env;
   if (EMAIL_TRANSPORT === "sendmail") {
     return true;
   }
@@ -64,7 +64,7 @@ export function isEmailConfigured(): boolean {
   return isConfigured;
 }
 
-export function getTransporter(): nodemailer.Transporter | null {
+export function getTransporter(): Transporter | null {
   if (transporter) {
     return transporter;
   }

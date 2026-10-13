@@ -193,7 +193,8 @@ export function ExpensesClient({
   const formatEntryAmount = (amount: string | number, entryCurrency?: string | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount;
     if (entryCurrency && entryCurrency !== baseCurrency) {
-      const symbol = currencySymbols[entryCurrency as keyof typeof currencySymbols] ?? entryCurrency;
+      const symbol =
+        currencySymbols[entryCurrency as keyof typeof currencySymbols] ?? entryCurrency;
       return `${num.toFixed(2)} ${symbol}`;
     }
     return formatCurrency(num);
@@ -237,7 +238,8 @@ export function ExpensesClient({
   );
   const totalReserves = periodicReserves.reduce(
     (sum, e) =>
-      sum + toBase(
+      sum +
+      toBase(
         normalizeToMonthly(parseFloat(e.amount), e.recurrenceType, e.recurrenceInterval),
         e.currency
       ),
@@ -263,10 +265,8 @@ export function ExpensesClient({
         return `${day}. ${month} (${tRecurrence("semiannual")})`;
       case "yearly":
         return `${day}. ${month} (${tRecurrence("yearly")})`;
-      case "weekly": {
-        const weekday = date.toLocaleDateString(undefined, { weekday: "long" });
+      case "weekly":
         return tRecurrence("weekly");
-      }
       case "custom":
         return tRecurrence("everyMonths", { count: expense.recurrenceInterval ?? 1 });
       default:
@@ -282,10 +282,7 @@ export function ExpensesClient({
     });
   };
 
-  const handleSuccess = (data: {
-    type: "periodic" | "daily";
-    item: { id: string; categoryId?: string; accountId?: string; [key: string]: unknown };
-  }) => {
+  const handleSuccess = (data: { type: "periodic" | "daily"; item: Expense | DailyExpense }) => {
     if (data.type === "periodic") {
       const newExpense = {
         ...data.item,
@@ -305,7 +302,7 @@ export function ExpensesClient({
 
   const handleEditSuccess = (data: {
     type: "periodic" | "daily";
-    item: { id: string; categoryId?: string; accountId?: string; [key: string]: unknown };
+    item: Expense | DailyExpense;
   }) => {
     if (data.type === "periodic") {
       const updatedExpense = {
