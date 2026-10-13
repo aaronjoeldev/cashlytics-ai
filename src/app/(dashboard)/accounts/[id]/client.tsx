@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  getBudgetedAmountForMonth,
+  getDueAmountForMonth,
+  getOccurrencesInMonth,
+  type RecurringItem,
+} from "@/lib/recurrence";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,89 +47,12 @@ interface AccountDetailClientProps {
   initialTransfers: TransferWithDetails[];
 }
 
-function isTransactionInMonth(
-  item: {
-    startDate: Date | string;
-    endDate?: Date | string | null;
-    recurrenceType: string;
-    recurrenceInterval?: number | null;
-  },
-  monthStart: Date,
-  monthEnd: Date
-): boolean {
-  const itemStart = new Date(item.startDate);
-  const itemEnd = item.endDate ? new Date(item.endDate) : null;
-
-  if (itemStart > monthEnd) return false;
-  if (itemEnd !== null && itemEnd < monthStart) return false;
-
-  const monthDiff =
-    (monthStart.getFullYear() - itemStart.getFullYear()) * 12 +
-    (monthStart.getMonth() - itemStart.getMonth());
-
-  switch (item.recurrenceType) {
-    case "once":
-      return itemStart >= monthStart && itemStart <= monthEnd;
-    case "daily":
-    case "weekly":
-    case "monthly":
-      return true;
-    case "quarterly":
-      return monthDiff >= 0 && monthDiff % 3 === 0;
-    case "semiannual":
-      return monthDiff >= 0 && monthDiff % 6 === 0;
-    case "yearly":
-      return monthDiff >= 0 && monthDiff % 12 === 0;
-    case "custom": {
-      const interval = item.recurrenceInterval;
-      if (!interval) return true;
-      return monthDiff >= 0 && monthDiff % interval === 0;
-    }
-    default:
-      return true;
-  }
-}
-
-function getTransactionDateForMonth(
-  item: {
-    startDate: Date | string;
-    recurrenceType: string;
-  },
-  monthStart: Date,
-  monthEnd: Date
-): Date {
-  const itemStart = new Date(item.startDate);
-
-  switch (item.recurrenceType) {
-    case "once":
-      return itemStart;
-    case "daily":
-      return itemStart > monthStart ? itemStart : monthStart;
-    case "weekly": {
-      const firstInMonth = new Date(monthStart);
-      const daysToAdd = (itemStart.getDay() - firstInMonth.getDay() + 7) % 7;
-      firstInMonth.setDate(firstInMonth.getDate() + daysToAdd);
-      if (firstInMonth < itemStart) {
-        firstInMonth.setDate(firstInMonth.getDate() + 7);
-      }
-      return firstInMonth <= monthEnd ? firstInMonth : monthStart;
-    }
-    default: {
-      const maxDay = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
-      return new Date(
-        monthStart.getFullYear(),
-        monthStart.getMonth(),
-        Math.min(itemStart.getDate(), maxDay)
-      );
-    }
-  }
-}
-
 function formatDate(date: Date | string) {
   return new Intl.DateTimeFormat("de-DE", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: "UTC",
   }).format(new Date(date));
 }
 
@@ -151,55 +80,6 @@ type Transaction = {
   description?: string | null;
 };
 
-function normalizeExpenseToMonthly(
-  amount: number,
-  recurrenceType: string,
-  recurrenceInterval: number | null
-): number {
-  switch (recurrenceType) {
-    case "daily":
-      return amount * 30;
-    case "weekly":
-      return amount * 4.33;
-    case "monthly":
-      return amount;
-    case "quarterly":
-      return amount / 3;
-    case "semiannual":
-      return amount / 6;
-    case "yearly":
-      return amount / 12;
-    case "custom":
-      return recurrenceInterval ? amount / recurrenceInterval : amount;
-    default:
-      return amount;
-  }
-}
-
-function normalizeIncomeToMonthly(amount: number, recurrenceType: string): number {
-  switch (recurrenceType) {
-    case "monthly":
-      return amount;
-    case "yearly":
-      return amount / 12;
-    default:
-      return amount;
-  }
-}
-
-function normalizeTransferToMonthly(amount: number, recurrenceType: string): number {
-  switch (recurrenceType) {
-    case "monthly":
-      return amount;
-    case "quarterly":
-      return amount / 3;
-    case "yearly":
-      return amount / 12;
-    default:
-      return amount;
-  }
-}
-
 export function AccountDetailClient({
   account,
   initialExpenses,
@@ -211,9 +91,10 @@ export function AccountDetailClient({
   const formatCurrency = (amount: string | number) =>
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
   const toBase = (amount: number, entryCurrency?: string | null): number => {
-    const from = (entryCurrency && currencies.includes(entryCurrency as Currency))
-      ? (entryCurrency as Currency)
-      : baseCurrency;
+    const from =
+      entryCurrency && currencies.includes(entryCurrency as Currency)
+        ? (entryCurrency as Currency)
+        : baseCurrency;
     return convertCurrency(amount, from, baseCurrency);
   };
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
@@ -236,66 +117,53 @@ export function AccountDetailClient({
 
   const transactions = useMemo<Transaction[]>(() => {
     const [year, month] = selectedMonth.split("-").map(Number);
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
 
-    const filteredExpenses = initialExpenses.filter((e) =>
-      isTransactionInMonth(e, startDate, endDate)
-    );
-    const filteredIncomes = initialIncomes.filter((i) =>
-      isTransactionInMonth(i, startDate, endDate)
-    );
-    const filteredTransfers = initialTransfers.filter((t) =>
-      isTransactionInMonth(t, startDate, endDate)
-    );
+    // Reserve mode shows the smoothed monthly share, cashflow mode what is due in the month.
+    const forMonth = (item: RecurringItem & { amount: string }) => {
+      const rawAmount = parseFloat(item.amount);
+      const amount =
+        calculationMode === "reserve"
+          ? getBudgetedAmountForMonth(item, rawAmount, year, month)
+          : getDueAmountForMonth(item, rawAmount, year, month);
+      const [firstDueDate] = getOccurrencesInMonth(item, year, month);
+      return { amount, date: firstDueDate ?? new Date(Date.UTC(year, month - 1, 1)) };
+    };
 
-    const expenseTransactions: Transaction[] = filteredExpenses.map((e) => {
-      const rawAmount = parseFloat(e.amount);
-      const normalizedAmount =
-        calculationMode === "reserve" && e.recurrenceType !== "once"
-          ? normalizeExpenseToMonthly(rawAmount, e.recurrenceType, e.recurrenceInterval)
-          : rawAmount;
-
+    const expenseTransactions: Transaction[] = initialExpenses.flatMap((e) => {
+      const { amount, date } = forMonth(e);
+      if (amount === 0) return [];
       return {
         id: e.id,
         type: "expense" as const,
         name: e.name,
-        amount: toBase(normalizedAmount, e.currency).toString(),
-        date: getTransactionDateForMonth(e, startDate, endDate),
+        amount: toBase(amount, e.currency).toString(),
+        date,
         category: e.category,
       };
     });
 
-    const incomeTransactions: Transaction[] = filteredIncomes.map((i) => {
-      const rawAmount = parseFloat(i.amount);
-      const normalizedAmount =
-        calculationMode === "reserve" && i.recurrenceType !== "once"
-          ? normalizeIncomeToMonthly(rawAmount, i.recurrenceType)
-          : rawAmount;
-
+    const incomeTransactions: Transaction[] = initialIncomes.flatMap((i) => {
+      const { amount, date } = forMonth(i);
+      if (amount === 0) return [];
       return {
         id: i.id,
         type: "income" as const,
         name: i.source,
-        amount: toBase(normalizedAmount, i.currency).toString(),
-        date: getTransactionDateForMonth(i, startDate, endDate),
+        amount: toBase(amount, i.currency).toString(),
+        date,
       };
     });
 
-    const transferTransactions: Transaction[] = filteredTransfers.map((t) => {
-      const rawAmount = parseFloat(t.amount);
-      const normalizedAmount =
-        calculationMode === "reserve" && t.recurrenceType !== "once"
-          ? normalizeTransferToMonthly(rawAmount, t.recurrenceType)
-          : rawAmount;
-
+    const transferTransactions: Transaction[] = initialTransfers.flatMap((t) => {
+      const { amount, date } = forMonth(t);
+      if (amount === 0) return [];
       return {
         id: t.id,
         type:
           t.targetAccountId === account.id ? ("transfer_in" as const) : ("transfer_out" as const),
         name: t.description || "Transfer",
-        amount: toBase(normalizedAmount, t.sourceCurrency).toString(),
-        date: getTransactionDateForMonth(t, startDate, endDate),
+        amount: toBase(amount, t.sourceCurrency).toString(),
+        date,
         description:
           t.targetAccountId === account.id
             ? `von ${t.sourceAccount?.name || "Unbekannt"}`

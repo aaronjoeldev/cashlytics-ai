@@ -1,5 +1,6 @@
 "use client";
 
+import { getDueAmountForMonth, type RecurringItem } from "@/lib/recurrence";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -26,49 +27,6 @@ interface AccountsClientProps {
   initialTransfers: TransferWithDetails[];
 }
 
-function isTransactionInMonth(
-  item: {
-    startDate: Date | string;
-    endDate?: Date | string | null;
-    recurrenceType: string;
-    recurrenceInterval?: number | null;
-  },
-  monthStart: Date,
-  monthEnd: Date
-): boolean {
-  const itemStart = new Date(item.startDate);
-  const itemEnd = item.endDate ? new Date(item.endDate) : null;
-
-  if (itemStart > monthEnd) return false;
-  if (itemEnd !== null && itemEnd < monthStart) return false;
-
-  const monthDiff =
-    (monthStart.getFullYear() - itemStart.getFullYear()) * 12 +
-    (monthStart.getMonth() - itemStart.getMonth());
-
-  switch (item.recurrenceType) {
-    case "once":
-      return itemStart >= monthStart && itemStart <= monthEnd;
-    case "daily":
-    case "weekly":
-    case "monthly":
-      return true;
-    case "quarterly":
-      return monthDiff >= 0 && monthDiff % 3 === 0;
-    case "semiannual":
-      return monthDiff >= 0 && monthDiff % 6 === 0;
-    case "yearly":
-      return monthDiff >= 0 && monthDiff % 12 === 0;
-    case "custom": {
-      const interval = item.recurrenceInterval;
-      if (!interval) return true;
-      return monthDiff >= 0 && monthDiff % interval === 0;
-    }
-    default:
-      return true;
-  }
-}
-
 export function AccountsClient({
   initialAccounts,
   initialExpenses,
@@ -82,9 +40,10 @@ export function AccountsClient({
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
 
   const toBase = (amount: number, entryCurrency?: string | null): number => {
-    const from = (entryCurrency && currencies.includes(entryCurrency as Currency))
-      ? (entryCurrency as Currency)
-      : baseCurrency;
+    const from =
+      entryCurrency && currencies.includes(entryCurrency as Currency)
+        ? (entryCurrency as Currency)
+        : baseCurrency;
     return convertCurrency(amount, from, baseCurrency);
   };
   const [accounts, setAccounts] = useState(initialAccounts);
@@ -146,30 +105,29 @@ export function AccountsClient({
   };
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const dueThisMonth = (item: RecurringItem & { amount: string }, currency?: string | null) =>
+    toBase(getDueAmountForMonth(item, parseFloat(item.amount), year, month), currency);
 
   const monthlyBalances = new Map<string, number>();
 
   for (const account of accounts) {
     const incomeTotal = initialIncomes
       .filter((income) => income.accountId === account.id)
-      .filter((income) => isTransactionInMonth(income, monthStart, monthEnd))
-      .reduce((sum, income) => sum + toBase(parseFloat(income.amount), income.currency), 0);
+      .reduce((sum, income) => sum + dueThisMonth(income, income.currency), 0);
 
     const expenseTotal = initialExpenses
       .filter((expense) => expense.accountId === account.id)
-      .filter((expense) => isTransactionInMonth(expense, monthStart, monthEnd))
-      .reduce((sum, expense) => sum + toBase(parseFloat(expense.amount), expense.currency), 0);
+      .reduce((sum, expense) => sum + dueThisMonth(expense, expense.currency), 0);
 
     const transferDelta = initialTransfers
       .filter(
         (transfer) =>
-          (transfer.sourceAccountId === account.id || transfer.targetAccountId === account.id) &&
-          isTransactionInMonth(transfer, monthStart, monthEnd)
+          transfer.sourceAccountId === account.id || transfer.targetAccountId === account.id
       )
       .reduce((sum, transfer) => {
-        const amount = toBase(parseFloat(transfer.amount), transfer.sourceCurrency);
+        const amount = dueThisMonth(transfer, transfer.sourceCurrency);
         if (transfer.targetAccountId === account.id) return sum + amount;
         if (transfer.sourceAccountId === account.id) return sum - amount;
         return sum;
