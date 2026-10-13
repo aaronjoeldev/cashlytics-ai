@@ -74,15 +74,17 @@ export async function createExpense(
     const { userId } = authResult;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
+    let accountCurrency: string | undefined;
     if (data.accountId) {
       const [ownedAccount] = await db
-        .select({ id: accounts.id })
+        .select({ id: accounts.id, currency: accounts.currency })
         .from(accounts)
         .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
         .limit(1);
       if (!ownedAccount) {
         return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
       }
+      accountCurrency = ownedAccount.currency;
     }
 
     // FK Validation: categoryId must belong to authenticated user (DATA-10)
@@ -99,7 +101,7 @@ export async function createExpense(
 
     const [expense] = await db
       .insert(expenses)
-      .values({ ...data, userId })
+      .values({ ...data, currency: data.currency ?? accountCurrency, userId })
       .returning();
 
     revalidatePath("/expenses");
@@ -217,20 +219,22 @@ export async function createDailyExpense(
     const { userId } = authResult;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
+    let accountCurrency: string | undefined;
     if (data.accountId) {
       const [ownedAccount] = await db
-        .select({ id: accounts.id })
+        .select({ id: accounts.id, currency: accounts.currency })
         .from(accounts)
         .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
         .limit(1);
       if (!ownedAccount) {
         return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
       }
+      accountCurrency = ownedAccount.currency;
     }
 
     const [expense] = await db
       .insert(dailyExpenses)
-      .values({ ...data, userId })
+      .values({ ...data, currency: data.currency ?? accountCurrency, userId })
       .returning();
 
     revalidatePath("/expenses");

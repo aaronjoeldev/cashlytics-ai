@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { createAccount } from "@/actions/account-actions";
 import { useToast } from "@/hooks/use-toast";
+import { useSettings } from "@/lib/settings-context";
 import type { Account } from "@/types/database";
 
 interface AccountFormProps {
@@ -35,6 +36,7 @@ interface AccountFormProps {
 export function AccountForm({ onSuccess, open: controlledOpen, onOpenChange }: AccountFormProps) {
   const t = useTranslations("accounts");
   const { toast } = useToast();
+  const { currency } = useSettings();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = (value: boolean) => {
@@ -70,6 +72,7 @@ export function AccountForm({ onSuccess, open: controlledOpen, onOpenChange }: A
       name: name.trim(),
       type,
       balance: balance || "0",
+      currency,
     });
 
     setIsLoading(false);

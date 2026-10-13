@@ -1,9 +1,9 @@
 import { isNull, gte, or, eq } from "drizzle-orm";
-import { differenceInDays, startOfDay, addDays } from "date-fns";
 import { db } from "@/lib/db";
 import { expenses, accounts } from "@/lib/db/schema";
 import { sendPushNotification } from "@/lib/push";
 import { defaultCurrency } from "@/lib/currency";
+import { isDueOn } from "@/lib/recurrence";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,104 +22,6 @@ interface ExpenseRow {
   startDate: Date;
   endDate: Date | null;
   currency: string; // from joined account, defaults to "EUR"
-}
-
-// ---------------------------------------------------------------------------
-// Date helpers
-// ---------------------------------------------------------------------------
-
-/** Number of days in the given year/month (0-indexed month). */
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-/**
- * Returns true when a payment for the given expense falls on `tomorrow`.
- * All comparisons are date-only (no time component).
- */
-function isDueTomorrow(
-  expense: Pick<ExpenseRow, "recurrenceType" | "recurrenceInterval" | "startDate">,
-  tomorrow: Date
-): boolean {
-  const start = startOfDay(expense.startDate);
-  const target = startOfDay(tomorrow);
-
-  // Expense cannot be due before it starts
-  if (start > target) return false;
-
-  const daysDiff = differenceInDays(target, start);
-
-  switch (expense.recurrenceType) {
-    case "once":
-      return daysDiff === 0;
-
-    case "daily":
-      // Due every day from startDate onwards (active check already handled by query)
-      return true;
-
-    case "weekly":
-      return daysDiff % 7 === 0;
-
-    case "monthly": {
-      const startDay = expense.startDate.getDate();
-      const targetYear = target.getFullYear();
-      const targetMonth = target.getMonth();
-      const maxDay = daysInMonth(targetYear, targetMonth);
-      // If startDate day exceeds days in target month, treat last day as due day
-      const effectiveDay = startDay > maxDay ? maxDay : startDay;
-      return target.getDate() === effectiveDay;
-    }
-
-    case "quarterly": {
-      const startDay = expense.startDate.getDate();
-      const targetYear = target.getFullYear();
-      const targetMonth = target.getMonth();
-      const startMonth = expense.startDate.getMonth();
-      const startYear = expense.startDate.getFullYear();
-      const totalMonths = (targetYear - startYear) * 12 + (targetMonth - startMonth);
-      if (totalMonths < 0 || totalMonths % 3 !== 0) return false;
-      const maxDay = daysInMonth(targetYear, targetMonth);
-      const effectiveDay = startDay > maxDay ? maxDay : startDay;
-      return target.getDate() === effectiveDay;
-    }
-
-    case "semiannual": {
-      const startDay = expense.startDate.getDate();
-      const targetYear = target.getFullYear();
-      const targetMonth = target.getMonth();
-      const startMonth = expense.startDate.getMonth();
-      const startYear = expense.startDate.getFullYear();
-      const totalMonths = (targetYear - startYear) * 12 + (targetMonth - startMonth);
-      if (totalMonths < 0 || totalMonths % 6 !== 0) return false;
-      const maxDay = daysInMonth(targetYear, targetMonth);
-      const effectiveDay = startDay > maxDay ? maxDay : startDay;
-      return target.getDate() === effectiveDay;
-    }
-
-    case "yearly":
-      return (
-        expense.startDate.getMonth() === target.getMonth() &&
-        expense.startDate.getDate() === target.getDate()
-      );
-
-    case "custom": {
-      const interval = expense.recurrenceInterval;
-      if (!interval || interval <= 0) return false;
-      const startDay = expense.startDate.getDate();
-      const targetYear = target.getFullYear();
-      const targetMonth = target.getMonth();
-      const startMonth = expense.startDate.getMonth();
-      const startYear = expense.startDate.getFullYear();
-      const totalMonths = (targetYear - startYear) * 12 + (targetMonth - startMonth);
-      if (totalMonths < 0 || totalMonths % interval !== 0) return false;
-      const maxDay = daysInMonth(targetYear, targetMonth);
-      const effectiveDay = startDay > maxDay ? maxDay : startDay;
-      return target.getDate() === effectiveDay;
-    }
-
-    default:
-      return false;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +63,10 @@ export async function checkUpcomingPayments(): Promise<{
   notified: number;
   total: number;
 }> {
-  const tomorrow = addDays(startOfDay(new Date()), 1);
+  const now = new Date();
+  const tomorrow = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+  );
 
   // Query all active expenses joined with their account for currency.
   // Active = endDate IS NULL OR endDate >= tomorrow
@@ -195,7 +100,7 @@ export async function checkUpcomingPayments(): Promise<{
   }));
 
   // Filter to expenses due tomorrow
-  const dueTomorrow = typedRows.filter((expense) => isDueTomorrow(expense, tomorrow));
+  const dueTomorrow = typedRows.filter((expense) => isDueOn(expense, tomorrow));
 
   const total = dueTomorrow.length;
 
