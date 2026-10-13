@@ -5,9 +5,11 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { hashPassword } from "@/lib/auth/password";
-import { MAX_PASSWORD_LENGTH, registerSchema } from "@/lib/validations/auth";
+import { MAX_PASSWORD_LENGTH, emailSchema, registerSchema } from "@/lib/validations/auth";
+import { markPasswordChanged } from "@/lib/auth/session-validity";
+import { headers } from "next/headers";
 import { rateLimit } from "@/lib/rate-limiter";
 import { isRegistrationOpen } from "@/lib/auth/registration-mode";
 import { isEmailConfigured, sendEmail } from "@/lib/email/transporter";
@@ -80,6 +82,14 @@ export async function registerAction(
   }
   // --- END MODE GATE ---
 
+  // Best effort: behind a reverse proxy the last X-Forwarded-For entry is the address the proxy
+  // saw. Without a proxy the header is client-controlled and this limit can be bypassed.
+  const forwardedFor = (await headers()).get("x-forwarded-for");
+  const clientAddress = forwardedFor?.split(",").at(-1)?.trim() || "unknown";
+  if (!rateLimit(`register:${clientAddress}`, 5, 60 * 60_000).allowed) {
+    return { error: "Too many registration attempts. Please try again later." };
+  }
+
   const result = registerSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -97,18 +107,28 @@ export async function registerAction(
 
   const { email, password } = result.data;
 
+  const emailTakenError = { fieldErrors: { email: "An account with this email already exists" } };
+
   const [existing] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.email, email))
+    .where(sql`lower(${users.email}) = ${email}`)
     .limit(1);
 
   if (existing) {
-    return { fieldErrors: { email: "An account with this email already exists" } };
+    return emailTakenError;
   }
 
   const hashedPassword = await hashPassword(password);
-  await db.insert(users).values({ email, password: hashedPassword });
+  // A concurrent registration with the same address loses on the unique constraint
+  const [created] = await db
+    .insert(users)
+    .values({ email, password: hashedPassword })
+    .onConflictDoNothing({ target: users.email })
+    .returning({ id: users.id });
+  if (!created) {
+    return emailTakenError;
+  }
 
   // Send welcome email (non-blocking, failures ignored)
   if (isEmailConfigured()) {
@@ -141,7 +161,7 @@ export async function logoutAction(): Promise<void> {
 }
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: emailSchema,
 });
 
 const passwordResetRequestMessage =
@@ -164,7 +184,7 @@ export async function forgotPasswordAction(
   const { email } = result.data;
 
   // Limit reset mails per address; the response stays identical so nothing is revealed
-  if (!rateLimit(`forgot-password:${email.toLowerCase()}`, 3, 60 * 60_000).allowed) {
+  if (!rateLimit(`forgot-password:${email}`, 3, 60 * 60_000).allowed) {
     return { success: true, message: passwordResetRequestMessage };
   }
 
@@ -174,7 +194,7 @@ export async function forgotPasswordAction(
     [user] = await db
       .select({ id: users.id, email: users.email })
       .from(users)
-      .where(eq(users.email, email))
+      .where(sql`lower(${users.email}) = ${email}`)
       .limit(1);
   } catch (error) {
     logger.error("Failed to look up user for password reset", "auth", error);
@@ -261,8 +281,14 @@ export async function resetPasswordAction(
     return { error: invalidResetLinkMessage };
   }
 
-  // Update user password
-  await db.update(users).set({ password: hashedPassword }).where(eq(users.id, validation.userId));
+  // Update user password. Whole seconds, so a sign-in right after the reset is not rejected.
+  const passwordChangedAt = new Date(Math.floor(Date.now() / 1000) * 1000);
+  await db
+    .update(users)
+    .set({ password: hashedPassword, passwordChangedAt })
+    .where(eq(users.id, validation.userId));
+  // Ends every session that was signed in before this moment
+  markPasswordChanged(validation.userId, passwordChangedAt);
 
   // Invalidate all other tokens for this user
   await invalidateUserTokens(validation.userId);

@@ -27,6 +27,8 @@ export async function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
+    pathname === "/sw.js" ||
+    pathname === "/~offline" ||
     pathname.startsWith("/_static")
   ) {
     return NextResponse.next();

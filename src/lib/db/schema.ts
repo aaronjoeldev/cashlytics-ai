@@ -61,6 +61,8 @@ export const users = pgTable("users", {
   emailVerified: timestamp("email_verified", { mode: "date" }),
   name: text("name"),
   password: text("password"),
+  // Sessions issued before this moment are rejected (set on password reset)
+  passwordChangedAt: timestamp("password_changed_at"),
   image: text("image"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -562,15 +564,19 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
 }));
 
 // Exchange rate cache (for Phase 2 — Live-Rate-Cache)
-export const exchangeRates = pgTable("exchange_rates", {
-  id: serial("id").primaryKey(),
-  baseCurrency: text("base_currency").notNull(),
-  targetCurrency: text("target_currency").notNull(),
-  rate: numeric("rate", { precision: 10, scale: 6 }).notNull(),
-  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
-}, (table) => ({
-  uniquePair: unique().on(table.baseCurrency, table.targetCurrency),
-}));
+export const exchangeRates = pgTable(
+  "exchange_rates",
+  {
+    id: serial("id").primaryKey(),
+    baseCurrency: text("base_currency").notNull(),
+    targetCurrency: text("target_currency").notNull(),
+    rate: numeric("rate", { precision: 10, scale: 6 }).notNull(),
+    fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniquePair: unique().on(table.baseCurrency, table.targetCurrency),
+  })
+);
 
 export const userSettings = pgTable("user_settings", {
   userId: uuid("user_id").primaryKey(),
@@ -586,21 +592,25 @@ export const userSettingsRelations = relations(userSettings, ({ one }) => ({
   }),
 }));
 
-export const merchantCategories = pgTable("merchant_categories", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  merchantPattern: text("merchant_pattern").notNull(),
-  categoryId: uuid("category_id")
-    .references(() => categories.id, { onDelete: "cascade" })
-    .notNull(),
-  usageCount: integer("usage_count").default(1).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  uniqueUserMerchant: unique().on(table.userId, table.merchantPattern),
-}));
+export const merchantCategories = pgTable(
+  "merchant_categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    merchantPattern: text("merchant_pattern").notNull(),
+    categoryId: uuid("category_id")
+      .references(() => categories.id, { onDelete: "cascade" })
+      .notNull(),
+    usageCount: integer("usage_count").default(1).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueUserMerchant: unique().on(table.userId, table.merchantPattern),
+  })
+);
 
 export const merchantCategoriesRelations = relations(merchantCategories, ({ one }) => ({
   user: one(users, {
@@ -629,7 +639,9 @@ export const insights = pgTable("insights", {
   type: insightTypeEnum("type").notNull(),
   title: text("title").notNull(),
   message: text("message").notNull(),
-  severity: text("severity", { enum: ["info", "warning", "critical"] }).notNull().default("info"),
+  severity: text("severity", { enum: ["info", "warning", "critical"] })
+    .notNull()
+    .default("info"),
   isRead: boolean("is_read").default(false).notNull(),
   expiresAt: timestamp("expires_at"),
   metadata: text("metadata"),

@@ -29,16 +29,20 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       header share one bucket. Used in `api/chat`, `api/receipt-scan`, `api/documents`.
 - [x] **No throttling on login or password reset.** Login is limited to 10 attempts per 15 minutes
       per e-mail, reset mails to 3 per hour per e-mail.
-- [ ] **Registration is not throttled**, and the login limit can be used to lock a known address
-      out for 15 minutes. Limits are in memory and per process.
-- [ ] **Password reset does not end existing sessions** (JWT strategy, `auth.config.ts`). A stolen
-      session stays valid until the token expires.
+- [x] **Registration was not throttled.** Limited to 5 per hour per client address, best effort:
+      without a reverse proxy the address header is client-controlled.
+- [ ] **The login limit can be used to lock a known address out** for 15 minutes. All limits are
+      in memory and per process.
+- [x] **Password reset did not end existing sessions.** Sessions carry their sign-in time and are
+      rejected once the password changed afterwards or the user was deleted (migration `0015`).
+      Other replicas can accept an old session for up to 30 seconds.
 - [x] **Reset token consumption is not atomic** (`auth-actions.ts`, `resetPasswordAction`). Two
       concurrent submissions of the same token both succeed. Missing `password` / `token` fields
       throw instead of returning a validation error.
-- [ ] **Service worker caches authenticated pages and API responses** (`public/sw.js`), keyed by URL
-      only, and nothing clears the cache on logout. On a shared device the next user can be served
-      the previous user's pages when offline. The 5-minute max age for `/api/` is a no-op.
+- [x] **Service worker cached authenticated pages and API responses** for whoever used the
+      browser next. Offline copies are now kept per signed-in user, removed on logout, on the
+      auth pages and when another user signs in, and expire after 7 days. API responses are not
+      cached.
 - [x] **Logs contain bound query parameters.** Drizzle puts parameters into the error message and
       `src/lib/logger.ts` prints it: whole base64 documents, e-mail addresses, push keys.
       `src/lib/email/transporter.ts` also logs the recipient on every send.
@@ -55,12 +59,15 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **`generateInsights(userId)` is exported from a `"use server"` file without an auth check**
       (`src/actions/insights-actions.ts`). _(reachability unverified)_
 - [x] **Password length was inconsistent** between sign-in, registration and reset.
-- [ ] **E-mails are never lower-cased**, so `Foo@x.com` and `foo@x.com` are separate accounts.
-      Needs a case-insensitive lookup or a data migration, not just a schema change.
+- [x] **E-mails were case-sensitive.** They are normalised to lower case on sign-in, registration
+      and reset, and looked up case-insensitively.
+- [ ] **Existing accounts that differ only in e-mail case** are not merged, and there is no unique
+      index on `lower(email)`.
 - [ ] **User enumeration**: explicit "account already exists" message on registration; response time
       of the forgot-password action reveals whether the address exists.
-- [ ] **Registration races**: `SINGLE_USER_MODE` count and insert are not atomic; a concurrent
-      duplicate e-mail raises an unhandled unique violation.
+- [x] **A concurrent duplicate registration raised an unhandled unique violation.**
+- [ ] **`SINGLE_USER_MODE` count and insert are not atomic**: two concurrent registrations on a
+      fresh instance can both succeed.
 - [x] **Cron secret compared with `!==`** in both cron routes (not constant-time).
 - [ ] **Prompt injection surface**: `sanitizeForPrompt` in `api/chat/route.ts` keeps newlines, and
       bank text from CSV imports and receipt OCR is placed in the system prompt.
@@ -170,8 +177,7 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **Category select in the floating expense dialog is always empty** (`expense-form.tsx` copies
       the initial prop into state).
 - [ ] **Calendar does not restore the current month** when navigating back (`overview/client.tsx`).
-- [ ] **Push toggle** throws a raw error when no VAPID key is configured; the service worker is not
-      reachable while logged out (`/sw.js` is redirected to `/login`).
+- [ ] **Push toggle** throws a raw error when no VAPID key is configured.
 - [ ] **Translations**: `common.error` is missing, English plurals are built from German suffixes
       ("5 categorn"), `semiannual` has no label in the overview, chat components and auth forms are
       not translated, 72 keys are unused.
