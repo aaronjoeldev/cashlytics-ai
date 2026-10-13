@@ -185,7 +185,7 @@ export async function forgotPasswordAction(
       const rawToken = await createResetToken(user.id);
 
       // Build reset URL
-      const resetUrl = `${process.env.APP_URL || "http://localhost:3000"}/reset-password?token=${rawToken}`;
+      const resetUrl = `${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password?token=${rawToken}`;
 
       // Render email
       const { html, text, subject } = await renderResetPasswordEmail(resetUrl);

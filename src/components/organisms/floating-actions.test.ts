@@ -8,6 +8,7 @@ const LABELS = {
   transfer: "Transfer",
   account: "Account",
   import: "CSV Import",
+  scan: "Scan",
 } as const;
 
 test("getFloatingActions hides CSV import when AI is disabled", () => {

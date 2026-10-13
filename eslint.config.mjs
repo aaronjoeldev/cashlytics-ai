@@ -8,6 +8,13 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Disables ESLint rules that conflict with Prettier – must be last.
   prettier,
+  {
+    rules: {
+      // New in eslint-plugin-react-hooks 7: flags the existing fetch-on-mount / mounted-flag effects.
+      // Kept visible as a warning until those effects are migrated.
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

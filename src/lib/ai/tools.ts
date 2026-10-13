@@ -130,7 +130,6 @@ export const tools = {
       endDate,
       currency,
     }) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return createExpense({
         accountId,
         categoryId: categoryId ?? null,
@@ -141,7 +140,7 @@ export const tools = {
         startDate: new Date(startDate),
         endDate: endDate ? new Date(endDate) : null,
         ...(currency !== undefined && { currency }),
-      } as any);
+      });
     },
   }),
 
@@ -256,7 +255,6 @@ export const tools = {
     }),
     needsApproval: true,
     execute: async ({ accountId, categoryId, description, amount, date, currency }) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await createDailyExpense({
         accountId,
         categoryId: categoryId ?? null,
@@ -264,7 +262,7 @@ export const tools = {
         amount: amount.toString(),
         date: new Date(date),
         ...(currency !== undefined && { currency }),
-      } as any);
+      });
 
       // Learn merchant→category mapping for future suggestions
       if (result.success && categoryId) {
@@ -399,7 +397,6 @@ export const tools = {
     }),
     needsApproval: true,
     execute: async ({ accountId, source, amount, recurrenceType, startDate, currency }) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return createIncome({
         accountId,
         source,
@@ -407,7 +404,7 @@ export const tools = {
         recurrenceType,
         startDate: new Date(startDate),
         ...(currency !== undefined && { currency }),
-      } as any);
+      });
     },
   }),
 
@@ -676,8 +673,20 @@ export const tools = {
       return {
         success: true,
         data: {
-          month1: { month: month1, year: year1, income: d1.totalIncome, expenses: d1.totalExpenses, balance: d1.balance },
-          month2: { month: month2, year: year2, income: d2.totalIncome, expenses: d2.totalExpenses, balance: d2.balance },
+          month1: {
+            month: month1,
+            year: year1,
+            income: d1.totalIncome,
+            expenses: d1.totalExpenses,
+            balance: d1.balance,
+          },
+          month2: {
+            month: month2,
+            year: year2,
+            income: d2.totalIncome,
+            expenses: d2.totalExpenses,
+            balance: d2.balance,
+          },
           changes: {
             incomeChange: pctChange(d1.totalIncome, d2.totalIncome),
             expensesChange: pctChange(d1.totalExpenses, d2.totalExpenses),
@@ -799,7 +808,9 @@ export const tools = {
           month: targetMonth,
           year: targetYear,
           totalExpenses: Math.round(currentExpenses * 100) / 100,
-          totalIncome: overviewResult.success ? Math.round(overviewResult.data.totalIncome * 100) / 100 : 0,
+          totalIncome: overviewResult.success
+            ? Math.round(overviewResult.data.totalIncome * 100) / 100
+            : 0,
           balance: overviewResult.success ? Math.round(overviewResult.data.balance * 100) / 100 : 0,
           expenseChangeVsPrevMonth: expenseChange,
           topCategories,
