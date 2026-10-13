@@ -38,7 +38,10 @@ export async function POST(req: Request) {
     await db
       .insert(pushSubscriptions)
       .values({ userId, endpoint, p256dh, auth: authKey })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: pushSubscriptions.endpoint,
+        set: { userId, p256dh, auth: authKey },
+      });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -17,10 +17,15 @@ async function getBaseCurrency(): Promise<Currency> {
   return defaultCurrency;
 }
 
-function toBase(amount: number, fromCurrency: string | null | undefined, baseCurrency: Currency): number {
-  const from = (fromCurrency && currencies.includes(fromCurrency as Currency))
-    ? (fromCurrency as Currency)
-    : baseCurrency;
+function toBase(
+  amount: number,
+  fromCurrency: string | null | undefined,
+  baseCurrency: Currency
+): number {
+  const from =
+    fromCurrency && currencies.includes(fromCurrency as Currency)
+      ? (fromCurrency as Currency)
+      : baseCurrency;
   return convertCurrency(amount, from, baseCurrency);
 }
 
@@ -169,59 +174,58 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
       new Date(now.getFullYear(), now.getMonth() - 1, 1)
     );
 
-    const [allIncomes, allExpenses, currentMonthDailyRows, lastMonthDailyRows] =
-      await Promise.all([
-        db
-          .select({
-            amount: incomes.amount,
-            recurrenceType: incomes.recurrenceType,
-            startDate: incomes.startDate,
-            endDate: incomes.endDate,
-            entryCurrency: incomes.currency,
-          })
-          .from(incomes)
-          .where(eq(incomes.userId, userId)),
+    const [allIncomes, allExpenses, currentMonthDailyRows, lastMonthDailyRows] = await Promise.all([
+      db
+        .select({
+          amount: incomes.amount,
+          recurrenceType: incomes.recurrenceType,
+          startDate: incomes.startDate,
+          endDate: incomes.endDate,
+          entryCurrency: incomes.currency,
+        })
+        .from(incomes)
+        .where(eq(incomes.userId, userId)),
 
-        db
-          .select({
-            amount: expenses.amount,
-            recurrenceType: expenses.recurrenceType,
-            recurrenceInterval: expenses.recurrenceInterval,
-            startDate: expenses.startDate,
-            endDate: expenses.endDate,
-            entryCurrency: expenses.currency,
-          })
-          .from(expenses)
-          .where(eq(expenses.userId, userId)),
+      db
+        .select({
+          amount: expenses.amount,
+          recurrenceType: expenses.recurrenceType,
+          recurrenceInterval: expenses.recurrenceInterval,
+          startDate: expenses.startDate,
+          endDate: expenses.endDate,
+          entryCurrency: expenses.currency,
+        })
+        .from(expenses)
+        .where(eq(expenses.userId, userId)),
 
-        db
-          .select({
-            amount: dailyExpenses.amount,
-            entryCurrency: dailyExpenses.currency,
-          })
-          .from(dailyExpenses)
-          .where(
-            and(
-              eq(dailyExpenses.userId, userId),
-              gte(dailyExpenses.date, currentMonthStart),
-              lte(dailyExpenses.date, currentMonthEnd)
-            )
-          ),
+      db
+        .select({
+          amount: dailyExpenses.amount,
+          entryCurrency: dailyExpenses.currency,
+        })
+        .from(dailyExpenses)
+        .where(
+          and(
+            eq(dailyExpenses.userId, userId),
+            gte(dailyExpenses.date, currentMonthStart),
+            lte(dailyExpenses.date, currentMonthEnd)
+          )
+        ),
 
-        db
-          .select({
-            amount: dailyExpenses.amount,
-            entryCurrency: dailyExpenses.currency,
-          })
-          .from(dailyExpenses)
-          .where(
-            and(
-              eq(dailyExpenses.userId, userId),
-              gte(dailyExpenses.date, lastMonthStart),
-              lte(dailyExpenses.date, lastMonthEnd)
-            )
-          ),
-      ]);
+      db
+        .select({
+          amount: dailyExpenses.amount,
+          entryCurrency: dailyExpenses.currency,
+        })
+        .from(dailyExpenses)
+        .where(
+          and(
+            eq(dailyExpenses.userId, userId),
+            gte(dailyExpenses.date, lastMonthStart),
+            lte(dailyExpenses.date, lastMonthEnd)
+          )
+        ),
+    ]);
 
     // Convert each daily expense row to baseCurrency before summing
     const currentDailyExpensesTotal = currentMonthDailyRows.reduce(
@@ -242,7 +246,8 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
       } else {
         const hasStarted = inc.startDate <= now;
         const isActive = !inc.endDate || inc.endDate >= currentMonthStart;
-        if (hasStarted && isActive) normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
+        if (hasStarted && isActive)
+          normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
       }
       return sum + toBase(normalizedAmount, inc.entryCurrency, baseCurrency);
     }, 0);
@@ -256,7 +261,8 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
       } else {
         const hasStarted = inc.startDate <= lastMonthEnd;
         const isActive = !inc.endDate || inc.endDate >= lastMonthStart;
-        if (hasStarted && isActive) normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
+        if (hasStarted && isActive)
+          normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
       }
       return sum + toBase(normalizedAmount, inc.entryCurrency, baseCurrency);
     }, 0);
@@ -267,7 +273,11 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
         const hasStarted = exp.startDate <= now;
         const isActive = !exp.endDate || exp.endDate >= currentMonthStart;
         if (!hasStarted || !isActive) return sum;
-        const rawAmount = normalizeToMonthly(safeParseFloat(exp.amount), exp.recurrenceType, exp.recurrenceInterval);
+        const rawAmount = normalizeToMonthly(
+          safeParseFloat(exp.amount),
+          exp.recurrenceType,
+          exp.recurrenceInterval
+        );
         return sum + toBase(rawAmount, exp.entryCurrency, baseCurrency);
       }, 0);
 
@@ -277,7 +287,11 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
         const hasStarted = exp.startDate <= lastMonthEnd;
         const isActive = !exp.endDate || exp.endDate >= lastMonthStart;
         if (!hasStarted || !isActive) return sum;
-        const rawAmount = normalizeToMonthly(safeParseFloat(exp.amount), exp.recurrenceType, exp.recurrenceInterval);
+        const rawAmount = normalizeToMonthly(
+          safeParseFloat(exp.amount),
+          exp.recurrenceType,
+          exp.recurrenceInterval
+        );
         return sum + toBase(rawAmount, exp.entryCurrency, baseCurrency);
       }, 0);
 
@@ -465,7 +479,7 @@ export async function getCategoryBreakdown(
       .where(
         and(
           eq(expenses.userId, userId),
-          sql`${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${startDate.toISOString()}`
+          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${startDate.toISOString()})`
         )
       );
 
@@ -666,7 +680,7 @@ export async function getUpcomingPayments(
       .where(
         and(
           eq(expenses.userId, userId),
-          sql`${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${now.toISOString()}`
+          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${now.toISOString()})`
         )
       );
 
@@ -717,7 +731,11 @@ export async function getUpcomingPayments(
       payments.push({
         id: item.dailyExpense.id,
         name: item.dailyExpense.description,
-        amount: toBase(safeParseFloat(item.dailyExpense.amount), item.dailyExpense.currency, baseCurrency),
+        amount: toBase(
+          safeParseFloat(item.dailyExpense.amount),
+          item.dailyExpense.currency,
+          baseCurrency
+        ),
         date: new Date(item.dailyExpense.date),
         type: "daily_expense",
         category: item.category
