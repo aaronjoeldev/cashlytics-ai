@@ -1,4 +1,4 @@
-import { and, isNull, gte, or, eq } from "drizzle-orm";
+import { isNull, gte, or, eq } from "drizzle-orm";
 import { differenceInDays, startOfDay, addDays } from "date-fns";
 import { db } from "@/lib/db";
 import { expenses, accounts } from "@/lib/db/schema";
@@ -10,14 +10,7 @@ import { defaultCurrency } from "@/lib/currency";
 // ---------------------------------------------------------------------------
 
 type RecurrenceType =
-  | "once"
-  | "daily"
-  | "weekly"
-  | "monthly"
-  | "quarterly"
-  | "semiannual"
-  | "yearly"
-  | "custom";
+  "once" | "daily" | "weekly" | "monthly" | "quarterly" | "semiannual" | "yearly" | "custom";
 
 interface ExpenseRow {
   id: string;
@@ -112,7 +105,16 @@ function isDueTomorrow(
     case "custom": {
       const interval = expense.recurrenceInterval;
       if (!interval || interval <= 0) return false;
-      return daysDiff % interval === 0;
+      const startDay = expense.startDate.getDate();
+      const targetYear = target.getFullYear();
+      const targetMonth = target.getMonth();
+      const startMonth = expense.startDate.getMonth();
+      const startYear = expense.startDate.getFullYear();
+      const totalMonths = (targetYear - startYear) * 12 + (targetMonth - startMonth);
+      if (totalMonths < 0 || totalMonths % interval !== 0) return false;
+      const maxDay = daysInMonth(targetYear, targetMonth);
+      const effectiveDay = startDay > maxDay ? maxDay : startDay;
+      return target.getDate() === effectiveDay;
     }
 
     default:
