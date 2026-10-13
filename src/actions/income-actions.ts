@@ -62,20 +62,22 @@ export async function createIncome(data: Omit<NewIncome, "userId">): Promise<Api
     const { userId } = authResult;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
+    let accountCurrency: string | undefined;
     if (data.accountId) {
       const [ownedAccount] = await db
-        .select({ id: accounts.id })
+        .select({ id: accounts.id, currency: accounts.currency })
         .from(accounts)
         .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
         .limit(1);
       if (!ownedAccount) {
         return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
       }
+      accountCurrency = ownedAccount.currency;
     }
 
     const [income] = await db
       .insert(incomes)
-      .values({ ...data, userId })
+      .values({ ...data, currency: data.currency ?? accountCurrency, userId })
       .returning();
 
     revalidatePath("/income");

@@ -242,6 +242,7 @@ export function ExpenseForm({
   const dailyAccountId = dailyForm.watch("accountId");
 
   useEffect(() => {
+    if (editExpense) return;
     const current = periodicForm.getValues("currency");
     if (current && current !== defaultCurrency) return;
     const account = accounts.find((a) => a.id === periodicAccountId);
@@ -251,6 +252,7 @@ export function ExpenseForm({
   }, [periodicAccountId, accounts]);
 
   useEffect(() => {
+    if (editDailyExpense) return;
     const current = dailyForm.getValues("currency");
     if (current && current !== defaultCurrency) return;
     const account = accounts.find((a) => a.id === dailyAccountId);

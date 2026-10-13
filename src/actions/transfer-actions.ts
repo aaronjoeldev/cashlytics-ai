@@ -67,7 +67,7 @@ export async function createTransfer(
 
     // FK Validation: BOTH accounts must belong to the authenticated user (DATA-10)
     const [sourceAccount] = await db
-      .select({ id: accounts.id })
+      .select({ id: accounts.id, currency: accounts.currency })
       .from(accounts)
       .where(and(eq(accounts.id, data.sourceAccountId), eq(accounts.userId, userId)))
       .limit(1);
@@ -75,7 +75,7 @@ export async function createTransfer(
       return { success: false, error: "Quellkonto nicht gefunden oder kein Zugriff." };
     }
     const [targetAccount] = await db
-      .select({ id: accounts.id })
+      .select({ id: accounts.id, currency: accounts.currency })
       .from(accounts)
       .where(and(eq(accounts.id, data.targetAccountId), eq(accounts.userId, userId)))
       .limit(1);
@@ -85,7 +85,12 @@ export async function createTransfer(
 
     const [transfer] = await db
       .insert(transfers)
-      .values({ ...data, userId })
+      .values({
+        ...data,
+        sourceCurrency: data.sourceCurrency ?? sourceAccount.currency,
+        targetCurrency: data.targetCurrency ?? targetAccount.currency,
+        userId,
+      })
       .returning();
 
     revalidatePath("/transfers");
