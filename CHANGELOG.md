@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.0...v0.8.1) (2026-10-13)
+
+### 🐛 Bug Fixes
+
+- custom recurrence reminders and password reset link host ([90826a1](https://github.com/aaronjoeldev/cashlytics-ai/commit/90826a1addfcf6361d9959f49270e15ab1a8df76))
+- **security:** close cross-user data leaks in dashboard, documents and push ([57be8b9](https://github.com/aaronjoeldev/cashlytics-ai/commit/57be8b967d805a458db3dd7d42cb14c2cd7c75bc))
+
 ## [0.8.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.7.0...v0.8.0) (2026-07-31)
 
 ### ✨ Features
