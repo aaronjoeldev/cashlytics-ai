@@ -33,6 +33,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { logoutAction } from "@/actions/auth-actions";
+import { clearOfflineUserData } from "@/lib/pwa/offline-cache";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -185,7 +186,7 @@ export function AppSidebar({ aiEnabled }: { aiEnabled: boolean }) {
         </SidebarMenu>
 
         {/* Logout button */}
-        <form action={logoutAction} className="mt-2">
+        <form action={logoutAction} onSubmit={() => void clearOfflineUserData()} className="mt-2">
           <button
             type="submit"
             className="group text-muted-foreground/70 hover:text-foreground flex h-10 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200 hover:bg-white/[0.05]"

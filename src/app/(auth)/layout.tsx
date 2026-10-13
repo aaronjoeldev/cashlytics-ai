@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { OfflineCacheOwner } from "@/components/pwa/offline-cache-owner";
 
 export const metadata: Metadata = {
   title: "Cashlytics — Auth",
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
+      <OfflineCacheOwner userId={null} />
       {/* Left panel — branding (hidden on mobile) */}
       <div className="relative hidden flex-col items-center justify-center overflow-hidden bg-[#08080a] p-12 lg:flex lg:w-[45%] xl:w-[40%]">
         {/* Vault grid overlay */}

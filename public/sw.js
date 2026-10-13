@@ -1,7 +1,14 @@
-const CACHE_VERSION = 'v1';
+// Erhöhen, wenn alte Caches verworfen werden sollen (v1 war nicht an den Nutzer gebunden)
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `cashlytics-static-${CACHE_VERSION}`;
-const API_CACHE = `cashlytics-api-${CACHE_VERSION}`;
+const META_CACHE = `cashlytics-meta-${CACHE_VERSION}`;
+// Muss zu USER_CACHE_PREFIX in src/lib/pwa/offline-cache.ts passen
+const USER_CACHE_PREFIX = 'cashlytics-user-';
 const OFFLINE_URL = '/~offline';
+const USER_KEY = '/__sw/current-user';
+const CACHED_AT_HEADER = 'x-sw-cached-at';
+// Ältere Offline-Kopien werden nicht mehr ausgeliefert (z. B. nach abgelaufener Session)
+const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Install: Offline-Seite vorhalten
 self.addEventListener('install', (event) => {
@@ -13,17 +20,62 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate: Alte Caches aufräumen
+// Activate: Caches früherer Versionen aufräumen
 self.addEventListener('activate', (event) => {
-  const CURRENT_CACHES = [STATIC_CACHE, API_CACHE];
+  const keep = (key) =>
+    key === STATIC_CACHE || key === META_CACHE || key.startsWith(USER_CACHE_PREFIX);
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((k) => !CURRENT_CACHES.includes(k)).map((k) => caches.delete(k))),
-      )
+      .then((keys) => Promise.all(keys.filter((k) => !keep(k)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
+});
+
+// ---------------------------------------------------------------------------
+// Offline-Kopien pro Nutzer
+//
+// Seiten und RSC-Daten sind nutzerspezifisch. Sie liegen in einem Cache, der die Nutzer-ID im
+// Namen trägt, und werden nur für den aktuell angemeldeten Nutzer ausgeliefert. Die Seite
+// meldet den Nutzer nach dem Login (SET_USER) und räumt beim Abmelden auf (CLEAR_USER).
+// ---------------------------------------------------------------------------
+
+async function getCurrentUser() {
+  const meta = await caches.open(META_CACHE);
+  const stored = await meta.match(USER_KEY);
+  return stored ? stored.text() : null;
+}
+
+async function deleteUserCaches(exceptUserId = null) {
+  const keys = await caches.keys();
+  await Promise.all(
+    keys
+      .filter((key) => key.startsWith(USER_CACHE_PREFIX) && key !== USER_CACHE_PREFIX + exceptUserId)
+      .map((key) => caches.delete(key)),
+  );
+}
+
+async function setCurrentUser(userId) {
+  const meta = await caches.open(META_CACHE);
+  await meta.put(USER_KEY, new Response(userId));
+  await deleteUserCaches(userId);
+}
+
+async function clearCurrentUser() {
+  const meta = await caches.open(META_CACHE);
+  await meta.delete(USER_KEY);
+  await deleteUserCaches();
+}
+
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || typeof data !== 'object') return;
+
+  if (data.type === 'SET_USER' && typeof data.userId === 'string' && data.userId) {
+    event.waitUntil(setCurrentUser(data.userId));
+  } else if (data.type === 'CLEAR_USER') {
+    event.waitUntil(clearCurrentUser());
+  }
 });
 
 // Fetch: Caching-Strategien nach Route
@@ -34,23 +86,17 @@ self.addEventListener('fetch', (event) => {
   // Nur GET, nur Same-Origin
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // Next.js HMR / Dev-Overhead überspringen
-  if (url.pathname.startsWith('/_next/webpack-hmr')) return;
-
   // /_next/static/ — Cache-first (Inhalts-Hash im Dateinamen = immutable)
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
     return;
   }
 
-  // /api/ — Network-first, max. 10 s, dann Cache (max. 5 Min. alt)
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(request, API_CACHE, { maxAgeSeconds: 300, timeoutMs: 10_000 }));
-    return;
-  }
+  // API-Antworten (Session, Schlüssel, Kurse) werden nie gespeichert
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) return;
 
-  // Alle anderen Seiten — Network-first, bei Fehler Offline-Seite
-  event.respondWith(networkFirst(request, STATIC_CACHE, { fallback: OFFLINE_URL }));
+  // Seiten und RSC-Daten — Network-first, offline die Kopie des angemeldeten Nutzers
+  event.respondWith(networkFirstForUser(request));
 });
 
 // Cache-first: aus Cache liefern, bei Miss netzwerken und cachen
@@ -66,40 +112,55 @@ async function cacheFirst(request, cacheName) {
   return response;
 }
 
-// Network-first: Netzwerk bevorzugt, Timeout optional, Cache als Fallback
-async function networkFirst(request, cacheName, { maxAgeSeconds = 0, timeoutMs = 0, fallback = null } = {}) {
-  const cache = await caches.open(cacheName);
+async function storeForUser(request, response) {
+  // Erst nach dem Laden prüfen: während der Anfrage kann abgemeldet worden sein
+  const userId = await getCurrentUser();
+  if (!userId) return;
 
+  const headers = new Headers(response.headers);
+  headers.set(CACHED_AT_HEADER, String(Date.now()));
+  const copy = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+  const cache = await caches.open(USER_CACHE_PREFIX + userId);
+  await cache.put(request, copy);
+}
+
+async function matchForUser(request) {
+  const userId = await getCurrentUser();
+  if (!userId) return null;
+
+  const cache = await caches.open(USER_CACHE_PREFIX + userId);
+  const cached = await cache.match(request);
+  if (!cached) return null;
+
+  const cachedAt = Number(cached.headers.get(CACHED_AT_HEADER));
+  if (!cachedAt || Date.now() - cachedAt > MAX_AGE_MS) {
+    await cache.delete(request);
+    return null;
+  }
+  return cached;
+}
+
+// Network-first: Netzwerk bevorzugt, offline die Kopie des Nutzers, sonst die Offline-Seite
+async function networkFirstForUser(request) {
   try {
-    let fetchPromise = fetch(request);
-
-    if (timeoutMs > 0) {
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), timeoutMs),
-      );
-      fetchPromise = Promise.race([fetchPromise, timeout]);
+    const response = await fetch(request);
+    // Weiterleitungen (z. B. zum Login) und Fehler werden nicht gespeichert
+    if (response.ok && !response.redirected) {
+      storeForUser(request, response.clone()).catch(() => {});
     }
-
-    const response = await fetchPromise;
-    if (response.ok) cache.put(request, response.clone());
     return response;
   } catch {
-    const cached = await caches.match(request);
+    const cached = await matchForUser(request);
+    if (cached) return cached;
 
-    if (cached) {
-      if (maxAgeSeconds > 0) {
-        const dateHeader = cached.headers.get('date');
-        if (dateHeader) {
-          const ageSeconds = (Date.now() - new Date(dateHeader).getTime()) / 1000;
-          if (ageSeconds > maxAgeSeconds) {
-            if (fallback) return (await caches.match(fallback)) ?? new Response('Offline', { status: 503 });
-          }
-        }
-      }
-      return cached;
+    if (request.mode === 'navigate') {
+      const offline = await caches.match(OFFLINE_URL);
+      if (offline) return offline;
     }
-
-    if (fallback) return (await caches.match(fallback)) ?? new Response('Offline', { status: 503 });
     return new Response('Offline', { status: 503 });
   }
 }
