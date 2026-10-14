@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Account, NewAccount } from "@/types/database";
 import { logger } from "@/lib/logger";
-import { pickFields } from "@/lib/auth/ownership";
+import { createAccountInput, parseInput, updateAccountInput } from "@/lib/validations/action-input";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getAccounts(): Promise<ApiResponse<Account[]>> {
@@ -33,9 +33,12 @@ export async function createAccount(
     const authResult = await requireAuth();
     if (authResult.error) return { success: false, error: "Unauthorized" };
 
+    const input = parseInput(createAccountInput, data);
+    if (!input.success) return input;
+
     const [account] = await db
       .insert(accounts)
-      .values({ ...data, userId: authResult.userId })
+      .values({ ...input.data, userId: authResult.userId })
       .returning();
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
@@ -54,9 +57,16 @@ export async function updateAccount(
     const authResult = await requireAuth();
     if (authResult.error) return { success: false, error: "Unauthorized" };
 
+    const input = parseInput(updateAccountInput, data);
+    if (!input.success) return input;
+    const updates = input.data;
+    if (Object.keys(updates).length === 0) {
+      return { success: false, error: "Keine Änderungen übergeben." };
+    }
+
     const [account] = await db
       .update(accounts)
-      .set(pickFields(data, ["name", "type", "balance", "currency"]))
+      .set(updates)
       .where(and(eq(accounts.id, id), eq(accounts.userId, authResult.userId)))
       .returning();
     if (!account) {

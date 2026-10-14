@@ -4,11 +4,10 @@ This document covers all expense-related server actions including periodic expen
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `src/actions/expenses-actions.ts` | Periodic expense CRUD operations |
-| `src/actions/expense-actions.ts` | Alternative expense actions with account balance updates |
-| `src/actions/daily-expenses-actions.ts` | Daily/one-time expense CRUD operations |
+| File                              | Purpose                                                                                        |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `src/actions/expenses-actions.ts` | Periodic expense CRUD operations                                                               |
+| `src/actions/expense-actions.ts`  | Periodic and daily expense CRUD; input is validated with `src/lib/validations/action-input.ts` |
 
 ---
 
@@ -29,12 +28,12 @@ Retrieves periodic expenses with optional filtering.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `filters.accountId` | `string` | No | Filter by account ID |
-| `filters.categoryId` | `string` | No | Filter by category ID |
-| `filters.startDate` | `Date` | No | Filter expenses starting from this date |
-| `filters.endDate` | `Date` | No | Filter expenses ending before this date |
+| Parameter            | Type     | Required | Description                             |
+| -------------------- | -------- | -------- | --------------------------------------- |
+| `filters.accountId`  | `string` | No       | Filter by account ID                    |
+| `filters.categoryId` | `string` | No       | Filter by category ID                   |
+| `filters.startDate`  | `Date`   | No       | Filter expenses starting from this date |
+| `filters.endDate`    | `Date`   | No       | Filter expenses ending before this date |
 
 **Returns**: `ApiResponse<ExpenseWithDetails[]>`
 
@@ -46,14 +45,15 @@ type ExpenseWithDetails = Expense & {
 ```
 
 **Example Usage**:
+
 ```typescript
-const result = await getExpenses({ 
-  accountId: 'acc-123',
-  startDate: new Date('2024-01-01')
+const result = await getExpenses({
+  accountId: "acc-123",
+  startDate: new Date("2024-01-01"),
 });
 
 if (result.success) {
-  result.data.forEach(expense => {
+  result.data.forEach((expense) => {
     console.log(`${expense.name}: ${expense.amount}€`);
   });
 }
@@ -69,15 +69,16 @@ Retrieves a single periodic expense by ID.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | `string` | Yes | Expense ID |
+| Parameter | Type     | Required | Description |
+| --------- | -------- | -------- | ----------- |
+| `id`      | `string` | Yes      | Expense ID  |
 
 **Returns**: `ApiResponse<ExpenseWithDetails>`
 
 **Example Usage**:
+
 ```typescript
-const result = await getExpenseById('expense-uuid');
+const result = await getExpenseById("expense-uuid");
 if (result.success) {
   console.log(result.data.name, result.data.amount);
 }
@@ -93,33 +94,35 @@ Creates a new periodic expense.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data.accountId` | `string` | Yes | Account to charge expense to |
-| `data.categoryId` | `string \| null` | No | Category ID |
-| `data.name` | `string` | Yes | Expense name/description |
-| `data.amount` | `number` | Yes | Expense amount |
-| `data.recurrenceType` | `RecurrenceType` | Yes | Recurrence pattern |
-| `data.recurrenceInterval` | `number \| null` | No | Custom interval (for 'custom' type) |
-| `data.startDate` | `Date \| string` | Yes | When expense starts |
-| `data.endDate` | `Date \| string \| null` | No | When expense ends |
+| Parameter                 | Type                     | Required | Description                         |
+| ------------------------- | ------------------------ | -------- | ----------------------------------- |
+| `data.accountId`          | `string`                 | Yes      | Account to charge expense to        |
+| `data.categoryId`         | `string \| null`         | No       | Category ID                         |
+| `data.name`               | `string`                 | Yes      | Expense name/description            |
+| `data.amount`             | `number`                 | Yes      | Expense amount                      |
+| `data.recurrenceType`     | `RecurrenceType`         | Yes      | Recurrence pattern                  |
+| `data.recurrenceInterval` | `number \| null`         | No       | Custom interval (for 'custom' type) |
+| `data.startDate`          | `Date \| string`         | Yes      | When expense starts                 |
+| `data.endDate`            | `Date \| string \| null` | No       | When expense ends                   |
 
 **Recurrence Types**:
+
 ```typescript
-type RecurrenceType = 'once' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
+type RecurrenceType = "once" | "daily" | "weekly" | "monthly" | "quarterly" | "yearly" | "custom";
 ```
 
 **Returns**: `ApiResponse<Expense>`
 
 **Example Usage**:
+
 ```typescript
 const result = await createExpense({
-  accountId: 'acc-123',
-  categoryId: 'cat-456',
-  name: 'Netflix Subscription',
+  accountId: "acc-123",
+  categoryId: "cat-456",
+  name: "Netflix Subscription",
   amount: 15.99,
-  recurrenceType: 'monthly',
-  startDate: new Date('2024-01-01')
+  recurrenceType: "monthly",
+  startDate: new Date("2024-01-01"),
 });
 ```
 
@@ -133,18 +136,19 @@ Updates an existing periodic expense.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | `string` | Yes | Expense ID to update |
-| `data` | `Partial<NewExpense>` | Yes | Fields to update |
+| Parameter | Type                  | Required | Description          |
+| --------- | --------------------- | -------- | -------------------- |
+| `id`      | `string`              | Yes      | Expense ID to update |
+| `data`    | `Partial<NewExpense>` | Yes      | Fields to update     |
 
 **Returns**: `ApiResponse<Expense>`
 
 **Example Usage**:
+
 ```typescript
-const result = await updateExpense('expense-uuid', {
+const result = await updateExpense("expense-uuid", {
   amount: 17.99,
-  name: 'Netflix Premium'
+  name: "Netflix Premium",
 });
 ```
 
@@ -158,15 +162,16 @@ Deletes a periodic expense.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | `string` | Yes | Expense ID to delete |
+| Parameter | Type     | Required | Description          |
+| --------- | -------- | -------- | -------------------- |
+| `id`      | `string` | Yes      | Expense ID to delete |
 
 **Returns**: `ApiResponse<void>`
 
 **Example Usage**:
+
 ```typescript
-const result = await deleteExpense('expense-uuid');
+const result = await deleteExpense("expense-uuid");
 ```
 
 **Error Handling**: Returns `{ success: false, error: 'Ausgabe konnte nicht gelöscht werden.' }`
@@ -194,21 +199,21 @@ Retrieves daily expenses with optional filtering.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `filters.accountId` | `string` | No | Filter by account ID |
-| `filters.categoryId` | `string` | No | Filter by category ID |
-| `filters.description` | `string` | No | Filter by description (case-insensitive) |
-| `filters.startDate` | `Date` | No | Filter from this date |
-| `filters.endDate` | `Date` | No | Filter until this date |
+| Parameter             | Type     | Required | Description                              |
+| --------------------- | -------- | -------- | ---------------------------------------- |
+| `filters.accountId`   | `string` | No       | Filter by account ID                     |
+| `filters.categoryId`  | `string` | No       | Filter by category ID                    |
+| `filters.description` | `string` | No       | Filter by description (case-insensitive) |
+| `filters.startDate`   | `Date`   | No       | Filter from this date                    |
+| `filters.endDate`     | `Date`   | No       | Filter until this date                   |
 
 **Returns**: `ApiResponse<DailyExpenseWithDetails[]>`
 
 ---
 
-## Daily Expenses (daily-expenses-actions.ts)
+## Daily Expenses
 
-**Path**: `src/actions/daily-expenses-actions.ts`  
+**Path**: `src/actions/expense-actions.ts`  
 **Type**: Server Action
 
 ### Overview
@@ -223,12 +228,12 @@ Retrieves daily expenses with optional filtering.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `filters.accountId` | `string` | No | Filter by account ID |
-| `filters.categoryId` | `string` | No | Filter by category ID |
-| `filters.startDate` | `Date` | No | Filter from this date |
-| `filters.endDate` | `Date` | No | Filter until this date |
+| Parameter            | Type     | Required | Description            |
+| -------------------- | -------- | -------- | ---------------------- |
+| `filters.accountId`  | `string` | No       | Filter by account ID   |
+| `filters.categoryId` | `string` | No       | Filter by category ID  |
+| `filters.startDate`  | `Date`   | No       | Filter from this date  |
+| `filters.endDate`    | `Date`   | No       | Filter until this date |
 
 **Returns**: `ApiResponse<DailyExpenseWithDetails[]>`
 
@@ -240,10 +245,11 @@ type DailyExpenseWithDetails = DailyExpense & {
 ```
 
 **Example Usage**:
+
 ```typescript
 const result = await getDailyExpenses({
-  startDate: new Date('2024-01-01'),
-  endDate: new Date('2024-01-31')
+  startDate: new Date("2024-01-01"),
+  endDate: new Date("2024-01-31"),
 });
 ```
 
@@ -255,9 +261,9 @@ Retrieves a single daily expense by ID.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | `string` | Yes | Daily expense ID |
+| Parameter | Type     | Required | Description      |
+| --------- | -------- | -------- | ---------------- |
+| `id`      | `string` | Yes      | Daily expense ID |
 
 **Returns**: `ApiResponse<DailyExpenseWithDetails>`
 
@@ -269,24 +275,25 @@ Creates a new daily expense.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `data.accountId` | `string` | Yes | Account to charge |
-| `data.categoryId` | `string \| null` | No | Category ID |
-| `data.description` | `string` | Yes | Expense description |
-| `data.amount` | `number` | Yes | Expense amount |
-| `data.date` | `Date \| string` | Yes | Transaction date |
+| Parameter          | Type             | Required | Description         |
+| ------------------ | ---------------- | -------- | ------------------- |
+| `data.accountId`   | `string`         | Yes      | Account to charge   |
+| `data.categoryId`  | `string \| null` | No       | Category ID         |
+| `data.description` | `string`         | Yes      | Expense description |
+| `data.amount`      | `number`         | Yes      | Expense amount      |
+| `data.date`        | `Date \| string` | Yes      | Transaction date    |
 
 **Returns**: `ApiResponse<DailyExpense>`
 
 **Example Usage**:
+
 ```typescript
 const result = await createDailyExpense({
-  accountId: 'acc-123',
-  categoryId: 'cat-groceries',
-  description: 'Weekly groceries',
-  amount: 85.50,
-  date: new Date()
+  accountId: "acc-123",
+  categoryId: "cat-groceries",
+  description: "Weekly groceries",
+  amount: 85.5,
+  date: new Date(),
 });
 ```
 
@@ -298,10 +305,10 @@ Updates an existing daily expense.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | `string` | Yes | Daily expense ID |
-| `data` | `Partial<NewDailyExpense>` | Yes | Fields to update |
+| Parameter | Type                       | Required | Description      |
+| --------- | -------------------------- | -------- | ---------------- |
+| `id`      | `string`                   | Yes      | Daily expense ID |
+| `data`    | `Partial<NewDailyExpense>` | Yes      | Fields to update |
 
 **Returns**: `ApiResponse<DailyExpense>`
 
@@ -313,9 +320,9 @@ Deletes a daily expense.
 
 **Parameters**:
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | `string` | Yes | Daily expense ID |
+| Parameter | Type     | Required | Description      |
+| --------- | -------- | -------- | ---------------- |
+| `id`      | `string` | Yes      | Daily expense ID |
 
 **Returns**: `ApiResponse<void>`
 

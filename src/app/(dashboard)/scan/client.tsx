@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createDailyExpense } from "@/actions/daily-expenses-actions";
+import { createDailyExpense } from "@/actions/expense-actions";
 import { uploadDocument } from "@/actions/document-actions";
 import { currencies, type Currency, currencySymbols, convertCurrency } from "@/lib/currency";
 import type { Account, Category } from "@/types/database";
@@ -135,12 +135,12 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
       accountId: selectedAccountId,
       categoryId: selectedCategoryId === "none" ? null : selectedCategoryId,
       description,
-      amount: parsedAmount,
+      amount: String(parsedAmount),
       date: new Date(date),
       currency: selectedCurrency,
-      originalAmount: isForeignCurrency ? parsedAmount : undefined,
+      originalAmount: isForeignCurrency ? String(parsedAmount) : undefined,
       exchangeRate: isForeignCurrency
-        ? convertCurrency(1, selectedCurrency, accountCurrency)
+        ? String(convertCurrency(1, selectedCurrency, accountCurrency))
         : undefined,
     });
 
@@ -336,9 +336,13 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
                     const accountCurrency = (account?.currency as Currency) ?? "EUR";
                     const parsedAmt = parseFloat(amount || "0");
                     if (selectedCurrency !== accountCurrency && parsedAmt > 0) {
-                      const converted = convertCurrency(parsedAmt, selectedCurrency, accountCurrency);
+                      const converted = convertCurrency(
+                        parsedAmt,
+                        selectedCurrency,
+                        accountCurrency
+                      );
                       return (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                           <Info className="h-3 w-3 shrink-0" />
                           <span>
                             ≈ {converted.toFixed(2)} {accountCurrency}

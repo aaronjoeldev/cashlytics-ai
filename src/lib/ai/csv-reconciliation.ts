@@ -6,7 +6,7 @@ const matchedDecisionSchema = z
   .object({
     csvRowId: z.string().min(1),
     action: z.literal("match_existing"),
-    matchedTransactionId: z.string().uuid(),
+    matchedTransactionId: z.guid(),
     confidence: z.number().min(0).max(1),
     reason: z.string().min(1).max(500),
   })
@@ -60,9 +60,7 @@ export type ExistingTransactionForAi = {
 };
 
 export type ReconciliationValidationErrorCode =
-  | "EMPTY_RESPONSE"
-  | "MALFORMED_JSON"
-  | "SCHEMA_VALIDATION_FAILED";
+  "EMPTY_RESPONSE" | "MALFORMED_JSON" | "SCHEMA_VALIDATION_FAILED";
 
 type ReconciliationValidationSuccess = {
   success: true;
@@ -78,8 +76,7 @@ type ReconciliationValidationFailure = {
 };
 
 export type ReconciliationValidationResult =
-  | ReconciliationValidationSuccess
-  | ReconciliationValidationFailure;
+  ReconciliationValidationSuccess | ReconciliationValidationFailure;
 
 const PROMPT_OUTPUT_SPEC = `Return ONLY JSON with this strict schema:
 {
