@@ -43,15 +43,22 @@ jobs:
           # VERSION is tracked, so its existence says nothing. A release happened only if
           # semantic-release created a new tag.
           TAG_BEFORE=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          npx semantic-release
+          # Do not abort on failure: semantic-release pushes the tag before it creates the GitHub
+          # release, so a later failure would otherwise leave a released version without image.
+          STATUS=0
+          npx semantic-release || STATUS=$?
           TAG_AFTER=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
           if [ -n "$TAG_AFTER" ] && [ "$TAG_AFTER" != "$TAG_BEFORE" ]; then
             echo "version=${TAG_AFTER#v}" >> $GITHUB_OUTPUT
             echo "released=true" >> $GITHUB_OUTPUT
+            if [ "$STATUS" -ne 0 ]; then
+              echo "::warning::semantic-release created $TAG_AFTER but failed afterwards (exit $STATUS). The image is built anyway; check the GitHub release for $TAG_AFTER."
+            fi
           else
             echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
             echo "released=false" >> $GITHUB_OUTPUT
+            exit $STATUS
           fi
 
       - name: Extract version
