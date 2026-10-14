@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.3](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.2...v0.8.3) (2026-10-14)
+
+### 🐛 Bug Fixes
+
+- **actions:** validate input of all create and update actions on the server ([cb8c155](https://github.com/aaronjoeldev/cashlytics-ai/commit/cb8c1550a78b01e860d7caeb9d20e785fe674abe))
+
 ## [0.8.2](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.1...v0.8.2) (2026-10-14)
 
 ### 🐛 Bug Fixes
