@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.4](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.3...v0.8.4) (2026-10-14)
+
+### 🐛 Bug Fixes
+
+- **ci:** build the image when semantic-release fails after tagging ([bdc17ab](https://github.com/aaronjoeldev/cashlytics-ai/commit/bdc17ab8b210b1fd99932dd964182a09cdb4e261))
+
 ## [0.8.3](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.2...v0.8.3) (2026-10-14)
 
 ### 🐛 Bug Fixes
