@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
+import { Controller, useForm, type FieldErrors } from "react-hook-form";
+import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import {
@@ -14,6 +15,8 @@ import { createIncome, updateIncome } from "@/actions/income-actions";
 import { currencies, type Currency, currencySymbols, defaultCurrency } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/molecules/date-input";
+import { getLocalCalendarDay } from "@/lib/recurrence";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -31,6 +34,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { Account, Income } from "@/types/database";
+
+/** Shows the first client-side validation message; most fields have no inline error. */
+function showFirstError(errors: FieldErrors) {
+  const first = Object.values(errors)[0];
+  if (first?.message) toast.error(String(first.message));
+}
 
 interface IncomeFormProps {
   accounts: Account[];
@@ -65,7 +74,7 @@ export function IncomeForm({
       amount: "",
       currency: defaultCurrency,
       recurrenceType: "monthly",
-      startDate: new Date(),
+      startDate: getLocalCalendarDay(),
       endDate: null,
       info: "",
     },
@@ -103,7 +112,7 @@ export function IncomeForm({
         amount: "",
         currency: defaultCurrency,
         recurrenceType: "monthly",
-        startDate: new Date(),
+        startDate: getLocalCalendarDay(),
         endDate: null,
         info: "",
       });
@@ -131,6 +140,7 @@ export function IncomeForm({
           endDate,
           info: data.info,
         });
+        if (!result.success) toast.error(result.error);
         if (result.success) {
           form.reset();
           setOpen(false);
@@ -147,6 +157,7 @@ export function IncomeForm({
           endDate,
           info: data.info,
         });
+        if (!result.success) toast.error(result.error);
         if (result.success) {
           form.reset();
           setOpen(false);
@@ -176,7 +187,7 @@ export function IncomeForm({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="mt-4 space-y-4">
+        <form onSubmit={form.handleSubmit(handleSubmit, showFirstError)} className="mt-4 space-y-4">
           <div className="space-y-2">
             <Label>{t("source")}</Label>
             <Input {...form.register("source")} placeholder={t("sourcePlaceholder")} />
@@ -256,13 +267,25 @@ export function IncomeForm({
             </div>
             <div className="space-y-2">
               <Label>{t("startDate")}</Label>
-              <Input type="date" {...form.register("startDate", { valueAsDate: true })} />
+              <Controller
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <DateInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+                )}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>{t("endDate")}</Label>
-            <Input type="date" {...form.register("endDate", { valueAsDate: true })} />
+            <Controller
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <DateInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+              )}
+            />
           </div>
 
           <div className="space-y-2">

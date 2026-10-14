@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
+import { Controller, useForm, type FieldErrors } from "react-hook-form";
+import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, ArrowRight } from "lucide-react";
 import {
@@ -13,6 +14,8 @@ import {
 import { createTransfer } from "@/actions/transfer-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/molecules/date-input";
+import { getLocalCalendarDay } from "@/lib/recurrence";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -30,6 +33,12 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { Account, Transfer } from "@/types/database";
+
+/** Shows the first client-side validation message; most fields have no inline error. */
+function showFirstError(errors: FieldErrors) {
+  const first = Object.values(errors)[0];
+  if (first?.message) toast.error(String(first.message));
+}
 
 interface TransferFormProps {
   accounts: Account[];
@@ -62,7 +71,7 @@ export function TransferForm({
       amount: "",
       description: "",
       recurrenceType: "once",
-      startDate: new Date(),
+      startDate: getLocalCalendarDay(),
       endDate: null,
     },
   });
@@ -86,6 +95,7 @@ export function TransferForm({
         startDate: data.startDate,
         endDate,
       });
+      if (!result.success) toast.error(result.error);
 
       if (result.success) {
         form.reset();
@@ -113,7 +123,7 @@ export function TransferForm({
           <DialogDescription>{t("newTransferDesc")}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="mt-4 space-y-4">
+        <form onSubmit={form.handleSubmit(handleSubmit, showFirstError)} className="mt-4 space-y-4">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr,auto,1fr] sm:items-end">
             <div className="space-y-2">
               <Label>{t("sourceAccount")}</Label>
@@ -200,11 +210,23 @@ export function TransferForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>{t("startDate")}</Label>
-              <Input type="date" {...form.register("startDate", { valueAsDate: true })} />
+              <Controller
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <DateInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+                )}
+              />
             </div>
             <div className="space-y-2">
               <Label>{t("endDate")}</Label>
-              <Input type="date" {...form.register("endDate", { valueAsDate: true })} />
+              <Controller
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <DateInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} />
+                )}
+              />
             </div>
           </div>
 
