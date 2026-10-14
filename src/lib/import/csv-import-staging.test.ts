@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createCsvImportStagingService, parseAndNormalizeCsv } from "./csv-import-staging";
+import {
+  createCsvImportStagingService,
+  parseAndNormalizeCsv,
+  normalizeAmount,
+} from "./csv-import-staging";
 
 test("parseAndNormalizeCsv returns failure when required header mapping is missing", () => {
   const csv = ["Date;Amount;Description", "2026/03/02;10.00;Salary"].join("\n");
@@ -71,5 +75,48 @@ test("parseAndNormalizeCsv supports two-digit day-month-year dates", () => {
     assert.equal(result.rows.length, 1);
     assert.equal(result.rows[0]?.bookingDate.toISOString().slice(0, 10), "2026-03-02");
     assert.equal(result.rows[0]?.amount, "120.50");
+  }
+});
+
+test("normalizeAmount parses common bank amount formats", () => {
+  const cases: Array<[string, string]> = [
+    ["12,50", "12.50"],
+    ["12.50", "12.50"],
+    ["-3,50", "-3.50"],
+    ["1.234,56", "1234.56"],
+    ["1,234.56", "1234.56"],
+    ["1.234.567,89", "1234567.89"],
+    ["1 234,56", "1234.56"],
+    ["1'234.56", "1234.56"],
+    ["1234", "1234.00"],
+    ["0,5", "0.50"],
+    ["0,500", "0.50"],
+    ["+100,00", "100.00"],
+    ["-0,00", "0.00"],
+  ];
+  for (const [input, expected] of cases) {
+    assert.equal(Number(normalizeAmount(input)), Number(expected), input);
+  }
+});
+
+test("normalizeAmount keeps debits negative", () => {
+  assert.equal(normalizeAmount("50,00-"), "-50.00");
+  assert.equal(normalizeAmount("(50,00)"), "-50.00");
+  assert.equal(normalizeAmount("12,50 S"), "-12.50");
+  assert.equal(normalizeAmount("12,50 H"), "12.50");
+  assert.equal(normalizeAmount("-1.234,56 €"), "-1234.56");
+  assert.equal(normalizeAmount("EUR -45,00"), "-45.00");
+});
+
+test("normalizeAmount reads a lone separator before three digits as thousands", () => {
+  assert.equal(normalizeAmount("1.234"), "1234.00");
+  assert.equal(normalizeAmount("1,234"), "1234.00");
+  assert.equal(normalizeAmount("1.234.567"), "1234567.00");
+  assert.equal(normalizeAmount("1,234,567"), "1234567.00");
+});
+
+test("normalizeAmount rejects values that are not amounts", () => {
+  for (const input of ["", "abc", "12,34,5", "1.2.3", "12-34", "--5"]) {
+    assert.throws(() => normalizeAmount(input), input);
   }
 });

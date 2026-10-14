@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { merchantCategories, categories } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { ownsCategory } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 import type { ApiResponse } from "@/types/database";
 
@@ -50,10 +51,10 @@ export async function suggestCategoryForMerchant(
     }
 
     return { success: true, data: bestMatch };
-  } catch (error) {
+  } catch {
     return {
       success: false,
-      error: `Fehler: ${error instanceof Error ? error.message : String(error)}`,
+      error: "Aktion fehlgeschlagen.",
     };
   }
 }
@@ -73,6 +74,9 @@ export async function learnMerchantCategory(
   try {
     const normalized = merchantPattern.toLowerCase().trim();
     if (!normalized) return { success: true, data: { learned: false } };
+    if (!(await ownsCategory(userId, categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
+    }
 
     await db
       .insert(merchantCategories)
@@ -87,10 +91,10 @@ export async function learnMerchantCategory(
       });
 
     return { success: true, data: { learned: true } };
-  } catch (error) {
+  } catch {
     return {
       success: false,
-      error: `Fehler: ${error instanceof Error ? error.message : String(error)}`,
+      error: "Aktion fehlgeschlagen.",
     };
   }
 }

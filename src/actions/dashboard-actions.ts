@@ -242,7 +242,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
     logger.error("Failed to fetch dashboard stats", "getDashboardStats", error);
     return {
       success: false,
-      error: `Failed to fetch dashboard stats: ${error instanceof Error ? error.message : String(error)}`,
+      error: "Failed to fetch dashboard stats",
     };
   }
 }

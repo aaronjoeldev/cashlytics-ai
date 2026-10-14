@@ -19,8 +19,7 @@ export async function POST(req: Request) {
   }
   const userId = session.user.id;
 
-  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "local";
-  const rl = rateLimit(`receipt-scan:${ip}`, 5, 60_000);
+  const rl = rateLimit(`receipt-scan:${userId}`, 5, 60_000);
   if (!rl.allowed) {
     const retryAfterSecs = Math.ceil((rl.resetAt - Date.now()) / 1000);
     return NextResponse.json(

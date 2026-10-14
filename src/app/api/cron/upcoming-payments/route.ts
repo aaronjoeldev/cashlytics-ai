@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkUpcomingPayments } from "@/lib/cron/upcoming-payments";
 import { logger } from "@/lib/logger";
+import { isValidCronRequest } from "@/lib/auth/cron-secret";
 
 export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
   }
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+  if (!isValidCronRequest(authHeader, cronSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

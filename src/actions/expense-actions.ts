@@ -14,6 +14,7 @@ import type {
   DailyExpenseWithDetails,
 } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { ownsAccount, ownsCategory, pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getExpenses(filters?: {
@@ -125,9 +126,31 @@ export async function updateExpense(
     }
     const { userId } = authResult;
 
+    const updates = pickFields(data, [
+      "accountId",
+      "categoryId",
+      "name",
+      "amount",
+      "recurrenceType",
+      "recurrenceInterval",
+      "startDate",
+      "endDate",
+      "isSubscription",
+      "currency",
+      "originalAmount",
+      "exchangeRate",
+      "info",
+    ]);
+    if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
+      return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
+    }
+    if (updates.categoryId && !(await ownsCategory(userId, updates.categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
+    }
+
     const [expense] = await db
       .update(expenses)
-      .set(data)
+      .set(updates)
       .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
       .returning();
     if (!expense) {
@@ -232,6 +255,10 @@ export async function createDailyExpense(
       accountCurrency = ownedAccount.currency;
     }
 
+    if (data.categoryId && !(await ownsCategory(userId, data.categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
+    }
+
     const [expense] = await db
       .insert(dailyExpenses)
       .values({ ...data, currency: data.currency ?? accountCurrency, userId })
@@ -258,9 +285,27 @@ export async function updateDailyExpense(
     }
     const { userId } = authResult;
 
+    const updates = pickFields(data, [
+      "accountId",
+      "categoryId",
+      "description",
+      "amount",
+      "date",
+      "currency",
+      "originalAmount",
+      "exchangeRate",
+      "info",
+    ]);
+    if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
+      return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
+    }
+    if (updates.categoryId && !(await ownsCategory(userId, updates.categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
+    }
+
     const [expense] = await db
       .update(dailyExpenses)
-      .set(data)
+      .set(updates)
       .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)))
       .returning();
     if (!expense) {

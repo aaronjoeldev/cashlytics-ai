@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { generateInsights } from "@/actions/insights-actions";
 import { logger } from "@/lib/logger";
+import { isValidCronRequest } from "@/lib/auth/cron-secret";
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
   if (!cronSecret) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
-  if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+  if (!isValidCronRequest(authHeader, cronSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -24,7 +25,10 @@ export async function GET(req: Request) {
       totalGenerated += result.generated;
     }
 
-    logger.info(`Insights generated: ${totalGenerated} for ${allUsers.length} users`, "cron/insights");
+    logger.info(
+      `Insights generated: ${totalGenerated} for ${allUsers.length} users`,
+      "cron/insights"
+    );
     return NextResponse.json({ success: true, totalGenerated, users: allUsers.length });
   } catch (error) {
     logger.error("Cron insights failed", "cron/insights", error);

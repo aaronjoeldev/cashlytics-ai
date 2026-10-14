@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { documents } from "@/lib/db/schema";
+import { dailyExpenses, documents, expenses } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
@@ -48,6 +48,21 @@ export async function uploadDocument(
 
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
       return { success: false, error: "Dateityp nicht erlaubt. Erlaubt: PDF, PNG, JPEG." };
+    }
+
+    const [linkedExpense] = expenseId
+      ? await db
+          .select({ id: expenses.id })
+          .from(expenses)
+          .where(and(eq(expenses.id, expenseId), eq(expenses.userId, userId)))
+          .limit(1)
+      : await db
+          .select({ id: dailyExpenses.id })
+          .from(dailyExpenses)
+          .where(and(eq(dailyExpenses.id, dailyExpenseId!), eq(dailyExpenses.userId, userId)))
+          .limit(1);
+    if (!linkedExpense) {
+      return { success: false, error: "Ausgabe nicht gefunden oder kein Zugriff." };
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -211,9 +226,7 @@ export async function getAllDocuments(): Promise<
       dailyExpenseId: row.document.dailyExpenseId,
       expenseName: row.expense?.name ?? row.dailyExpense?.description ?? null,
       expenseType: (row.expense ? "periodic" : row.dailyExpense ? "daily" : null) as
-        | "periodic"
-        | "daily"
-        | null,
+        "periodic" | "daily" | null,
       category: row.category
         ? {
             id: row.category.id,

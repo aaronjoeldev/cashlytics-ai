@@ -6,6 +6,7 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Transfer, NewTransfer, TransferWithDetails } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { ownsAccount, pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getTransfers(filters?: {
@@ -108,23 +109,53 @@ export async function updateTransfer(
   data: Partial<NewTransfer>
 ): Promise<ApiResponse<Transfer>> {
   try {
-    if (
-      data.sourceAccountId &&
-      data.targetAccountId &&
-      data.sourceAccountId === data.targetAccountId
-    ) {
-      return { success: false, error: "Quell- und Zielkonto müssen unterschiedlich sein" };
-    }
-
     const authResult = await requireAuth();
     if (authResult.error) {
       return { success: false, error: "Unauthorized" };
     }
     const { userId } = authResult;
 
+    const updates = pickFields(data, [
+      "sourceAccountId",
+      "targetAccountId",
+      "amount",
+      "description",
+      "recurrenceType",
+      "startDate",
+      "endDate",
+      "sourceCurrency",
+      "targetCurrency",
+      "targetAmount",
+      "exchangeRate",
+    ]);
+
+    const [existing] = await db
+      .select({
+        sourceAccountId: transfers.sourceAccountId,
+        targetAccountId: transfers.targetAccountId,
+      })
+      .from(transfers)
+      .where(and(eq(transfers.id, id), eq(transfers.userId, userId)))
+      .limit(1);
+    if (!existing) {
+      return { success: false, error: "Transfer nicht gefunden." };
+    }
+
+    const sourceAccountId = updates.sourceAccountId ?? existing.sourceAccountId;
+    const targetAccountId = updates.targetAccountId ?? existing.targetAccountId;
+    if (sourceAccountId === targetAccountId) {
+      return { success: false, error: "Quell- und Zielkonto müssen unterschiedlich sein" };
+    }
+    if (updates.sourceAccountId && !(await ownsAccount(userId, updates.sourceAccountId))) {
+      return { success: false, error: "Quellkonto nicht gefunden oder kein Zugriff." };
+    }
+    if (updates.targetAccountId && !(await ownsAccount(userId, updates.targetAccountId))) {
+      return { success: false, error: "Zielkonto nicht gefunden oder kein Zugriff." };
+    }
+
     const [transfer] = await db
       .update(transfers)
-      .set(data)
+      .set(updates)
       .where(and(eq(transfers.id, id), eq(transfers.userId, userId)))
       .returning();
 

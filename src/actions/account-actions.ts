@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Account, NewAccount } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getAccounts(): Promise<ApiResponse<Account[]>> {
@@ -55,7 +56,7 @@ export async function updateAccount(
 
     const [account] = await db
       .update(accounts)
-      .set(data)
+      .set(pickFields(data, ["name", "type", "balance", "currency"]))
       .where(and(eq(accounts.id, id), eq(accounts.userId, authResult.userId)))
       .returning();
     if (!account) {

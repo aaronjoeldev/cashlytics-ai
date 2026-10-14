@@ -101,7 +101,7 @@ export function getTransporter(): Transporter | null {
 
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   if (!isEmailConfigured()) {
-    logger.info(`Email not sent (not configured): ${options.to}`, "email");
+    logger.info("Email not sent (not configured)", "email");
     return { success: false, error: "EMAIL_NOT_CONFIGURED" };
   }
 
@@ -118,10 +118,10 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
       text: options.text,
       html: options.html,
     });
-    logger.info(`Email sent: ${options.to}`, "email");
+    logger.info("Email sent", "email");
     return { success: true };
   } catch (error) {
-    logger.error(`Email send failed: ${options.to}`, "email", error);
+    logger.error("Email send failed", "email", error);
     return { success: false, error: "SEND_FAILED" };
   }
 }

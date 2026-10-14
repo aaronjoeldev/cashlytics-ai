@@ -2,118 +2,13 @@
 
 import { db } from "@/lib/db";
 import { dailyExpenses, categories, accounts } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import type {
-  ApiResponse,
-  DailyExpense,
-  DailyExpenseWithDetails,
-  NewDailyExpense,
-} from "@/types/database";
+import type { ApiResponse, DailyExpense, NewDailyExpense } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { ownsAccount, ownsCategory, pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { defaultCurrency } from "@/lib/currency";
-
-export async function getDailyExpenses(filters?: {
-  accountId?: string;
-  categoryId?: string;
-  startDate?: Date;
-  endDate?: Date;
-  minAmount?: number;
-  maxAmount?: number;
-}): Promise<ApiResponse<DailyExpenseWithDetails[]>> {
-  try {
-    const authResult = await requireAuth();
-    if (authResult.error) {
-      return { success: false, error: "Unauthorized" };
-    }
-    const { userId } = authResult;
-
-    const conditions = [eq(dailyExpenses.userId, userId)];
-
-    if (filters?.accountId) {
-      conditions.push(eq(dailyExpenses.accountId, filters.accountId));
-    }
-    if (filters?.categoryId) {
-      conditions.push(eq(dailyExpenses.categoryId, filters.categoryId));
-    }
-    if (filters?.startDate) {
-      conditions.push(gte(dailyExpenses.date, filters.startDate));
-    }
-    if (filters?.endDate) {
-      conditions.push(lte(dailyExpenses.date, filters.endDate));
-    }
-    if (filters?.minAmount !== undefined) {
-      conditions.push(gte(dailyExpenses.amount, filters.minAmount.toString()));
-    }
-    if (filters?.maxAmount !== undefined) {
-      conditions.push(lte(dailyExpenses.amount, filters.maxAmount.toString()));
-    }
-
-    const result = await db
-      .select({
-        dailyExpense: dailyExpenses,
-        category: categories,
-        account: accounts,
-      })
-      .from(dailyExpenses)
-      .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
-      .leftJoin(accounts, eq(dailyExpenses.accountId, accounts.id))
-      .where(and(...conditions))
-      .orderBy(desc(dailyExpenses.date));
-
-    const dailyExpensesWithDetails: DailyExpenseWithDetails[] = result.map((r) => ({
-      ...r.dailyExpense,
-      category: r.category,
-      account: r.account,
-    }));
-
-    return { success: true, data: dailyExpensesWithDetails };
-  } catch (error) {
-    logger.error("Failed to fetch daily expenses", "getDailyExpenses", error);
-    return { success: false, error: "Tägliche Ausgaben konnten nicht geladen werden." };
-  }
-}
-
-export async function getDailyExpenseById(
-  id: string
-): Promise<ApiResponse<DailyExpenseWithDetails>> {
-  try {
-    const authResult = await requireAuth();
-    if (authResult.error) {
-      return { success: false, error: "Unauthorized" };
-    }
-    const { userId } = authResult;
-
-    const [result] = await db
-      .select({
-        dailyExpense: dailyExpenses,
-        category: categories,
-        account: accounts,
-      })
-      .from(dailyExpenses)
-      .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
-      .leftJoin(accounts, eq(dailyExpenses.accountId, accounts.id))
-      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)))
-      .limit(1);
-
-    if (!result) {
-      return { success: false, error: "Tägliche Ausgabe nicht gefunden." };
-    }
-
-    return {
-      success: true,
-      data: {
-        ...result.dailyExpense,
-        category: result.category,
-        account: result.account,
-      },
-    };
-  } catch (error) {
-    logger.error("Failed to fetch daily expense", "getDailyExpenseById", error);
-    return { success: false, error: "Tägliche Ausgabe konnte nicht geladen werden." };
-  }
-}
 
 export async function createDailyExpense(data: {
   accountId: string;
@@ -194,14 +89,30 @@ export async function updateDailyExpense(
     }
     const { userId } = authResult;
 
-    const updateData = { ...data };
-    if (data.date && typeof data.date === "string") {
-      updateData.date = new Date(data.date);
+    const updates = pickFields(data, [
+      "accountId",
+      "categoryId",
+      "description",
+      "amount",
+      "date",
+      "currency",
+      "originalAmount",
+      "exchangeRate",
+      "info",
+    ]);
+    if (updates.date && typeof updates.date === "string") {
+      updates.date = new Date(updates.date);
+    }
+    if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
+      return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
+    }
+    if (updates.categoryId && !(await ownsCategory(userId, updates.categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
     }
 
     const [updatedDailyExpense] = await db
       .update(dailyExpenses)
-      .set(updateData)
+      .set(updates)
       .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)))
       .returning();
 
@@ -215,31 +126,5 @@ export async function updateDailyExpense(
   } catch (error) {
     logger.error("Failed to update daily expense", "updateDailyExpense", error);
     return { success: false, error: "Tägliche Ausgabe konnte nicht aktualisiert werden." };
-  }
-}
-
-export async function deleteDailyExpense(id: string): Promise<ApiResponse<void>> {
-  try {
-    const authResult = await requireAuth();
-    if (authResult.error) {
-      return { success: false, error: "Unauthorized" };
-    }
-    const { userId } = authResult;
-
-    const [deletedDailyExpense] = await db
-      .delete(dailyExpenses)
-      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)))
-      .returning();
-
-    if (!deletedDailyExpense) {
-      return { success: false, error: "Tägliche Ausgabe nicht gefunden." };
-    }
-
-    revalidatePath("/expenses");
-    revalidatePath("/dashboard");
-    return { success: true, data: undefined };
-  } catch (error) {
-    logger.error("Failed to delete daily expense", "deleteDailyExpense", error);
-    return { success: false, error: "Tägliche Ausgabe konnte nicht gelöscht werden." };
   }
 }
