@@ -80,9 +80,14 @@ export async function deleteCategory(id: string): Promise<ApiResponse<void>> {
     const authResult = await requireAuth();
     if (authResult.error) return { success: false, error: "Unauthorized" };
 
-    await db
+    // Expenses and daily expenses keep their data; their category is set to null (ON DELETE SET NULL)
+    const deleted = await db
       .delete(categories)
-      .where(and(eq(categories.id, id), eq(categories.userId, authResult.userId)));
+      .where(and(eq(categories.id, id), eq(categories.userId, authResult.userId)))
+      .returning({ id: categories.id });
+    if (deleted.length === 0) {
+      return { success: false, error: "Category not found" };
+    }
     revalidatePath("/settings");
 
     revalidatePath("/categories");

@@ -173,7 +173,13 @@ export async function deleteExpense(id: string): Promise<ApiResponse<void>> {
     }
     const { userId } = authResult;
 
-    await db.delete(expenses).where(and(eq(expenses.id, id), eq(expenses.userId, userId)));
+    const [deleted] = await db
+      .delete(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning({ id: expenses.id });
+    if (!deleted) {
+      return { success: false, error: "Expense not found" };
+    }
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");
@@ -328,9 +334,13 @@ export async function deleteDailyExpense(id: string): Promise<ApiResponse<void>>
     }
     const { userId } = authResult;
 
-    await db
+    const [deleted] = await db
       .delete(dailyExpenses)
-      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)));
+      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)))
+      .returning({ id: dailyExpenses.id });
+    if (!deleted) {
+      return { success: false, error: "Daily expense not found" };
+    }
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");

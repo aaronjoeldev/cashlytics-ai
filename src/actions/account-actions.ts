@@ -76,9 +76,13 @@ export async function deleteAccount(id: string): Promise<ApiResponse<void>> {
     const authResult = await requireAuth();
     if (authResult.error) return { success: false, error: "Unauthorized" };
 
-    await db
+    const [deleted] = await db
       .delete(accounts)
-      .where(and(eq(accounts.id, id), eq(accounts.userId, authResult.userId)));
+      .where(and(eq(accounts.id, id), eq(accounts.userId, authResult.userId)))
+      .returning({ id: accounts.id });
+    if (!deleted) {
+      return { success: false, error: "Account not found" };
+    }
     revalidatePath("/accounts");
     revalidatePath("/dashboard");
     return { success: true, data: undefined };

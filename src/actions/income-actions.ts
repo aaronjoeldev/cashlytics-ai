@@ -143,7 +143,13 @@ export async function deleteIncome(id: string): Promise<ApiResponse<void>> {
     }
     const { userId } = authResult;
 
-    await db.delete(incomes).where(and(eq(incomes.id, id), eq(incomes.userId, userId)));
+    const [deleted] = await db
+      .delete(incomes)
+      .where(and(eq(incomes.id, id), eq(incomes.userId, userId)))
+      .returning({ id: incomes.id });
+    if (!deleted) {
+      return { success: false, error: "Income not found" };
+    }
     revalidatePath("/income");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");

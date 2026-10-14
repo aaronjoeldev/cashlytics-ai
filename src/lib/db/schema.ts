@@ -11,8 +11,9 @@ import {
   boolean,
   primaryKey,
   unique,
+  index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 export const accountTypeEnum = pgEnum("account_type", ["checking", "savings", "etf"]);
 export const recurrenceTypeEnum = pgEnum("recurrence_type", [
@@ -55,17 +56,21 @@ export const importDecisionEnum = pgEnum("import_decision", [
 ]);
 
 // Auth.js user table - extended with Auth.js adapter fields
-export const users = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  email: text("email").notNull().unique(),
-  emailVerified: timestamp("email_verified", { mode: "date" }),
-  name: text("name"),
-  password: text("password"),
-  // Sessions issued before this moment are rejected (set on password reset)
-  passwordChangedAt: timestamp("password_changed_at"),
-  image: text("image"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: text("email").notNull().unique(),
+    emailVerified: timestamp("email_verified", { mode: "date" }),
+    name: text("name"),
+    password: text("password"),
+    // Sessions issued before this moment are rejected (set on password reset)
+    passwordChangedAt: timestamp("password_changed_at"),
+    image: text("image"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("users_email_lower_idx").on(sql`lower(${t.email})`)]
+);
 
 // Auth.js accounts table (OAuth provider linking)
 // Prefixed with "auth_" to avoid conflict with financial accounts table
@@ -106,16 +111,20 @@ export const authVerificationTokens = pgTable(
 );
 
 // Password reset tokens (custom flow, NOT Auth.js managed)
-export const passwordResetTokens = pgTable("password_reset_tokens", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tokenHash: text("token_hash").notNull().unique(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: timestamp("expires_at").notNull(),
-  usedAt: timestamp("used_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tokenHash: text("token_hash").notNull().unique(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("password_reset_tokens_user_id_idx").on(t.userId)]
+);
 
 // User relations - enables querying user's data with Drizzle relational queries
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -140,209 +149,280 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
 }));
 
-export const accounts = pgTable("accounts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  name: text("name").notNull(),
-  type: accountTypeEnum("type").notNull(),
-  balance: decimal("balance", { precision: 12, scale: 2 }).notNull().default("0"),
-  currency: text("currency").default("EUR").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    type: accountTypeEnum("type").notNull(),
+    balance: decimal("balance", { precision: 12, scale: 2 }).notNull().default("0"),
+    currency: text("currency").default("EUR").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("accounts_user_id_idx").on(t.userId)]
+);
 
-export const categories = pgTable("categories", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  name: text("name").notNull(),
-  icon: text("icon"),
-  color: text("color"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    icon: text("icon"),
+    color: text("color"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("categories_user_id_idx").on(t.userId)]
+);
 
-export const expenses = pgTable("expenses", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
-  categoryId: uuid("category_id").references(() => categories.id),
-  name: text("name").notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  recurrenceType: recurrenceTypeEnum("recurrence_type").notNull(),
-  recurrenceInterval: integer("recurrence_interval"),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date"),
-  isSubscription: boolean("is_subscription").default(false).notNull(),
-  currency: text("currency").default("EUR").notNull(),
-  originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
-  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
-  info: text("info"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const expenses = pgTable(
+  "expenses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    recurrenceType: recurrenceTypeEnum("recurrence_type").notNull(),
+    recurrenceInterval: integer("recurrence_interval"),
+    startDate: timestamp("start_date").notNull(),
+    endDate: timestamp("end_date"),
+    isSubscription: boolean("is_subscription").default(false).notNull(),
+    currency: text("currency").default("EUR").notNull(),
+    originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
+    exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
+    info: text("info"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("expenses_user_id_idx").on(t.userId),
+    index("expenses_account_id_idx").on(t.accountId),
+    index("expenses_category_id_idx").on(t.categoryId),
+  ]
+);
 
-export const incomes = pgTable("incomes", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
-  source: text("source").notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  recurrenceType: incomeRecurrenceTypeEnum("recurrence_type").notNull(),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date"),
-  currency: text("currency").default("EUR").notNull(),
-  originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
-  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
-  info: text("info"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const incomes = pgTable(
+  "incomes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    recurrenceType: incomeRecurrenceTypeEnum("recurrence_type").notNull(),
+    startDate: timestamp("start_date").notNull(),
+    endDate: timestamp("end_date"),
+    currency: text("currency").default("EUR").notNull(),
+    originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
+    exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
+    info: text("info"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("incomes_user_id_idx").on(t.userId),
+    index("incomes_account_id_idx").on(t.accountId),
+  ]
+);
 
-export const dailyExpenses = pgTable("daily_expenses", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
-  categoryId: uuid("category_id").references(() => categories.id),
-  description: text("description").notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  date: timestamp("date").notNull(),
-  currency: text("currency").default("EUR").notNull(),
-  originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
-  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
-  info: text("info"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const dailyExpenses = pgTable(
+  "daily_expenses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "set null" }),
+    description: text("description").notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    date: timestamp("date").notNull(),
+    currency: text("currency").default("EUR").notNull(),
+    originalAmount: numeric("original_amount", { precision: 12, scale: 2 }),
+    exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
+    info: text("info"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("daily_expenses_user_id_date_idx").on(t.userId, t.date),
+    index("daily_expenses_account_id_idx").on(t.accountId),
+    index("daily_expenses_category_id_idx").on(t.categoryId),
+  ]
+);
 
-export const transfers = pgTable("transfers", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  sourceAccountId: uuid("source_account_id")
-    .references(() => accounts.id, { onDelete: "cascade" })
-    .notNull(),
-  targetAccountId: uuid("target_account_id")
-    .references(() => accounts.id, { onDelete: "cascade" })
-    .notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  description: text("description"),
-  recurrenceType: transferRecurrenceTypeEnum("recurrence_type").notNull(),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date"),
-  sourceCurrency: text("source_currency").default("EUR").notNull(),
-  targetCurrency: text("target_currency").default("EUR").notNull(),
-  targetAmount: numeric("target_amount", { precision: 12, scale: 2 }),
-  exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const transfers = pgTable(
+  "transfers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    sourceAccountId: uuid("source_account_id")
+      .references(() => accounts.id, { onDelete: "cascade" })
+      .notNull(),
+    targetAccountId: uuid("target_account_id")
+      .references(() => accounts.id, { onDelete: "cascade" })
+      .notNull(),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    description: text("description"),
+    recurrenceType: transferRecurrenceTypeEnum("recurrence_type").notNull(),
+    startDate: timestamp("start_date").notNull(),
+    endDate: timestamp("end_date"),
+    sourceCurrency: text("source_currency").default("EUR").notNull(),
+    targetCurrency: text("target_currency").default("EUR").notNull(),
+    targetAmount: numeric("target_amount", { precision: 12, scale: 2 }),
+    exchangeRate: numeric("exchange_rate", { precision: 10, scale: 6 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("transfers_user_id_idx").on(t.userId),
+    index("transfers_source_account_id_idx").on(t.sourceAccountId),
+    index("transfers_target_account_id_idx").on(t.targetAccountId),
+  ]
+);
 
-export const documents = pgTable("documents", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  expenseId: uuid("expense_id").references(() => expenses.id, { onDelete: "cascade" }),
-  dailyExpenseId: uuid("daily_expense_id").references(() => dailyExpenses.id, {
-    onDelete: "cascade",
-  }),
-  fileName: text("file_name").notNull(),
-  mimeType: text("mime_type").notNull(),
-  size: integer("size").notNull(),
-  data: text("data").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    expenseId: uuid("expense_id").references(() => expenses.id, { onDelete: "cascade" }),
+    dailyExpenseId: uuid("daily_expense_id").references(() => dailyExpenses.id, {
+      onDelete: "cascade",
+    }),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    size: integer("size").notNull(),
+    data: text("data").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("documents_user_id_idx").on(t.userId),
+    index("documents_expense_id_idx").on(t.expenseId),
+    index("documents_daily_expense_id_idx").on(t.dailyExpenseId),
+  ]
+);
 
-export const importSessions = pgTable("import_sessions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  accountId: uuid("account_id")
-    .references(() => accounts.id, { onDelete: "cascade" })
-    .notNull(),
-  status: importSessionStatusEnum("status").notNull().default("draft"),
-  sourceFileName: text("source_file_name").notNull(),
-  sourceFileHash: text("source_file_hash"),
-  totalRows: integer("total_rows").notNull().default(0),
-  stagedRows: integer("staged_rows").notNull().default(0),
-  conflictRows: integer("conflict_rows").notNull().default(0),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  completedAt: timestamp("completed_at"),
-});
+export const importSessions = pgTable(
+  "import_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    accountId: uuid("account_id")
+      .references(() => accounts.id, { onDelete: "cascade" })
+      .notNull(),
+    status: importSessionStatusEnum("status").notNull().default("draft"),
+    sourceFileName: text("source_file_name").notNull(),
+    sourceFileHash: text("source_file_hash"),
+    totalRows: integer("total_rows").notNull().default(0),
+    stagedRows: integer("staged_rows").notNull().default(0),
+    conflictRows: integer("conflict_rows").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (t) => [
+    index("import_sessions_user_id_idx").on(t.userId),
+    index("import_sessions_account_id_idx").on(t.accountId),
+  ]
+);
 
-export const importRows = pgTable("import_rows", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  sessionId: uuid("session_id")
-    .references(() => importSessions.id, { onDelete: "cascade" })
-    .notNull(),
-  rowIndex: integer("row_index").notNull(),
-  bookingDate: timestamp("booking_date"),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  currency: text("currency").default("EUR").notNull(),
-  description: text("description").notNull(),
-  counterparty: text("counterparty"),
-  senderAccount: text("sender_account"),
-  receiverAccount: text("receiver_account"),
-  balanceAfterBooking: decimal("balance_after_booking", { precision: 12, scale: 2 }),
-  normalizedPayload: text("normalized_payload").notNull(),
-  validationErrors: text("validation_errors"),
-  excludedByUser: boolean("excluded_by_user").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const importRows = pgTable(
+  "import_rows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    sessionId: uuid("session_id")
+      .references(() => importSessions.id, { onDelete: "cascade" })
+      .notNull(),
+    rowIndex: integer("row_index").notNull(),
+    bookingDate: timestamp("booking_date"),
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: text("currency").default("EUR").notNull(),
+    description: text("description").notNull(),
+    counterparty: text("counterparty"),
+    senderAccount: text("sender_account"),
+    receiverAccount: text("receiver_account"),
+    balanceAfterBooking: decimal("balance_after_booking", { precision: 12, scale: 2 }),
+    normalizedPayload: text("normalized_payload").notNull(),
+    validationErrors: text("validation_errors"),
+    excludedByUser: boolean("excluded_by_user").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("import_rows_session_id_idx").on(t.sessionId)]
+);
 
-export const importConflicts = pgTable("import_conflicts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  sessionId: uuid("session_id")
-    .references(() => importSessions.id, { onDelete: "cascade" })
-    .notNull(),
-  importRowId: uuid("import_row_id")
-    .references(() => importRows.id, { onDelete: "cascade" })
-    .notNull(),
-  existingExpenseId: uuid("existing_expense_id").references(() => dailyExpenses.id, {
-    onDelete: "cascade",
-  }),
-  existingIncomeId: uuid("existing_income_id").references(() => incomes.id, {
-    onDelete: "cascade",
-  }),
-  similarityScore: decimal("similarity_score", { precision: 5, scale: 4 }),
-  confidence: decimal("confidence", { precision: 5, scale: 4 }),
-  explanation: text("explanation"),
-  suggestion: importConflictSuggestionEnum("suggestion").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const importConflicts = pgTable(
+  "import_conflicts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    sessionId: uuid("session_id")
+      .references(() => importSessions.id, { onDelete: "cascade" })
+      .notNull(),
+    importRowId: uuid("import_row_id")
+      .references(() => importRows.id, { onDelete: "cascade" })
+      .notNull(),
+    existingExpenseId: uuid("existing_expense_id").references(() => dailyExpenses.id, {
+      onDelete: "cascade",
+    }),
+    existingIncomeId: uuid("existing_income_id").references(() => incomes.id, {
+      onDelete: "cascade",
+    }),
+    similarityScore: decimal("similarity_score", { precision: 5, scale: 4 }),
+    confidence: decimal("confidence", { precision: 5, scale: 4 }),
+    explanation: text("explanation"),
+    suggestion: importConflictSuggestionEnum("suggestion").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("import_conflicts_session_id_idx").on(t.sessionId),
+    index("import_conflicts_import_row_id_idx").on(t.importRowId),
+    index("import_conflicts_existing_expense_id_idx").on(t.existingExpenseId),
+    index("import_conflicts_existing_income_id_idx").on(t.existingIncomeId),
+  ]
+);
 
-export const importDecisions = pgTable("import_decisions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  sessionId: uuid("session_id")
-    .references(() => importSessions.id, { onDelete: "cascade" })
-    .notNull(),
-  conflictId: uuid("conflict_id")
-    .references(() => importConflicts.id, { onDelete: "cascade" })
-    .notNull()
-    .unique(),
-  decision: importDecisionEnum("decision").notNull(),
-  decidedAt: timestamp("decided_at").defaultNow().notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const importDecisions = pgTable(
+  "import_decisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    sessionId: uuid("session_id")
+      .references(() => importSessions.id, { onDelete: "cascade" })
+      .notNull(),
+    conflictId: uuid("conflict_id")
+      .references(() => importConflicts.id, { onDelete: "cascade" })
+      .notNull()
+      .unique(),
+    decision: importDecisionEnum("decision").notNull(),
+    decidedAt: timestamp("decided_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("import_decisions_session_id_idx").on(t.sessionId)]
+);
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
   user: one(users, {
@@ -509,25 +589,33 @@ export const importDecisionsRelations = relations(importDecisions, ({ one }) => 
   }),
 }));
 
-export const conversations = pgTable("conversations", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  title: text("title").notNull().default("Neuer Chat"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    title: text("title").notNull().default("Neuer Chat"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("conversations_user_id_idx").on(t.userId)]
+);
 
-export const messages = pgTable("messages", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  conversationId: uuid("conversation_id")
-    .references(() => conversations.id, { onDelete: "cascade" })
-    .notNull(),
-  role: text("role", { enum: ["user", "assistant"] }).notNull(),
-  content: text("content").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .references(() => conversations.id, { onDelete: "cascade" })
+      .notNull(),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("messages_conversation_id_idx").on(t.conversationId)]
+);
 
 export const conversationsRelations = relations(conversations, ({ one, many }) => ({
   user: one(users, {
@@ -545,16 +633,20 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 }));
 
 // Web Push subscriptions (VAPID-based push notifications)
-export const pushSubscriptions = pgTable("push_subscriptions", {
-  id: uuid("id").defaultRandom().primaryKey().notNull(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  endpoint: text("endpoint").notNull().unique(),
-  p256dh: text("p256dh").notNull(),
-  auth: text("auth").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey().notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("push_subscriptions_user_id_idx").on(t.userId)]
+);
 
 export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
   user: one(users, {
@@ -609,6 +701,7 @@ export const merchantCategories = pgTable(
   },
   (table) => ({
     uniqueUserMerchant: unique().on(table.userId, table.merchantPattern),
+    categoryIdx: index("merchant_categories_category_id_idx").on(table.categoryId),
   })
 );
 
@@ -631,22 +724,26 @@ export const insightTypeEnum = pgEnum("insight_type", [
   "trend_info",
 ]);
 
-export const insights = pgTable("insights", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  type: insightTypeEnum("type").notNull(),
-  title: text("title").notNull(),
-  message: text("message").notNull(),
-  severity: text("severity", { enum: ["info", "warning", "critical"] })
-    .notNull()
-    .default("info"),
-  isRead: boolean("is_read").default(false).notNull(),
-  expiresAt: timestamp("expires_at"),
-  metadata: text("metadata"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const insights = pgTable(
+  "insights",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    type: insightTypeEnum("type").notNull(),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    severity: text("severity", { enum: ["info", "warning", "critical"] })
+      .notNull()
+      .default("info"),
+    isRead: boolean("is_read").default(false).notNull(),
+    expiresAt: timestamp("expires_at"),
+    metadata: text("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("insights_user_id_idx").on(t.userId)]
+);
 
 export const insightsRelations = relations(insights, ({ one }) => ({
   user: one(users, {
