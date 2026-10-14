@@ -6,6 +6,7 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Income, NewIncome, IncomeWithAccount } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { ownsAccount, pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getIncomes(filters?: {
@@ -62,20 +63,22 @@ export async function createIncome(data: Omit<NewIncome, "userId">): Promise<Api
     const { userId } = authResult;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
+    let accountCurrency: string | undefined;
     if (data.accountId) {
       const [ownedAccount] = await db
-        .select({ id: accounts.id })
+        .select({ id: accounts.id, currency: accounts.currency })
         .from(accounts)
         .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
         .limit(1);
       if (!ownedAccount) {
         return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
       }
+      accountCurrency = ownedAccount.currency;
     }
 
     const [income] = await db
       .insert(incomes)
-      .values({ ...data, userId })
+      .values({ ...data, currency: data.currency ?? accountCurrency, userId })
       .returning();
 
     revalidatePath("/income");
@@ -99,9 +102,25 @@ export async function updateIncome(
     }
     const { userId } = authResult;
 
+    const updates = pickFields(data, [
+      "accountId",
+      "source",
+      "amount",
+      "recurrenceType",
+      "startDate",
+      "endDate",
+      "currency",
+      "originalAmount",
+      "exchangeRate",
+      "info",
+    ]);
+    if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
+      return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
+    }
+
     const [income] = await db
       .update(incomes)
-      .set(data)
+      .set(updates)
       .where(and(eq(incomes.id, id), eq(incomes.userId, userId)))
       .returning();
     if (!income) {
@@ -124,7 +143,13 @@ export async function deleteIncome(id: string): Promise<ApiResponse<void>> {
     }
     const { userId } = authResult;
 
-    await db.delete(incomes).where(and(eq(incomes.id, id), eq(incomes.userId, userId)));
+    const [deleted] = await db
+      .delete(incomes)
+      .where(and(eq(incomes.id, id), eq(incomes.userId, userId)))
+      .returning({ id: incomes.id });
+    if (!deleted) {
+      return { success: false, error: "Income not found" };
+    }
     revalidatePath("/income");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");

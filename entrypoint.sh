@@ -18,8 +18,10 @@ while [ $retry_count -lt $max_retries ]; do
     fi
 done
 
+# Without the current schema every page fails, so stop here and let the restart policy retry.
 if [ $retry_count -eq $max_retries ]; then
-    echo "Warning: Migrations failed after $max_retries attempts. Starting app anyway..."
+    echo "Error: Migrations failed after $max_retries attempts. Not starting the app." >&2
+    exit 1
 fi
 
 exec node /app/server.js

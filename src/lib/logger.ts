@@ -11,6 +11,15 @@ interface LogEntry {
 function formatError(error: unknown): string {
   if (error instanceof Error) {
     const maybeCause = error as Error & { cause?: unknown };
+    // Drizzle query errors embed the SQL and all bound parameters (file contents, e-mail
+    // addresses, keys) in their message. Log the driver's cause instead.
+    if ("query" in error && "params" in error) {
+      const cause =
+        maybeCause.cause instanceof Error
+          ? `${maybeCause.cause.name}: ${maybeCause.cause.message}`
+          : "unknown cause";
+      return `${error.name}: Failed query | cause=${cause}`;
+    }
     if (maybeCause.cause instanceof Error) {
       return `${error.name}: ${error.message} | cause=${maybeCause.cause.name}: ${maybeCause.cause.message}`;
     }

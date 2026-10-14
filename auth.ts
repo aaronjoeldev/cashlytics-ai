@@ -3,8 +3,10 @@ import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db";
 import { users, authAccounts, authSessions, authVerificationTokens } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { verifyPassword } from "@/lib/auth/password";
+import { rateLimit } from "@/lib/rate-limiter";
+import { isSessionStillValid } from "@/lib/auth/session-validity";
 import { signInSchema } from "@/lib/validations/auth";
 import { ZodError } from "zod";
 import { authConfig } from "./auth.config";
@@ -19,8 +21,30 @@ declare module "next-auth" {
   }
 }
 
+declare module "next-auth/jwt" {
+  interface JWT {
+    /** When the user signed in, in milliseconds. Not refreshed when the token is re-issued. */
+    signedInAt?: number;
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    jwt: async ({ token, user }) => {
+      if (user) {
+        token.sub = user.id;
+        token.signedInAt = Date.now();
+        return token;
+      }
+      // Returning null ends the session: password changed since sign-in, or user deleted
+      if (!token.sub || !(await isSessionStillValid(token.sub, token.signedInAt))) {
+        return null;
+      }
+      return token;
+    },
+  },
   adapter: DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: authAccounts,
@@ -37,9 +61,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           const { email, password } = await signInSchema.parseAsync(credentials);
 
-          // TODO: Users table will be created in Phase 2
-          // For now, this will return null until users exist
-          const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+          // 10 attempts per 15 minutes per account
+          if (!rateLimit(`login:${email}`, 10, 15 * 60_000).allowed) {
+            return null;
+          }
+
+          // Accounts created before e-mails were normalised may be stored in mixed case
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(sql`lower(${users.email}) = ${email}`)
+            .limit(1);
 
           if (!user?.password) {
             return null;

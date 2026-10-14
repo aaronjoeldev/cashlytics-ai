@@ -26,9 +26,8 @@ export async function POST(req: Request) {
   }
   const userId = session.user.id;
 
-  // Rate limiting: 10 uploads per minute per IP
-  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "local";
-  const rl = rateLimit(`documents:${ip}`, 10, 60_000);
+  // Rate limiting: 10 uploads per minute per user
+  const rl = rateLimit(`documents:${userId}`, 10, 60_000);
   if (!rl.allowed) {
     const retryAfterSecs = Math.ceil((rl.resetAt - Date.now()) / 1000);
     return NextResponse.json(

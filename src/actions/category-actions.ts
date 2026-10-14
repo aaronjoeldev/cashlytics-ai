@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Category, NewCategory } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getCategories(): Promise<ApiResponse<Category[]>> {
@@ -57,7 +58,7 @@ export async function updateCategory(
 
     const [category] = await db
       .update(categories)
-      .set(data)
+      .set(pickFields(data, ["name", "icon", "color"]))
       .where(and(eq(categories.id, id), eq(categories.userId, authResult.userId)))
       .returning();
     if (!category) {
@@ -79,9 +80,14 @@ export async function deleteCategory(id: string): Promise<ApiResponse<void>> {
     const authResult = await requireAuth();
     if (authResult.error) return { success: false, error: "Unauthorized" };
 
-    await db
+    // Expenses and daily expenses keep their data; their category is set to null (ON DELETE SET NULL)
+    const deleted = await db
       .delete(categories)
-      .where(and(eq(categories.id, id), eq(categories.userId, authResult.userId)));
+      .where(and(eq(categories.id, id), eq(categories.userId, authResult.userId)))
+      .returning({ id: categories.id });
+    if (deleted.length === 0) {
+      return { success: false, error: "Category not found" };
+    }
     revalidatePath("/settings");
 
     revalidatePath("/categories");

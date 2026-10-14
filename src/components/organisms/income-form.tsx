@@ -75,6 +75,7 @@ export function IncomeForm({
   const selectedCurrency = (form.watch("currency") as Currency) ?? defaultCurrency;
 
   useEffect(() => {
+    if (editIncome) return;
     const current = form.getValues("currency");
     if (current && current !== defaultCurrency) return;
     const account = accounts.find((a) => a.id === selectedAccountId);
@@ -188,14 +189,25 @@ export function IncomeForm({
             <div className="space-y-2">
               <Label>{t("amount")}</Label>
               <div className="flex gap-1.5">
-                <Input {...form.register("amount")} placeholder="0.00" type="number" step="0.01" className="flex-1" />
-                <Select value={selectedCurrency} onValueChange={(v) => form.setValue("currency", v as Currency)}>
+                <Input
+                  {...form.register("amount")}
+                  placeholder="0.00"
+                  type="number"
+                  step="0.01"
+                  className="flex-1"
+                />
+                <Select
+                  value={selectedCurrency}
+                  onValueChange={(v) => form.setValue("currency", v as Currency)}
+                >
                   <SelectTrigger className="w-[80px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {currencies.map((c) => (
-                      <SelectItem key={c} value={c}>{c} {currencySymbols[c]}</SelectItem>
+                      <SelectItem key={c} value={c}>
+                        {c} {currencySymbols[c]}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

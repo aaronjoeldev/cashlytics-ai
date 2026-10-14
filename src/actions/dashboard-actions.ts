@@ -9,6 +9,12 @@ import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { cookies } from "next/headers";
 import { convertCurrency, defaultCurrency, currencies, type Currency } from "@/lib/currency";
+import {
+  getBudgetedAmountForMonth,
+  getDueAmountForMonth,
+  getNextOccurrence,
+  type RecurringItem,
+} from "@/lib/recurrence";
 
 async function getBaseCurrency(): Promise<Currency> {
   const cookieStore = await cookies();
@@ -27,31 +33,6 @@ function toBase(
       ? (fromCurrency as Currency)
       : baseCurrency;
   return convertCurrency(amount, from, baseCurrency);
-}
-
-function normalizeToMonthly(
-  amount: number,
-  recurrenceType: string,
-  recurrenceInterval: number | null
-): number {
-  switch (recurrenceType) {
-    case "daily":
-      return amount * 30;
-    case "weekly":
-      return amount * 4.33;
-    case "monthly":
-      return amount;
-    case "quarterly":
-      return amount / 3;
-    case "semiannual":
-      return amount / 6;
-    case "yearly":
-      return amount / 12;
-    case "custom":
-      return recurrenceInterval ? amount / recurrenceInterval : amount;
-    default:
-      return 0;
-  }
 }
 
 interface DashboardStats {
@@ -78,60 +59,6 @@ function getMonthDateRange(reference: Date): { monthStart: Date; monthEnd: Date 
   const monthStart = new Date(reference.getFullYear(), reference.getMonth(), 1, 0, 0, 0, 0);
   const monthEnd = new Date(reference.getFullYear(), reference.getMonth() + 1, 0, 23, 59, 59, 999);
   return { monthStart, monthEnd };
-}
-
-function normalizeIncomeToMonthly(amount: number, recurrenceType: string): number {
-  switch (recurrenceType) {
-    case "monthly":
-      return amount;
-    case "yearly":
-      return amount / 12;
-    default:
-      return 0;
-  }
-}
-
-function isRecurringInMonth(
-  item: {
-    startDate: Date;
-    endDate?: Date | null;
-    recurrenceType: string;
-    recurrenceInterval?: number | null;
-  },
-  monthStart: Date,
-  monthEnd: Date
-): boolean {
-  const itemStart = new Date(item.startDate);
-  const itemEnd = item.endDate ? new Date(item.endDate) : null;
-
-  if (itemStart > monthEnd) return false;
-  if (itemEnd !== null && itemEnd < monthStart) return false;
-
-  const monthDiff =
-    (monthStart.getFullYear() - itemStart.getFullYear()) * 12 +
-    (monthStart.getMonth() - itemStart.getMonth());
-
-  switch (item.recurrenceType) {
-    case "once":
-      return itemStart >= monthStart && itemStart <= monthEnd;
-    case "daily":
-    case "weekly":
-    case "monthly":
-      return true;
-    case "quarterly":
-      return monthDiff >= 0 && monthDiff % 3 === 0;
-    case "semiannual":
-      return monthDiff >= 0 && monthDiff % 6 === 0;
-    case "yearly":
-      return monthDiff >= 0 && monthDiff % 12 === 0;
-    case "custom": {
-      const interval = item.recurrenceInterval;
-      if (!interval) return true;
-      return monthDiff >= 0 && monthDiff % interval === 0;
-    }
-    default:
-      return false;
-  }
 }
 
 interface CategoryBreakdown {
@@ -170,9 +97,8 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
 
     const now = new Date();
     const { monthStart: currentMonthStart, monthEnd: currentMonthEnd } = getMonthDateRange(now);
-    const { monthStart: lastMonthStart, monthEnd: lastMonthEnd } = getMonthDateRange(
-      new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    );
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const { monthStart: lastMonthStart, monthEnd: lastMonthEnd } = getMonthDateRange(lastMonth);
 
     const [allIncomes, allExpenses, currentMonthDailyRows, lastMonthDailyRows] = await Promise.all([
       db
@@ -237,129 +163,35 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
       0
     );
 
-    const reserveMonthlyIncome = allIncomes.reduce((sum, inc) => {
-      const rawAmount = safeParseFloat(inc.amount);
-      let normalizedAmount = 0;
-      if (inc.recurrenceType === "once") {
-        if (inc.startDate >= currentMonthStart && inc.startDate <= currentMonthEnd)
-          normalizedAmount = rawAmount;
-      } else {
-        const hasStarted = inc.startDate <= now;
-        const isActive = !inc.endDate || inc.endDate >= currentMonthStart;
-        if (hasStarted && isActive)
-          normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
-      }
-      return sum + toBase(normalizedAmount, inc.entryCurrency, baseCurrency);
-    }, 0);
+    const sumForMonth = (
+      items: Array<RecurringItem & { amount: string; entryCurrency: string | null }>,
+      amountForMonth: typeof getBudgetedAmountForMonth,
+      reference: Date
+    ) =>
+      items.reduce((sum, item) => {
+        const amount = amountForMonth(
+          item,
+          safeParseFloat(item.amount),
+          reference.getFullYear(),
+          reference.getMonth() + 1
+        );
+        return sum + toBase(amount, item.entryCurrency, baseCurrency);
+      }, 0);
 
-    const reserveLastMonthlyIncome = allIncomes.reduce((sum, inc) => {
-      const rawAmount = safeParseFloat(inc.amount);
-      let normalizedAmount = 0;
-      if (inc.recurrenceType === "once") {
-        if (inc.startDate >= lastMonthStart && inc.startDate <= lastMonthEnd)
-          normalizedAmount = rawAmount;
-      } else {
-        const hasStarted = inc.startDate <= lastMonthEnd;
-        const isActive = !inc.endDate || inc.endDate >= lastMonthStart;
-        if (hasStarted && isActive)
-          normalizedAmount = normalizeIncomeToMonthly(rawAmount, inc.recurrenceType);
-      }
-      return sum + toBase(normalizedAmount, inc.entryCurrency, baseCurrency);
-    }, 0);
-
+    // Reserve view: smoothed monthly averages. Cashflow view: what is actually due in the month.
+    const reserveMonthlyIncome = sumForMonth(allIncomes, getBudgetedAmountForMonth, now);
+    const reserveLastMonthlyIncome = sumForMonth(allIncomes, getBudgetedAmountForMonth, lastMonth);
     const reserveMonthlyExpenses =
-      currentDailyExpensesTotal +
-      allExpenses.reduce((sum, exp) => {
-        const hasStarted = exp.startDate <= now;
-        const isActive = !exp.endDate || exp.endDate >= currentMonthStart;
-        if (!hasStarted || !isActive) return sum;
-        const rawAmount = normalizeToMonthly(
-          safeParseFloat(exp.amount),
-          exp.recurrenceType,
-          exp.recurrenceInterval
-        );
-        return sum + toBase(rawAmount, exp.entryCurrency, baseCurrency);
-      }, 0);
-
+      currentDailyExpensesTotal + sumForMonth(allExpenses, getBudgetedAmountForMonth, now);
     const reserveLastMonthlyExpenses =
-      lastDailyExpensesTotal +
-      allExpenses.reduce((sum, exp) => {
-        const hasStarted = exp.startDate <= lastMonthEnd;
-        const isActive = !exp.endDate || exp.endDate >= lastMonthStart;
-        if (!hasStarted || !isActive) return sum;
-        const rawAmount = normalizeToMonthly(
-          safeParseFloat(exp.amount),
-          exp.recurrenceType,
-          exp.recurrenceInterval
-        );
-        return sum + toBase(rawAmount, exp.entryCurrency, baseCurrency);
-      }, 0);
+      lastDailyExpensesTotal + sumForMonth(allExpenses, getBudgetedAmountForMonth, lastMonth);
 
-    const cashflowMonthlyIncome = allIncomes.reduce((sum, inc) => {
-      const inCurrentMonth = isRecurringInMonth(
-        {
-          startDate: inc.startDate,
-          endDate: inc.endDate,
-          recurrenceType: inc.recurrenceType,
-        },
-        currentMonthStart,
-        currentMonthEnd
-      );
-      return inCurrentMonth
-        ? sum + toBase(safeParseFloat(inc.amount), inc.entryCurrency, baseCurrency)
-        : sum;
-    }, 0);
-
-    const cashflowLastMonthlyIncome = allIncomes.reduce((sum, inc) => {
-      const inLastMonth = isRecurringInMonth(
-        {
-          startDate: inc.startDate,
-          endDate: inc.endDate,
-          recurrenceType: inc.recurrenceType,
-        },
-        lastMonthStart,
-        lastMonthEnd
-      );
-      return inLastMonth
-        ? sum + toBase(safeParseFloat(inc.amount), inc.entryCurrency, baseCurrency)
-        : sum;
-    }, 0);
-
+    const cashflowMonthlyIncome = sumForMonth(allIncomes, getDueAmountForMonth, now);
+    const cashflowLastMonthlyIncome = sumForMonth(allIncomes, getDueAmountForMonth, lastMonth);
     const cashflowMonthlyExpenses =
-      currentDailyExpensesTotal +
-      allExpenses.reduce((sum, exp) => {
-        const inCurrentMonth = isRecurringInMonth(
-          {
-            startDate: exp.startDate,
-            endDate: exp.endDate,
-            recurrenceType: exp.recurrenceType,
-            recurrenceInterval: exp.recurrenceInterval,
-          },
-          currentMonthStart,
-          currentMonthEnd
-        );
-        return inCurrentMonth
-          ? sum + toBase(safeParseFloat(exp.amount), exp.entryCurrency, baseCurrency)
-          : sum;
-      }, 0);
-
+      currentDailyExpensesTotal + sumForMonth(allExpenses, getDueAmountForMonth, now);
     const cashflowLastMonthlyExpenses =
-      lastDailyExpensesTotal +
-      allExpenses.reduce((sum, exp) => {
-        const inLastMonth = isRecurringInMonth(
-          {
-            startDate: exp.startDate,
-            endDate: exp.endDate,
-            recurrenceType: exp.recurrenceType,
-            recurrenceInterval: exp.recurrenceInterval,
-          },
-          lastMonthStart,
-          lastMonthEnd
-        );
-        return inLastMonth
-          ? sum + toBase(safeParseFloat(exp.amount), exp.entryCurrency, baseCurrency)
-          : sum;
-      }, 0);
+      lastDailyExpensesTotal + sumForMonth(allExpenses, getDueAmountForMonth, lastMonth);
 
     const reserveSavingsRate = reserveMonthlyIncome - reserveMonthlyExpenses;
     const cashflowSavingsRate = cashflowMonthlyIncome - cashflowMonthlyExpenses;
@@ -410,7 +242,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
     logger.error("Failed to fetch dashboard stats", "getDashboardStats", error);
     return {
       success: false,
-      error: `Failed to fetch dashboard stats: ${error instanceof Error ? error.message : String(error)}`,
+      error: "Failed to fetch dashboard stats",
     };
   }
 }
@@ -471,6 +303,7 @@ export async function getCategoryBreakdown(
         amount: expenses.amount,
         recurrenceType: expenses.recurrenceType,
         recurrenceInterval: expenses.recurrenceInterval,
+        startDate: expenses.startDate,
         endDate: expenses.endDate,
         entryCurrency: expenses.currency,
       })
@@ -484,14 +317,15 @@ export async function getCategoryBreakdown(
       );
 
     for (const row of periodicExpensesResult) {
-      if (row.recurrenceType === "once") continue;
-
-      const categoryId = row.categoryId || "uncategorized-periodic";
-      const rawMonthly = normalizeToMonthly(
+      const rawMonthly = getBudgetedAmountForMonth(
+        row,
         safeParseFloat(row.amount),
-        row.recurrenceType,
-        row.recurrenceInterval
+        startDate.getFullYear(),
+        startDate.getMonth() + 1
       );
+      if (rawMonthly === 0) continue;
+
+      const categoryId = row.categoryId || "uncategorized";
       const monthlyAmount = toBase(rawMonthly, row.entryCurrency, baseCurrency);
 
       if (categoryMap.has(categoryId)) {
@@ -583,79 +417,6 @@ interface UpcomingPayment {
   isSubscription: boolean;
 }
 
-function getNextPaymentDate(
-  startDate: Date,
-  recurrenceType: string,
-  recurrenceInterval: number | null
-): Date {
-  const now = new Date();
-  const start = new Date(startDate);
-
-  const buildDateWithStartDay = (year: number, month: number): Date => {
-    const maxDay = new Date(year, month + 1, 0).getDate();
-    return new Date(year, month, Math.min(start.getDate(), maxDay));
-  };
-
-  switch (recurrenceType) {
-    case "daily": {
-      const next = new Date(now);
-      next.setDate(next.getDate() + 1);
-      next.setHours(0, 0, 0, 0);
-      return next;
-    }
-    case "weekly": {
-      const daysUntilNext = (7 - ((now.getDay() - start.getDay() + 7) % 7)) % 7 || 7;
-      const next = new Date(now);
-      next.setDate(next.getDate() + daysUntilNext);
-      next.setHours(0, 0, 0, 0);
-      return next;
-    }
-    case "monthly": {
-      let next = buildDateWithStartDay(now.getFullYear(), now.getMonth());
-      if (next <= now) {
-        next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + 1);
-      }
-      return next;
-    }
-    case "quarterly": {
-      const monthsSinceStart =
-        (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-      const remainder = ((monthsSinceStart % 3) + 3) % 3;
-      const monthsUntilNext = remainder === 0 ? 0 : 3 - remainder;
-      let next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext);
-      if (next <= now) {
-        next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext + 3);
-      }
-      return next;
-    }
-    case "yearly": {
-      const next = new Date(now.getFullYear() + 1, start.getMonth(), start.getDate());
-      if (next <= now) {
-        next.setFullYear(next.getFullYear() + 1);
-      }
-      return next;
-    }
-    case "custom": {
-      if (!recurrenceInterval) return start;
-      const monthsSinceStart =
-        (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-      const remainder =
-        ((monthsSinceStart % recurrenceInterval) + recurrenceInterval) % recurrenceInterval;
-      const monthsUntilNext = remainder === 0 ? 0 : recurrenceInterval - remainder;
-      let next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext);
-      if (next <= now) {
-        next = buildDateWithStartDay(
-          now.getFullYear(),
-          now.getMonth() + monthsUntilNext + recurrenceInterval
-        );
-      }
-      return next;
-    }
-    default:
-      return start;
-  }
-}
-
 export async function getUpcomingPayments(
   days: number = 14
 ): Promise<ApiResponse<UpcomingPayment[]>> {
@@ -665,7 +426,8 @@ export async function getUpcomingPayments(
 
   try {
     const now = new Date();
-    const endDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const endDate = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
     const baseCurrency = await getBaseCurrency();
 
     const payments: UpcomingPayment[] = [];
@@ -680,20 +442,16 @@ export async function getUpcomingPayments(
       .where(
         and(
           eq(expenses.userId, userId),
-          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${now.toISOString()})`
+          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${today.toISOString()})`
         )
       );
 
     for (const item of activeExpenses) {
       if (item.expense.recurrenceType === "once") continue;
 
-      const nextDate = getNextPaymentDate(
-        item.expense.startDate,
-        item.expense.recurrenceType,
-        item.expense.recurrenceInterval
-      );
+      const nextDate = getNextOccurrence(item.expense, now);
 
-      if (nextDate >= now && nextDate <= endDate) {
+      if (nextDate && nextDate <= endDate) {
         payments.push({
           id: item.expense.id,
           name: item.expense.name,
@@ -722,7 +480,7 @@ export async function getUpcomingPayments(
       .where(
         and(
           eq(dailyExpenses.userId, userId),
-          gte(dailyExpenses.date, now),
+          gte(dailyExpenses.date, today),
           lte(dailyExpenses.date, endDate)
         )
       );

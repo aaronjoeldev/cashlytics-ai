@@ -18,6 +18,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       released: ${{ steps.version.outputs.released }}
       is_dev: ${{ steps.version.outputs.is_dev }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,22 +40,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # VERSION is tracked, so its existence says nothing. A release happened only if
+          # semantic-release created a new tag.
+          TAG_BEFORE=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           npx semantic-release
+          TAG_AFTER=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
-          # Get the new version if released
-          if [ -f "VERSION" ]; then
-            echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
+          if [ -n "$TAG_AFTER" ] && [ "$TAG_AFTER" != "$TAG_BEFORE" ]; then
+            echo "version=${TAG_AFTER#v}" >> $GITHUB_OUTPUT
             echo "released=true" >> $GITHUB_OUTPUT
           else
-            # No release happened, use current version
-            CURRENT_VERSION=$(node -p "require('./package.json').version")
-            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
             echo "released=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Extract version
         id: version
         run: |
+          # HEAD is the release commit when semantic-release just ran, otherwise the pushed commit
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
           if [ "${{ github.ref_name }}" = "dev" ]; then
             SHORT_SHA=$(git rev-parse --short HEAD)
             echo "version=${SHORT_SHA}" >> $GITHUB_OUTPUT
@@ -65,9 +69,7 @@ jobs:
             echo "released=true" >> $GITHUB_OUTPUT
             echo "is_dev=false" >> $GITHUB_OUTPUT
           else
-            # Get version from package.json or use default
-            CURRENT_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "0.1.0")
-            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "version=$(cat VERSION)" >> $GITHUB_OUTPUT
             echo "released=false" >> $GITHUB_OUTPUT
             echo "is_dev=false" >> $GITHUB_OUTPUT
           fi
@@ -83,11 +85,13 @@ jobs:
     name: Build & Push Docker Image
     runs-on: ubuntu-latest
     needs: release
+    # Pushes to main that do not produce a release must not overwrite the published tags
+    if: needs.release.outputs.released == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release.outputs.is_dev == 'true' && github.sha || needs.release.outputs.released == 'true' && 'main' || github.sha }}
+          ref: ${{ needs.release.outputs.sha }}
 
       - name: Download version.ts
         if: needs.release.outputs.is_dev == 'false'
@@ -111,7 +115,8 @@ jobs:
         run: |
           VERSION="${{ needs.release.outputs.version }}"
           REPO="ghcr.io/${{ github.repository }}"
-          SHORT_SHA="${GITHUB_SHA:0:7}"
+          BUILD_SHA="${{ needs.release.outputs.sha }}"
+          SHORT_SHA="${BUILD_SHA:0:7}"
 
           if [ "${{ needs.release.outputs.is_dev }}" = "true" ]; then
             DISPLAY_VERSION="dev-${VERSION}"

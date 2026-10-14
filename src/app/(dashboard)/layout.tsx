@@ -4,8 +4,15 @@ import { Header } from "@/components/layout/header";
 import { Toaster } from "@/components/ui/toaster";
 import { FloatingActions } from "@/components/organisms/floating-actions";
 import { isAiEnabled } from "@/lib/import/feature-gating";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import { OfflineCacheOwner } from "@/components/pwa/offline-cache-owner";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  // The proxy only checks that the cookie decodes; the server may have ended the session
+  const session = await auth();
+  if (!session?.user?.id) redirect("/session-expired");
+
   const aiEnabled = isAiEnabled();
 
   return (
@@ -61,6 +68,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </SidebarInset>
       <FloatingActions aiEnabled={aiEnabled} />
       <Toaster />
+      <OfflineCacheOwner userId={session.user.id} />
     </SidebarProvider>
   );
 }

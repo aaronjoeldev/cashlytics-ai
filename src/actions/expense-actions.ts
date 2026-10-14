@@ -14,6 +14,7 @@ import type {
   DailyExpenseWithDetails,
 } from "@/types/database";
 import { logger } from "@/lib/logger";
+import { ownsAccount, ownsCategory, pickFields } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getExpenses(filters?: {
@@ -74,15 +75,17 @@ export async function createExpense(
     const { userId } = authResult;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
+    let accountCurrency: string | undefined;
     if (data.accountId) {
       const [ownedAccount] = await db
-        .select({ id: accounts.id })
+        .select({ id: accounts.id, currency: accounts.currency })
         .from(accounts)
         .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
         .limit(1);
       if (!ownedAccount) {
         return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
       }
+      accountCurrency = ownedAccount.currency;
     }
 
     // FK Validation: categoryId must belong to authenticated user (DATA-10)
@@ -99,7 +102,7 @@ export async function createExpense(
 
     const [expense] = await db
       .insert(expenses)
-      .values({ ...data, userId })
+      .values({ ...data, currency: data.currency ?? accountCurrency, userId })
       .returning();
 
     revalidatePath("/expenses");
@@ -123,9 +126,31 @@ export async function updateExpense(
     }
     const { userId } = authResult;
 
+    const updates = pickFields(data, [
+      "accountId",
+      "categoryId",
+      "name",
+      "amount",
+      "recurrenceType",
+      "recurrenceInterval",
+      "startDate",
+      "endDate",
+      "isSubscription",
+      "currency",
+      "originalAmount",
+      "exchangeRate",
+      "info",
+    ]);
+    if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
+      return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
+    }
+    if (updates.categoryId && !(await ownsCategory(userId, updates.categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
+    }
+
     const [expense] = await db
       .update(expenses)
-      .set(data)
+      .set(updates)
       .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
       .returning();
     if (!expense) {
@@ -148,7 +173,13 @@ export async function deleteExpense(id: string): Promise<ApiResponse<void>> {
     }
     const { userId } = authResult;
 
-    await db.delete(expenses).where(and(eq(expenses.id, id), eq(expenses.userId, userId)));
+    const [deleted] = await db
+      .delete(expenses)
+      .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+      .returning({ id: expenses.id });
+    if (!deleted) {
+      return { success: false, error: "Expense not found" };
+    }
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");
@@ -217,20 +248,26 @@ export async function createDailyExpense(
     const { userId } = authResult;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
+    let accountCurrency: string | undefined;
     if (data.accountId) {
       const [ownedAccount] = await db
-        .select({ id: accounts.id })
+        .select({ id: accounts.id, currency: accounts.currency })
         .from(accounts)
         .where(and(eq(accounts.id, data.accountId), eq(accounts.userId, userId)))
         .limit(1);
       if (!ownedAccount) {
         return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
       }
+      accountCurrency = ownedAccount.currency;
+    }
+
+    if (data.categoryId && !(await ownsCategory(userId, data.categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
     }
 
     const [expense] = await db
       .insert(dailyExpenses)
-      .values({ ...data, userId })
+      .values({ ...data, currency: data.currency ?? accountCurrency, userId })
       .returning();
 
     revalidatePath("/expenses");
@@ -254,9 +291,27 @@ export async function updateDailyExpense(
     }
     const { userId } = authResult;
 
+    const updates = pickFields(data, [
+      "accountId",
+      "categoryId",
+      "description",
+      "amount",
+      "date",
+      "currency",
+      "originalAmount",
+      "exchangeRate",
+      "info",
+    ]);
+    if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
+      return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
+    }
+    if (updates.categoryId && !(await ownsCategory(userId, updates.categoryId))) {
+      return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
+    }
+
     const [expense] = await db
       .update(dailyExpenses)
-      .set(data)
+      .set(updates)
       .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)))
       .returning();
     if (!expense) {
@@ -279,9 +334,13 @@ export async function deleteDailyExpense(id: string): Promise<ApiResponse<void>>
     }
     const { userId } = authResult;
 
-    await db
+    const [deleted] = await db
       .delete(dailyExpenses)
-      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)));
+      .where(and(eq(dailyExpenses.id, id), eq(dailyExpenses.userId, userId)))
+      .returning({ id: dailyExpenses.id });
+    if (!deleted) {
+      return { success: false, error: "Daily expense not found" };
+    }
     revalidatePath("/expenses");
     revalidatePath("/dashboard");
     revalidatePath("/accounts");

@@ -10,9 +10,9 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# PostgreSQL Container starten
+# Nur den PostgreSQL Container starten; der App-Container würde Port 3000 belegen
 echo "📦 Starte PostgreSQL Container..."
-docker compose up -d
+docker compose up -d postgres
 
 # Warten bis PostgreSQL bereit ist
 echo "⏳ Warte auf PostgreSQL..."

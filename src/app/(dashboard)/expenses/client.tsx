@@ -1,5 +1,6 @@
 "use client";
 
+import { getLocalCalendarDay, getNextOccurrence, normalizeToMonthly } from "@/lib/recurrence";
 import { useState, useSyncExternalStore } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,96 +39,6 @@ function formatDate(date: Date | string) {
   return new Intl.DateTimeFormat().format(new Date(date));
 }
 
-function getNextPaymentDate(expense: {
-  recurrenceType: string;
-  startDate: Date | string;
-  recurrenceInterval: number | null;
-  endDate?: Date | string | null;
-}): Date | null {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const start = new Date(expense.startDate);
-
-  const buildDateWithStartDay = (year: number, month: number): Date => {
-    const maxDay = new Date(year, month + 1, 0).getDate();
-    return new Date(year, month, Math.min(start.getDate(), maxDay));
-  };
-
-  if (expense.endDate) {
-    const endDate = new Date(expense.endDate);
-    if (endDate < now) return null;
-  }
-
-  switch (expense.recurrenceType) {
-    case "daily": {
-      const next = new Date(now);
-      next.setDate(next.getDate() + 1);
-      return next;
-    }
-    case "weekly": {
-      const daysUntilNext = (7 - ((now.getDay() - start.getDay() + 7) % 7)) % 7 || 7;
-      const next = new Date(now);
-      next.setDate(next.getDate() + daysUntilNext);
-      return next;
-    }
-    case "monthly": {
-      let next = buildDateWithStartDay(now.getFullYear(), now.getMonth());
-      if (next <= now) {
-        next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + 1);
-      }
-      return next;
-    }
-    case "quarterly": {
-      const monthsSinceStart =
-        (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-      const remainder = ((monthsSinceStart % 3) + 3) % 3;
-      const monthsUntilNext = remainder === 0 ? 0 : 3 - remainder;
-      let next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext);
-      if (next <= now) {
-        next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext + 3);
-      }
-      return next;
-    }
-    case "semiannual": {
-      const monthsSinceStart =
-        (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-      const remainder = ((monthsSinceStart % 6) + 6) % 6;
-      const monthsUntilNext = remainder === 0 ? 0 : 6 - remainder;
-      let next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext);
-      if (next <= now) {
-        next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext + 6);
-      }
-      return next;
-    }
-    case "yearly": {
-      let next = buildDateWithStartDay(now.getFullYear(), start.getMonth());
-      if (next <= now) {
-        next = buildDateWithStartDay(now.getFullYear() + 1, start.getMonth());
-      }
-      return next;
-    }
-    case "custom": {
-      if (!expense.recurrenceInterval) return start;
-      const monthsSinceStart =
-        (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-      const remainder =
-        ((monthsSinceStart % expense.recurrenceInterval) + expense.recurrenceInterval) %
-        expense.recurrenceInterval;
-      const monthsUntilNext = remainder === 0 ? 0 : expense.recurrenceInterval - remainder;
-      let next = buildDateWithStartDay(now.getFullYear(), now.getMonth() + monthsUntilNext);
-      if (next <= now) {
-        next = buildDateWithStartDay(
-          now.getFullYear(),
-          now.getMonth() + monthsUntilNext + expense.recurrenceInterval
-        );
-      }
-      return next;
-    }
-    default:
-      return null;
-  }
-}
-
 function formatNextPayment(
   expense: {
     recurrenceType: string;
@@ -137,44 +48,21 @@ function formatNextPayment(
   },
   t: (key: string, params?: Record<string, number>) => string
 ): string | null {
-  const nextDate = getNextPaymentDate(expense);
+  const today = getLocalCalendarDay();
+  const nextDate = getNextOccurrence(expense, today);
   if (!nextDate) return null;
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const diffTime = nextDate.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) return t("today");
   if (diffDays === 1) return t("tomorrow");
   if (diffDays <= 7) return t("inDays", { count: diffDays });
 
-  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(nextDate);
-}
-
-function normalizeToMonthly(
-  amount: number,
-  recurrenceType: string,
-  recurrenceInterval: number | null
-): number {
-  switch (recurrenceType) {
-    case "daily":
-      return amount * 30;
-    case "weekly":
-      return amount * 4.33;
-    case "monthly":
-      return amount;
-    case "quarterly":
-      return amount / 3;
-    case "semiannual":
-      return amount / 6;
-    case "yearly":
-      return amount / 12;
-    case "custom":
-      return recurrenceInterval ? amount / recurrenceInterval : amount;
-    default:
-      return 0;
-  }
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(nextDate);
 }
 
 export function ExpensesClient({

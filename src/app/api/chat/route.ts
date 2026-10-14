@@ -9,9 +9,12 @@ import { getDashboardStats } from "@/actions/dashboard-actions";
 import { getActiveInsights } from "@/actions/insights-actions";
 import { currencies } from "@/lib/currency";
 import { rateLimit } from "@/lib/rate-limiter";
+import { isAiEnabled } from "@/lib/import/feature-gating";
+import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
 
 const MAX_MESSAGES = 100;
+const MAX_REQUEST_CHARS = 400_000;
 const supportedCurrencyList = currencies.join(", ");
 
 /**
@@ -132,7 +135,15 @@ async function buildSystemPrompt(): Promise<string> {
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
 
-  const [accountsResult, categoriesResult, expensesResult, dashboardResult, recentDailyResult, incomesResult, insightsResult] = await Promise.all([
+  const [
+    accountsResult,
+    categoriesResult,
+    expensesResult,
+    dashboardResult,
+    recentDailyResult,
+    incomesResult,
+    insightsResult,
+  ] = await Promise.all([
     getAccounts(),
     getCategories(),
     getExpenses(),
@@ -187,7 +198,10 @@ async function buildSystemPrompt(): Promise<string> {
 ${recentDailyResult.data
   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   .slice(0, 10)
-  .map((e) => `  - ${new Date(e.date).toLocaleDateString("de-DE")}: "${sanitizeForPrompt(e.description)}" ${e.amount}€${e.category ? ` [${sanitizeForPrompt(e.category.name)}]` : ""}`)
+  .map(
+    (e) =>
+      `  - ${new Date(e.date).toLocaleDateString("de-DE")}: "${sanitizeForPrompt(e.description)}" ${e.amount}€${e.category ? ` [${sanitizeForPrompt(e.category.name)}]` : ""}`
+  )
   .join("\n")}`
       : "";
 
@@ -195,7 +209,9 @@ ${recentDailyResult.data
     incomesResult.success && incomesResult.data.length > 0
       ? `### Bestehende Einnahmen:
 ${incomesResult.data
-  .map((i) => `  - "${sanitizeForPrompt(i.source)}" | ${i.amount}€ | ${i.recurrenceType} | ID: ${i.id}`)
+  .map(
+    (i) => `  - "${sanitizeForPrompt(i.source)}" | ${i.amount}€ | ${i.recurrenceType} | ID: ${i.id}`
+  )
   .join("\n")}`
       : "";
 
@@ -203,7 +219,10 @@ ${incomesResult.data
     insightsResult.success && insightsResult.data.length > 0
       ? `### Aktuelle Finanz-Insights (proaktiv erwähnen wenn relevant):
 ${insightsResult.data
-  .map((i) => `  - [${i.severity.toUpperCase()}] ${sanitizeForPrompt(i.title)}: ${sanitizeForPrompt(i.message)}`)
+  .map(
+    (i) =>
+      `  - [${i.severity.toUpperCase()}] ${sanitizeForPrompt(i.title)}: ${sanitizeForPrompt(i.message)}`
+  )
   .join("\n")}`
       : "";
 
@@ -233,9 +252,23 @@ ${insightsContext}`;
 }
 
 export async function POST(req: Request) {
-  // Rate limiting: 20 requests per minute per IP
-  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "local";
-  const rl = rateLimit(`chat:${ip}`, 20, 60_000);
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!isAiEnabled()) {
+    return new Response(JSON.stringify({ error: "KI-Assistent ist nicht konfiguriert." }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Rate limiting: 20 requests per minute per user
+  const rl = rateLimit(`chat:${session.user.id}`, 20, 60_000);
   if (!rl.allowed) {
     const retryAfterSecs = Math.ceil((rl.resetAt - Date.now()) / 1000);
     return new Response(JSON.stringify({ error: "Zu viele Anfragen. Bitte warte einen Moment." }), {
@@ -271,24 +304,32 @@ export async function POST(req: Request) {
       );
     }
 
-    if (messages.length > MAX_MESSAGES) {
-      return new Response(
-        JSON.stringify({ error: `Zu viele Nachrichten. Maximum: ${MAX_MESSAGES}.` }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
-      if (!msg || typeof msg !== "object" || !("role" in msg)) {
-        return new Response(JSON.stringify({ error: `Nachricht ${i} fehlt "role".` }), {
+      // Only user and assistant turns may come from the client; the system prompt is built here.
+      const isValid =
+        !!msg &&
+        typeof msg === "object" &&
+        (msg.role === "user" || msg.role === "assistant") &&
+        Array.isArray(msg.parts);
+      if (!isValid) {
+        return new Response(JSON.stringify({ error: `Nachricht ${i} ist ungültig.` }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
       }
     }
 
-    const validatedMessages = messages as UIMessage[];
+    if (JSON.stringify(messages).length > MAX_REQUEST_CHARS) {
+      return new Response(JSON.stringify({ error: "Die Unterhaltung ist zu lang." }), {
+        status: 413,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // The client re-sends the whole history; keep long conversations usable by sending only
+    // the most recent turns to the model.
+    const validatedMessages = (messages as UIMessage[]).slice(-MAX_MESSAGES);
     const systemPrompt = await buildSystemPrompt();
 
     const result = streamText({

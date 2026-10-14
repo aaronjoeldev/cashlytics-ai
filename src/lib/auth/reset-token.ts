@@ -99,12 +99,16 @@ export async function validateResetToken(
  * Marks a token as used by setting the usedAt timestamp.
  *
  * @param tokenId - The UUID of the token to consume
+ * @returns false when the token was already used, so concurrent submissions of the same link
+ *   cannot both succeed
  */
-export async function consumeResetToken(tokenId: string): Promise<void> {
-  await db
+export async function consumeResetToken(tokenId: string): Promise<boolean> {
+  const consumed = await db
     .update(passwordResetTokens)
     .set({ usedAt: new Date() })
-    .where(eq(passwordResetTokens.id, tokenId));
+    .where(and(eq(passwordResetTokens.id, tokenId), isNull(passwordResetTokens.usedAt)))
+    .returning({ id: passwordResetTokens.id });
+  return consumed.length > 0;
 }
 
 /**

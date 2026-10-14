@@ -83,6 +83,8 @@ type ImportCommitDataStore = {
     accountId: string;
     source: string;
     amount: string;
+    currency: string;
+    originalAmount: string | null;
     startDate: Date;
     info: string;
   }): Promise<void>;
@@ -103,6 +105,8 @@ type ImportCommitDataStore = {
       accountId: string;
       source: string;
       amount: string;
+      currency: string;
+      originalAmount: string | null;
       startDate: Date;
       info: string;
     }
@@ -204,8 +208,7 @@ async function applyRow(
 
   // Resolve currency: row currency takes precedence, fallback to account currency
   const rowCurrency = row.currency || session.accountCurrency;
-  const originalAmount =
-    row.currency && row.currency !== session.accountCurrency ? amount : null;
+  const originalAmount = row.currency && row.currency !== session.accountCurrency ? amount : null;
   // exchangeRate: null — TODO: Phase 2 — getExchangeRate(row.currency, session.accountCurrency)
 
   const decision = rowResolution?.decision ?? "keep_both";
@@ -221,6 +224,8 @@ async function applyRow(
         accountId: session.accountId,
         source: row.description,
         amount,
+        currency: rowCurrency,
+        originalAmount,
         startDate: rowDate,
         info,
       });
@@ -251,6 +256,8 @@ async function applyRow(
       accountId: session.accountId,
       source: row.description,
       amount,
+      currency: rowCurrency,
+      originalAmount,
       startDate: rowDate,
       info,
     });
@@ -361,7 +368,9 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
         .from(importSessions)
         .innerJoin(accounts, eq(accounts.id, importSessions.accountId))
         .where(and(eq(importSessions.id, sessionId), eq(importSessions.userId, userId)))
-        .limit(1);
+        .limit(1)
+        // Row lock: a second confirmation waits here and then sees status "confirmed"
+        .for("update", { of: importSessions });
 
       if (!row) return null;
       return {
@@ -457,6 +466,8 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
         accountId: params.accountId,
         source: params.source,
         amount: params.amount,
+        currency: params.currency,
+        originalAmount: params.originalAmount,
         recurrenceType: "once",
         startDate: params.startDate,
         endDate: null,
@@ -485,9 +496,9 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
           accountId: params.accountId,
           source: params.source,
           amount: params.amount,
-          recurrenceType: "once",
+          currency: params.currency,
+          originalAmount: params.originalAmount,
           startDate: params.startDate,
-          endDate: null,
           info: params.info,
         })
         .where(and(eq(incomes.id, incomeId), eq(incomes.userId, userId)))
@@ -505,6 +516,8 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
           accountId: params.accountId,
           description: params.description,
           amount: params.amount,
+          currency: params.currency,
+          originalAmount: params.originalAmount,
           date: params.date,
           info: params.info,
         })

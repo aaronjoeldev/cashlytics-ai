@@ -203,32 +203,78 @@ function resolveHeaderMapping(
   return mapping;
 }
 
-function normalizeAmount(rawValue: string): string {
-  const compact = rawValue.replace(/\s+/g, "").replace(/[^0-9,.-]/g, "");
-  if (compact.length === 0) {
+/**
+ * Parses a bank amount into a signed decimal string with two fraction digits.
+ *
+ * Handles decimal comma and decimal point, thousands separators (".", ",", "'" and spaces),
+ * currency symbols and codes, and the ways banks mark debits: leading or trailing minus,
+ * parentheses, and a trailing "S" (Soll) versus "H" (Haben).
+ *
+ * A single separator followed by exactly three digits ("1.234", "1,234") is read as a thousands
+ * separator, because money amounts do not have three fraction digits.
+ */
+export function normalizeAmount(rawValue: string): string {
+  let value = rawValue.replace(/[\s\u00a0\u202f']/g, "");
+  if (value.length === 0) {
     throw new Error("Amount is empty");
   }
 
-  const hasComma = compact.includes(",");
-  const hasDot = compact.includes(".");
-  let normalized = compact;
-
-  if (hasComma && hasDot) {
-    const decimalSeparator = compact.lastIndexOf(",") > compact.lastIndexOf(".") ? "," : ".";
-    const thousandsSeparator = decimalSeparator === "," ? /\./g : /,/g;
-    normalized = compact.replace(thousandsSeparator, "").replace(decimalSeparator, ".");
-  } else if (hasComma) {
-    normalized = compact.replace(/\./g, "").replace(/,/g, ".");
-  } else {
-    normalized = compact.replace(/,/g, "");
+  let negative = false;
+  if (/^\(.*\)$/.test(value)) {
+    negative = true;
+    value = value.slice(1, -1);
+  }
+  // Currency symbols and ISO codes, before or after the number
+  value = value.replace(/[€$£¥]/g, "").replace(/^[A-Z]{3}(?=[-+\d])|(?<=\d)[A-Z]{3}$/g, "");
+  if (/\d[SH]$/.test(value)) {
+    negative = negative || value.endsWith("S");
+    value = value.slice(0, -1);
+  }
+  if (/^[-+]/.test(value)) {
+    negative = negative || value.startsWith("-");
+    value = value.slice(1);
+  } else if (/[-+]$/.test(value)) {
+    negative = negative || value.endsWith("-");
+    value = value.slice(0, -1);
   }
 
-  const amount = Number.parseFloat(normalized);
-  if (Number.isNaN(amount)) {
+  if (!/^\d[\d.,]*$/.test(value)) {
     throw new Error(`Amount is invalid: ${rawValue}`);
   }
 
-  return amount.toFixed(2);
+  const lastComma = value.lastIndexOf(",");
+  const lastDot = value.lastIndexOf(".");
+  let normalized: string;
+
+  if (lastComma !== -1 && lastDot !== -1) {
+    // Both present: the later one is the decimal separator
+    const decimalSeparator = lastComma > lastDot ? "," : ".";
+    const thousandsSeparator = decimalSeparator === "," ? "." : ",";
+    normalized = value.split(thousandsSeparator).join("").replace(decimalSeparator, ".");
+  } else if (lastComma !== -1 || lastDot !== -1) {
+    const separator = lastComma !== -1 ? "," : ".";
+    const groups = value.split(separator);
+    const isThousandsGrouping =
+      groups[0].length <= 3 &&
+      !groups[0].startsWith("0") &&
+      groups.slice(1).every((group) => group.length === 3);
+    if (isThousandsGrouping) {
+      normalized = groups.join("");
+    } else if (groups.length === 2) {
+      normalized = groups.join(".");
+    } else {
+      throw new Error(`Amount is invalid: ${rawValue}`);
+    }
+  } else {
+    normalized = value;
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    throw new Error(`Amount is invalid: ${rawValue}`);
+  }
+
+  const amount = Number.parseFloat(normalized);
+  return (negative ? -amount : amount).toFixed(2);
 }
 
 function normalizeDate(rawValue: string): Date {
