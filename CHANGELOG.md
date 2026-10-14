@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.2](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.1...v0.8.2) (2026-10-14)
+
+### 🐛 Bug Fixes
+
+- **auth:** end sessions on password reset, normalise e-mails, limit registration ([623b5c4](https://github.com/aaronjoeldev/cashlytics-ai/commit/623b5c45bfe5a50dc8316b6b5fcb2d73876026ea))
+- **ci:** only build and publish images when a release was created ([867935f](https://github.com/aaronjoeldev/cashlytics-ai/commit/867935f3c0dedb5d00f93f95bcdca3bc4aff6fcc))
+- **db:** add indexes, allow deleting categories in use, report missing rows on delete ([08aea62](https://github.com/aaronjoeldev/cashlytics-ai/commit/08aea62a19adc9697365699d0f6c1dc28779eb93))
+- **docker:** stop on failed migrations, repair compose files ([37cd7fc](https://github.com/aaronjoeldev/cashlytics-ai/commit/37cd7fc41feae9a2ee7351c32b761678cc7e0282))
+- **import:** parse bank amounts correctly and make commits safe ([7ae22d8](https://github.com/aaronjoeldev/cashlytics-ai/commit/7ae22d8f1bf02ecb29958e814d7a953eb68e2201))
+- **pwa:** keep offline copies per user and remove them on logout ([571fb26](https://github.com/aaronjoeldev/cashlytics-ai/commit/571fb26c2488af2ff84f12c045011f4bdc2ca7ff))
+- **security:** validate ownership on updates, real rate limits, safer auth ([494b5d3](https://github.com/aaronjoeldev/cashlytics-ai/commit/494b5d3b6dec1d57680553e69ea8f2f1e840cdb9))
+- store the right currency for transfers, accounts and edited entries ([30b4785](https://github.com/aaronjoeldev/cashlytics-ai/commit/30b478504389d91d7a5d60294d0ac3a8cfce6b6c))
+- unify recurrence math so all views show the same figures ([ac3929e](https://github.com/aaronjoeldev/cashlytics-ai/commit/ac3929e3f57320846c2790ea846e80a71e6b4d82))
+
 ## [0.8.1](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.0...v0.8.1) (2026-10-13)
 
 ### 🐛 Bug Fixes
