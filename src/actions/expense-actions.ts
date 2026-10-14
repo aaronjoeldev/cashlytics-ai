@@ -14,8 +14,15 @@ import type {
   DailyExpenseWithDetails,
 } from "@/types/database";
 import { logger } from "@/lib/logger";
-import { ownsAccount, ownsCategory, pickFields } from "@/lib/auth/ownership";
+import { ownsAccount, ownsCategory } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
+import {
+  createDailyExpenseInput,
+  createExpenseInput,
+  parseInput,
+  updateDailyExpenseInput,
+  updateExpenseInput,
+} from "@/lib/validations/action-input";
 
 export async function getExpenses(filters?: {
   accountId?: string;
@@ -65,7 +72,7 @@ export async function getExpenses(filters?: {
 }
 
 export async function createExpense(
-  data: Omit<NewExpense, "userId">
+  rawData: Omit<NewExpense, "userId">
 ): Promise<ApiResponse<Expense>> {
   try {
     const authResult = await requireAuth();
@@ -73,6 +80,10 @@ export async function createExpense(
       return { success: false, error: "Unauthorized" };
     }
     const { userId } = authResult;
+
+    const input = parseInput(createExpenseInput, rawData);
+    if (!input.success) return input;
+    const data = input.data;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
     let accountCurrency: string | undefined;
@@ -126,21 +137,12 @@ export async function updateExpense(
     }
     const { userId } = authResult;
 
-    const updates = pickFields(data, [
-      "accountId",
-      "categoryId",
-      "name",
-      "amount",
-      "recurrenceType",
-      "recurrenceInterval",
-      "startDate",
-      "endDate",
-      "isSubscription",
-      "currency",
-      "originalAmount",
-      "exchangeRate",
-      "info",
-    ]);
+    const input = parseInput(updateExpenseInput, data);
+    if (!input.success) return input;
+    const updates = input.data;
+    if (Object.keys(updates).length === 0) {
+      return { success: false, error: "Keine Änderungen übergeben." };
+    }
     if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
       return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
     }
@@ -238,7 +240,7 @@ export async function getDailyExpenses(filters?: {
 }
 
 export async function createDailyExpense(
-  data: Omit<NewDailyExpense, "userId">
+  rawData: Omit<NewDailyExpense, "userId">
 ): Promise<ApiResponse<DailyExpense>> {
   try {
     const authResult = await requireAuth();
@@ -246,6 +248,10 @@ export async function createDailyExpense(
       return { success: false, error: "Unauthorized" };
     }
     const { userId } = authResult;
+
+    const input = parseInput(createDailyExpenseInput, rawData);
+    if (!input.success) return input;
+    const data = input.data;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
     let accountCurrency: string | undefined;
@@ -291,17 +297,12 @@ export async function updateDailyExpense(
     }
     const { userId } = authResult;
 
-    const updates = pickFields(data, [
-      "accountId",
-      "categoryId",
-      "description",
-      "amount",
-      "date",
-      "currency",
-      "originalAmount",
-      "exchangeRate",
-      "info",
-    ]);
+    const input = parseInput(updateDailyExpenseInput, data);
+    if (!input.success) return input;
+    const updates = input.data;
+    if (Object.keys(updates).length === 0) {
+      return { success: false, error: "Keine Änderungen übergeben." };
+    }
     if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
       return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
     }

@@ -6,7 +6,11 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Category, NewCategory } from "@/types/database";
 import { logger } from "@/lib/logger";
-import { pickFields } from "@/lib/auth/ownership";
+import {
+  createCategoryInput,
+  parseInput,
+  updateCategoryInput,
+} from "@/lib/validations/action-input";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export async function getCategories(): Promise<ApiResponse<Category[]>> {
@@ -33,9 +37,12 @@ export async function createCategory(
     const authResult = await requireAuth();
     if (authResult.error) return { success: false, error: "Unauthorized" };
 
+    const input = parseInput(createCategoryInput, data);
+    if (!input.success) return input;
+
     const [category] = await db
       .insert(categories)
-      .values({ ...data, userId: authResult.userId })
+      .values({ ...input.data, userId: authResult.userId })
       .returning();
     revalidatePath("/settings");
 
@@ -56,9 +63,16 @@ export async function updateCategory(
     const authResult = await requireAuth();
     if (authResult.error) return { success: false, error: "Unauthorized" };
 
+    const input = parseInput(updateCategoryInput, data);
+    if (!input.success) return input;
+    const updates = input.data;
+    if (Object.keys(updates).length === 0) {
+      return { success: false, error: "Keine Änderungen übergeben." };
+    }
+
     const [category] = await db
       .update(categories)
-      .set(pickFields(data, ["name", "icon", "color"]))
+      .set(updates)
       .where(and(eq(categories.id, id), eq(categories.userId, authResult.userId)))
       .returning();
     if (!category) {

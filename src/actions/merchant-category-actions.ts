@@ -72,8 +72,9 @@ export async function learnMerchantCategory(
   const { userId } = auth;
 
   try {
-    const normalized = merchantPattern.toLowerCase().trim();
-    if (!normalized) return { success: true, data: { learned: false } };
+    const normalized =
+      typeof merchantPattern === "string" ? merchantPattern.toLowerCase().trim() : "";
+    if (!normalized || normalized.length > 200) return { success: true, data: { learned: false } };
     if (!(await ownsCategory(userId, categoryId))) {
       return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
     }

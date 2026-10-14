@@ -6,8 +6,9 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Income, NewIncome, IncomeWithAccount } from "@/types/database";
 import { logger } from "@/lib/logger";
-import { ownsAccount, pickFields } from "@/lib/auth/ownership";
+import { ownsAccount } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { createIncomeInput, parseInput, updateIncomeInput } from "@/lib/validations/action-input";
 
 export async function getIncomes(filters?: {
   accountId?: string;
@@ -54,13 +55,19 @@ export async function getIncomes(filters?: {
   }
 }
 
-export async function createIncome(data: Omit<NewIncome, "userId">): Promise<ApiResponse<Income>> {
+export async function createIncome(
+  rawData: Omit<NewIncome, "userId">
+): Promise<ApiResponse<Income>> {
   try {
     const authResult = await requireAuth();
     if (authResult.error) {
       return { success: false, error: "Unauthorized" };
     }
     const { userId } = authResult;
+
+    const input = parseInput(createIncomeInput, rawData);
+    if (!input.success) return input;
+    const data = input.data;
 
     // FK Validation: accountId must belong to authenticated user (DATA-10)
     let accountCurrency: string | undefined;
@@ -102,18 +109,12 @@ export async function updateIncome(
     }
     const { userId } = authResult;
 
-    const updates = pickFields(data, [
-      "accountId",
-      "source",
-      "amount",
-      "recurrenceType",
-      "startDate",
-      "endDate",
-      "currency",
-      "originalAmount",
-      "exchangeRate",
-      "info",
-    ]);
+    const input = parseInput(updateIncomeInput, data);
+    if (!input.success) return input;
+    const updates = input.data;
+    if (Object.keys(updates).length === 0) {
+      return { success: false, error: "Keine Änderungen übergeben." };
+    }
     if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
       return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
     }

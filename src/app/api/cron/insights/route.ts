@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { generateInsights } from "@/actions/insights-actions";
+import { generateInsights } from "@/lib/insights/generate-insights";
 import { logger } from "@/lib/logger";
 import { isValidCronRequest } from "@/lib/auth/cron-secret";
 

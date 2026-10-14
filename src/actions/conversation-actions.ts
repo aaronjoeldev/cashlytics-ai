@@ -13,6 +13,10 @@ import type {
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
 
+const MAX_TITLE_LENGTH = 200;
+// Same bound as a whole chat request in src/app/api/chat/route.ts
+const MAX_MESSAGE_LENGTH = 400_000;
+
 export async function getConversations(): Promise<ApiResponse<Conversation[]>> {
   try {
     const authResult = await requireAuth();
@@ -81,7 +85,7 @@ export async function createConversation(title?: string): Promise<ApiResponse<Co
       .insert(conversations)
       .values({
         userId,
-        title: title || "Neuer Chat",
+        title: title?.trim().slice(0, MAX_TITLE_LENGTH) || "Neuer Chat",
         createdAt: now,
         updatedAt: now,
       })
@@ -105,9 +109,14 @@ export async function updateConversationTitle(
     }
     const { userId } = authResult;
 
+    const trimmed = typeof title === "string" ? title.trim().slice(0, MAX_TITLE_LENGTH) : "";
+    if (!trimmed) {
+      return { success: false, error: "Titel ist erforderlich." };
+    }
+
     const [conversation] = await db
       .update(conversations)
-      .set({ title, updatedAt: new Date() })
+      .set({ title: trimmed, updatedAt: new Date() })
       .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
       .returning();
 
@@ -152,6 +161,13 @@ export async function saveMessage(
       return { success: false, error: "Unauthorized" };
     }
     const { userId } = authResult;
+
+    if (role !== "user" && role !== "assistant") {
+      return { success: false, error: "Ungültige Rolle." };
+    }
+    if (typeof content !== "string" || content.length > MAX_MESSAGE_LENGTH) {
+      return { success: false, error: "Nachricht ist zu lang." };
+    }
 
     // Verify conversation ownership before inserting a message
     const [ownedConv] = await db

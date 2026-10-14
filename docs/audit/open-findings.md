@@ -57,8 +57,8 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       so such paths reach route handlers without a session. Confirmed for `/api/documents/x.png`.
 - [ ] **Push endpoint is not validated as a push-service URL** (`api/push/subscribe`): blind SSRF
       through the reminder job.
-- [ ] **`generateInsights(userId)` is exported from a `"use server"` file without an auth check**
-      (`src/actions/insights-actions.ts`). _(reachability unverified)_
+- [x] **`generateInsights(userId)` was exported from a `"use server"` file without an auth check**
+      and was registered as a server action. Moved to `src/lib/insights/generate-insights.ts`.
 - [x] **Password length was inconsistent** between sign-in, registration and reset.
 - [x] **E-mails were case-sensitive.** They are normalised to lower case on sign-in, registration
       and reset, and looked up case-insensitively.
@@ -89,8 +89,13 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       entries count as "this month".
 - [x] **Delete actions reported success when no row matched** (`deleteExpense`, `deleteDailyExpense`,
       `deleteIncome`, `deleteAccount`, `deleteCategory`).
-- [ ] **No server-side validation in the actions.** The zod schemas run only in the client forms; a
-      direct call can store a negative amount or interval.
+- [x] **No server-side validation in the actions.** Create and update actions now parse their input
+      with `src/lib/validations/action-input.ts` (amount range, enums, currencies, dates, end after
+      start, text length, unknown keys dropped); this also covers the AI tools.
+- [x] **Form and AI tool schemas rejected the demo ids**: zod 4 `uuid()` requires an RFC version
+      digit, which the fixed ids of the demo seed lack. All id checks use `z.guid()`.
+- [ ] **End date is not checked against the stored start date** when an update sets only one of
+      the two (for example the AI `updateExpense` tool setting only `endDate`).
 
 ## 3. CSV import
 
@@ -139,9 +144,7 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       uncategorised spend is titled "null: …", the average divides by three even with one month of
       history, and the budget warning fires on day one of a month.
 - [ ] **One failing user aborts the whole insights run.**
-- [ ] Smaller: `createAccount` tool accepts any string as currency, tool dates are unvalidated
-      strings, merchant-category learning is written but never read, receipt dates and amounts
-      from the model are not validated.
+- [ ] Smaller: merchant-category learning is written but never read.
 
 ## 5. Deployment and database
 
@@ -200,10 +203,9 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **Dead code**: `accounts-actions.ts`, `expenses-actions.ts`, `incomes-actions.ts` now hold
       one function each (used by `accounts/[id]/page.tsx`) and can be merged into the singular
       files; `account-detail-actions.ts`,
-      `exchange-rates-actions.ts`, `src/lib/validators/`, `validations/{expense,income,daily-expense}.ts`,
-      `lib/auth/user-id.ts`, `lib/email/index.ts`, `organisms/category-list.tsx`,
-      `atoms/category-select.tsx`. `daily-expenses-actions.ts` is a second live path for creating
-      and updating daily expenses with different behaviour.
+      `exchange-rates-actions.ts`, `lib/auth/user-id.ts`, `lib/email/index.ts`,
+      `organisms/category-list.tsx`, `atoms/category-select.tsx`. (`src/lib/validators/`, the
+      unused `validations/*` schemas and the second daily-expense path were removed.)
 - [ ] **Tracked by accident**: `.tmp/` (agent session files) and
       `.planning/milestones/v1.0-phases`, a byte-identical copy of `.planning/phases/01…05`.
 - [ ] **Outdated notes**: `.planning/codebase/CONCERNS.md` and `TESTING.md`.

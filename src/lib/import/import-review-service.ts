@@ -85,9 +85,9 @@ export type ImportReviewServiceDeps = {
 };
 
 const updateRowInputSchema = z.object({
-  userId: z.string().uuid(),
-  sessionId: z.string().uuid(),
-  rowId: z.string().uuid(),
+  userId: z.guid(),
+  sessionId: z.guid(),
+  rowId: z.guid(),
   patch: z
     .object({
       bookingDate: z
@@ -114,18 +114,18 @@ const updateRowInputSchema = z.object({
 });
 
 const removeRowInputSchema = z.object({
-  userId: z.string().uuid(),
-  sessionId: z.string().uuid(),
-  rowId: z.string().uuid(),
+  userId: z.guid(),
+  sessionId: z.guid(),
+  rowId: z.guid(),
 });
 
 const saveDecisionsInputSchema = z.object({
-  userId: z.string().uuid(),
-  sessionId: z.string().uuid(),
+  userId: z.guid(),
+  sessionId: z.guid(),
   decisions: z
     .array(
       z.object({
-        conflictId: z.string().uuid(),
+        conflictId: z.guid(),
         decision: z.enum(DECISION_VALUES),
       })
     )

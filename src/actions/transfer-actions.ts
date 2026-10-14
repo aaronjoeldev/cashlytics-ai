@@ -6,8 +6,13 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Transfer, NewTransfer, TransferWithDetails } from "@/types/database";
 import { logger } from "@/lib/logger";
-import { ownsAccount, pickFields } from "@/lib/auth/ownership";
+import { ownsAccount } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
+import {
+  createTransferInput,
+  parseInput,
+  updateTransferInput,
+} from "@/lib/validations/action-input";
 
 export async function getTransfers(filters?: {
   sourceAccountId?: string;
@@ -53,18 +58,18 @@ export async function getTransfers(filters?: {
 }
 
 export async function createTransfer(
-  data: Omit<NewTransfer, "userId">
+  rawData: Omit<NewTransfer, "userId">
 ): Promise<ApiResponse<Transfer>> {
   try {
-    if (data.sourceAccountId === data.targetAccountId) {
-      return { success: false, error: "Quell- und Zielkonto müssen unterschiedlich sein" };
-    }
-
     const authResult = await requireAuth();
     if (authResult.error) {
       return { success: false, error: "Unauthorized" };
     }
     const { userId } = authResult;
+
+    const input = parseInput(createTransferInput, rawData);
+    if (!input.success) return input;
+    const data = input.data;
 
     // FK Validation: BOTH accounts must belong to the authenticated user (DATA-10)
     const [sourceAccount] = await db
@@ -115,19 +120,12 @@ export async function updateTransfer(
     }
     const { userId } = authResult;
 
-    const updates = pickFields(data, [
-      "sourceAccountId",
-      "targetAccountId",
-      "amount",
-      "description",
-      "recurrenceType",
-      "startDate",
-      "endDate",
-      "sourceCurrency",
-      "targetCurrency",
-      "targetAmount",
-      "exchangeRate",
-    ]);
+    const input = parseInput(updateTransferInput, data);
+    if (!input.success) return input;
+    const updates = input.data;
+    if (Object.keys(updates).length === 0) {
+      return { success: false, error: "Keine Änderungen übergeben." };
+    }
 
     const [existing] = await db
       .select({

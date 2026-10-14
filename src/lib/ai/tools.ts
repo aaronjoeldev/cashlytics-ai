@@ -14,6 +14,7 @@ import {
   deleteExpense,
   getDailyExpenses,
   createDailyExpense,
+  updateDailyExpense,
   deleteDailyExpense,
 } from "@/actions/expense-actions";
 import { getIncomes, createIncome, updateIncome, deleteIncome } from "@/actions/income-actions";
@@ -25,7 +26,6 @@ import {
   getNormalizedMonthlyExpenses,
   getSubscriptions,
 } from "@/actions/analytics-actions";
-import { updateDailyExpense } from "@/actions/daily-expenses-actions";
 import { getTransfers, createTransfer } from "@/actions/transfer-actions";
 import { getActiveInsights, markInsightRead } from "@/actions/insights-actions";
 import { currencies, defaultCurrency } from "@/lib/currency";
@@ -59,7 +59,7 @@ export const tools = {
   updateAccount: tool({
     description: "Aktualisiert ein bestehendes Konto.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID des Kontos"),
+      id: z.guid().describe("ID des Kontos"),
       name: z.string().optional().describe("Neuer Name des Kontos"),
       type: z.enum(["checking", "savings", "etf"]).optional().describe("Neuer Kontotyp"),
       balance: z.string().optional().describe("Neuer Kontostand"),
@@ -77,7 +77,7 @@ export const tools = {
   deleteAccount: tool({
     description: "Löscht ein Konto. Warnung: Dies löscht auch alle zugehörigen Transaktionen.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID des zu löschenden Kontos"),
+      id: z.guid().describe("ID des zu löschenden Kontos"),
     }),
     needsApproval: true,
     execute: async ({ id }) => {
@@ -89,9 +89,9 @@ export const tools = {
     description:
       "Erstellt eine WIEDERKEHRENDE Ausgabe (z.B. Miete, Netflix-Abo, Versicherung, Gym-Mitgliedschaft). NUR für Ausgaben nutzen, die sich regelmäßig wiederholen. Für einmalige Ausgaben (Einkauf, Tanken, Restaurant) IMMER createDailyExpense nutzen. Die accountId ist im Kontext bekannt – kein getAccounts nötig.",
     inputSchema: z.object({
-      accountId: z.uuid().describe("ID des Kontos aus dem Kontext"),
+      accountId: z.guid().describe("ID des Kontos aus dem Kontext"),
       categoryId: z
-        .uuid()
+        .guid()
         .optional()
         .nullable()
         .describe("ID der Kategorie aus dem Kontext, optional"),
@@ -148,8 +148,8 @@ export const tools = {
     description:
       'Gibt periodische/wiederkehrende Ausgaben zurück. Nutze name um nach einer bestimmten Ausgabe zu suchen (z.B. name="Autofinanzierung"). Ohne Filter werden alle zurückgegeben.',
     inputSchema: z.object({
-      accountId: z.uuid().optional().describe("Filter nach Konto-ID"),
-      categoryId: z.uuid().optional().describe("Filter nach Kategorie-ID"),
+      accountId: z.guid().optional().describe("Filter nach Konto-ID"),
+      categoryId: z.guid().optional().describe("Filter nach Kategorie-ID"),
       name: z
         .string()
         .optional()
@@ -203,7 +203,7 @@ export const tools = {
   updateExpense: tool({
     description: "Aktualisiert eine bestehende periodische Ausgabe.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID der Ausgabe"),
+      id: z.guid().describe("ID der Ausgabe"),
       name: z.string().optional().describe("Neuer Name"),
       amount: z.number().positive().optional().describe("Neuer Betrag"),
       recurrenceType: z
@@ -225,7 +225,7 @@ export const tools = {
   deleteExpense: tool({
     description: "Löscht eine periodische Ausgabe.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID der zu löschenden Ausgabe"),
+      id: z.guid().describe("ID der zu löschenden Ausgabe"),
     }),
     needsApproval: true,
     execute: async ({ id }) => {
@@ -237,9 +237,9 @@ export const tools = {
     description:
       "Erstellt eine einmalige Ausgabe (z.B. Einkauf, Tanken, Restaurant, einmalige Zahlung). Für wirklich wiederkehrende Ausgaben (Miete, Abo) nutze createExpense. Die accountId und categoryId sind im Kontext bekannt – kein getAccounts nötig.",
     inputSchema: z.object({
-      accountId: z.uuid().describe("ID des Kontos aus dem Kontext"),
+      accountId: z.guid().describe("ID des Kontos aus dem Kontext"),
       categoryId: z
-        .uuid()
+        .guid()
         .optional()
         .nullable()
         .describe("ID der Kategorie aus dem Kontext, optional"),
@@ -277,8 +277,8 @@ export const tools = {
     description:
       'Gibt einmalige Ausgaben zurück. Nutze description um nach einer bestimmten Ausgabe zu suchen (z.B. description="REWE"). Ohne Filter werden alle zurückgegeben.',
     inputSchema: z.object({
-      accountId: z.uuid().optional().describe("Filter nach Konto-ID"),
-      categoryId: z.uuid().optional().describe("Filter nach Kategorie-ID"),
+      accountId: z.guid().optional().describe("Filter nach Konto-ID"),
+      categoryId: z.guid().optional().describe("Filter nach Kategorie-ID"),
       description: z
         .string()
         .optional()
@@ -350,7 +350,7 @@ export const tools = {
   deleteDailyExpense: tool({
     description: "Löscht eine tägliche Ausgabe.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID der zu löschenden Ausgabe"),
+      id: z.guid().describe("ID der zu löschenden Ausgabe"),
     }),
     needsApproval: true,
     execute: async ({ id }) => {
@@ -362,10 +362,10 @@ export const tools = {
     description:
       "Aktualisiert eine bestehende einmalige Ausgabe. Nutze dies um Beschreibung, Betrag, Datum oder Kategorie einer täglichen Ausgabe zu korrigieren. Die ID der Ausgabe ist aus getDailyExpenses bekannt.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID der zu aktualisierenden Ausgabe"),
+      id: z.guid().describe("ID der zu aktualisierenden Ausgabe"),
       description: z.string().optional().describe("Neue Beschreibung"),
       amount: z.number().positive().optional().describe("Neuer Betrag"),
-      categoryId: z.uuid().optional().nullable().describe("Neue Kategorie-ID aus dem Kontext"),
+      categoryId: z.guid().optional().nullable().describe("Neue Kategorie-ID aus dem Kontext"),
       date: z.string().optional().describe("Neues Datum im ISO-Format"),
     }),
     needsApproval: true,
@@ -383,7 +383,7 @@ export const tools = {
     description:
       "Erstellt eine neue Einnahme (z.B. Gehalt, Nebenverdienst, Bonus). Die accountId ist im Kontext bekannt – kein getAccounts nötig.",
     inputSchema: z.object({
-      accountId: z.uuid().describe("ID des Kontos aus dem Kontext"),
+      accountId: z.guid().describe("ID des Kontos aus dem Kontext"),
       source: z.string().describe('Quelle/Beschreibung der Einnahme, z.B. "Gehalt"'),
       amount: z.number().positive().describe("Betrag als Zahl"),
       recurrenceType: z.enum(["once", "monthly", "yearly"]).describe("Wiederholungstyp"),
@@ -412,7 +412,7 @@ export const tools = {
     description:
       "Gibt ALLE Einnahmen zurück (monthly, yearly, once). Nutze dies um dem Benutzer seine Einnahmen zu zeigen. Kann nach Konto oder Datum gefiltert werden.",
     inputSchema: z.object({
-      accountId: z.uuid().optional().describe("Filter nach Konto-ID"),
+      accountId: z.guid().optional().describe("Filter nach Konto-ID"),
       startDate: z.string().optional().describe("Filter ab Datum (ISO-Format)"),
       endDate: z.string().optional().describe("Filter bis Datum (ISO-Format)"),
     }),
@@ -428,7 +428,7 @@ export const tools = {
   updateIncome: tool({
     description: "Aktualisiert eine bestehende Einnahme.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID der Einnahme"),
+      id: z.guid().describe("ID der Einnahme"),
       source: z.string().optional().describe("Neue Quelle/Beschreibung"),
       amount: z.number().positive().optional().describe("Neuer Betrag"),
       recurrenceType: z.enum(["once", "monthly", "yearly"]).optional(),
@@ -446,7 +446,7 @@ export const tools = {
   deleteIncome: tool({
     description: "Löscht eine Einnahme.",
     inputSchema: z.object({
-      id: z.uuid().describe("ID der zu löschenden Einnahme"),
+      id: z.guid().describe("ID der zu löschenden Einnahme"),
     }),
     needsApproval: true,
     execute: async ({ id }) => {
@@ -548,8 +548,8 @@ export const tools = {
     description:
       "Gibt Überweisungen zwischen Konten zurück. Kann nach Quell- oder Zielkonto und Zeitraum gefiltert werden.",
     inputSchema: z.object({
-      sourceAccountId: z.uuid().optional().describe("Filter nach Quellkonto-ID"),
-      targetAccountId: z.uuid().optional().describe("Filter nach Zielkonto-ID"),
+      sourceAccountId: z.guid().optional().describe("Filter nach Quellkonto-ID"),
+      targetAccountId: z.guid().optional().describe("Filter nach Zielkonto-ID"),
       startDate: z.string().optional().describe("Filter ab Datum (ISO-Format)"),
       endDate: z.string().optional().describe("Filter bis Datum (ISO-Format)"),
     }),
@@ -590,8 +590,8 @@ export const tools = {
     description:
       "Erstellt eine Überweisung zwischen zwei Konten. sourceAccountId und targetAccountId müssen unterschiedlich sein. Die Konto-IDs sind im Kontext bekannt.",
     inputSchema: z.object({
-      sourceAccountId: z.uuid().describe("ID des Quellkontos (von dem Geld abgeht)"),
-      targetAccountId: z.uuid().describe("ID des Zielkontos (auf das Geld kommt)"),
+      sourceAccountId: z.guid().describe("ID des Quellkontos (von dem Geld abgeht)"),
+      targetAccountId: z.guid().describe("ID des Zielkontos (auf das Geld kommt)"),
       amount: z.number().positive().describe("Betrag als Zahl"),
       description: z.string().optional().describe("Optionale Beschreibung der Überweisung"),
       recurrenceType: z
@@ -738,7 +738,7 @@ export const tools = {
   markInsightRead: tool({
     description: "Markiert einen Insight als gelesen/erledigt.",
     inputSchema: z.object({
-      insightId: z.uuid().describe("ID des Insights"),
+      insightId: z.guid().describe("ID des Insights"),
     }),
     needsApproval: true,
     execute: async ({ insightId }) => {
