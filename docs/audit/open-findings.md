@@ -3,8 +3,9 @@
 Result of the full repository audit from 2026-10-13. This file lists what is still open; tick items
 off as they are fixed. Line numbers refer to commit `e37f3a9` (release 0.8.0) and may have shifted.
 
-Items ticked `[x]` were fixed after this list was written (branch `fix/security-hardening`); the
-release workflow change has not run in CI yet.
+Items ticked `[x]` were fixed after this list was written (branches `fix/security-hardening`,
+`fix/auth-sessions-and-pwa` and `fix/ops-and-database`); the release workflow change has not run in
+CI yet.
 
 Already fixed and not listed here: dependency updates and Node 24, the cross-user leak in the
 dashboard queries, the unauthenticated `/api/documents/[id]` route, push subscription ownership,
@@ -86,7 +87,7 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       the transfers list, import review, search dialog and scan success screen.
 - [ ] **Dashboard category breakdown has no upper date bound** for daily expenses, so future-dated
       entries count as "this month".
-- [ ] **Delete actions report success when no row matched** (`deleteExpense`, `deleteDailyExpense`,
+- [x] **Delete actions reported success when no row matched** (`deleteExpense`, `deleteDailyExpense`,
       `deleteIncome`, `deleteAccount`, `deleteCategory`).
 - [ ] **No server-side validation in the actions.** The zod schemas run only in the client forms; a
       direct call can store a negative amount or interval.
@@ -148,20 +149,26 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       `.github/workflows/release.yml` tests for the file `VERSION`, which is tracked and always
       exists, so every push to `main` reports a release. The docker job also checks out `main`
       instead of the triggering commit.
-- [ ] **`entrypoint.sh` starts the app after failed migrations.**
-- [ ] **`docker-compose.demo.yml` is invalid**: `demo_network` is not declared, the seeder cannot
-      reach Postgres, the app has no port or web network, registration is open.
-- [ ] **`docker-compose.yml` cannot start the app**: the `.:/app` volume hides the standalone
-      build. `start-services.sh` then starts a second server on the same port.
+- [x] **`entrypoint.sh` started the app after failed migrations.** It now exits and leaves the retry
+      to the container restart policy.
+- [x] **`docker-compose.demo.yml` was invalid**: `demo_network` was not declared, the seeder could
+      not reach Postgres, the app had no port, registration was open. All services now share the
+      default network; an external proxy network is documented as an override.
+- [x] **`docker-compose.yml` could not start the app**: the `.:/app` volume hid the standalone
+      build and `DATABASE_URL` pointed outside the compose network. `start-services.sh` now starts
+      only Postgres.
 - [ ] **Migration `0005` deletes all rows without `user_id`**; relevant only when upgrading an
       install from before February 2026.
-- [ ] **No secondary indexes anywhere.** Every query filters on `user_id`; add indexes on
-      `user_id`, `(user_id, date)` for daily expenses and the child foreign keys.
-- [ ] **Categories in use can never be deleted** (`ON DELETE no action` on `expenses.category_id`
-      and `daily_expenses.category_id`).
-- [ ] **`.env.example` breaks reminders when copied as is**: empty `CRON_SECRET` and VAPID
-      placeholders. `NEXT_PUBLIC_DEFAULT_LOCALE` / `CURRENCY` are set at runtime in the self-host
-      compose file but are baked in at build time.
+- [x] **No secondary indexes anywhere.** Migration `0016` adds indexes on `user_id`,
+      `(user_id, date)` for daily expenses, the child foreign keys and `lower(email)`.
+- [x] **Categories in use could never be deleted.** `expenses.category_id` and
+      `daily_expenses.category_id` are now `ON DELETE SET NULL`, as the delete dialog already said.
+- [x] **`.env.example` broke reminders when copied as is**: VAPID placeholders and an empty
+      `CRON_SECRET` are now commented out with instructions. `NEXT_PUBLIC_DEFAULT_LOCALE` /
+      `CURRENCY` were removed from the self-host compose file because they are baked in at build
+      time.
+- [ ] **Locale and currency defaults cannot be changed with the published image.** They would have
+      to be read at runtime instead of from `NEXT_PUBLIC_*` variables.
 - [ ] **Server action body limit is the 1 MB default** while uploads promise 5 MB. _(unverified)_
 - [ ] Smaller: `user_settings` has no foreign key to `users`, snapshots `0010` / `0011` are
       missing in `drizzle/meta`, `package.json` version is never bumped, `scripts/migrate-add-userId.ts`

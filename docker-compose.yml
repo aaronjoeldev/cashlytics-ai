@@ -1,4 +1,7 @@
-version: "3.8"
+# Builds the image from this checkout and runs it with a local PostgreSQL.
+#
+#   docker compose up -d --build     app on http://localhost:3000
+#   docker compose up -d postgres    database only, for `npm run dev` (see start-services.sh)
 
 services:
   app:
@@ -10,7 +13,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      # The app reaches the database over the compose network, not via localhost
+      - DATABASE_URL=postgresql://cashlytics:cashlytics_secret@postgres:5432/cashlytics
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - AUTH_SECRET=${AUTH_SECRET}
       - SINGLE_USER_MODE=${SINGLE_USER_MODE:-true}
@@ -23,6 +27,9 @@ services:
       - APP_URL=${APP_URL}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - CRON_SECRET=${CRON_SECRET}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,10 +39,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/.next
 
   cashlytics-cron:
     image: alpine:3.20

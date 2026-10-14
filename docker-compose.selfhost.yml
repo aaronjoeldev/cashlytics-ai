@@ -17,10 +17,9 @@ services:
       - DATABASE_URL=postgresql://cashlytics:${POSTGRES_PASSWORD}@postgres:5432/cashlytics
       # Public URL of your Cashlytics instance
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      # Default locale (de or en)
-      - NEXT_PUBLIC_DEFAULT_LOCALE=${NEXT_PUBLIC_DEFAULT_LOCALE:-de}
-      # Default currency (EUR, USD, GBP, CHF)
-      - NEXT_PUBLIC_DEFAULT_CURRENCY=${NEXT_PUBLIC_DEFAULT_CURRENCY:-EUR}
+      # NEXT_PUBLIC_DEFAULT_LOCALE / NEXT_PUBLIC_DEFAULT_CURRENCY are compiled in at build time.
+      # Setting them here only changes the server side and mismatches the client, so they are
+      # left out; build the image yourself to change the defaults (de / EUR).
       # Auth.js secret for JWT encryption (generate with: npx auth secret)
       - AUTH_SECRET=${AUTH_SECRET}
       # Required when accessing via IP address or custom domain (not localhost)

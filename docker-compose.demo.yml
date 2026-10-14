@@ -12,6 +12,17 @@
 #   POSTGRES_PASSWORD Internal DB password               (default: cashlytics_demo)
 #   AUTH_SECRET       Auth.js secret for JWT encryption  (default: demo_secret_change_in_production)
 #   OPENAI_API_KEY    For the AI assistant feature       (default: empty, feature disabled)
+#
+# Registration is closed: the seed leaves only the demo user, and single-user mode
+# blocks further sign-ups. Log in as demo@cashlytics.online / admin123456789.
+#
+# Behind a reverse proxy on an external network, attach the app with an override file:
+#   services:
+#     app:
+#       networks: [default, web_network]
+#   networks:
+#     web_network:
+#       external: true
 
 name: cashlytics-demo
 
@@ -34,8 +45,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    networks:
-      - demo_network
 
   # ------------------------------------------------------------
   # Cashlytics application
@@ -45,12 +54,15 @@ services:
     image: ghcr.io/aaronjoeldev/cashlytics-ai:latest
     container_name: cashlytics-demo-app
     restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://cashlytics:${POSTGRES_PASSWORD:-cashlytics_demo}@postgres:5432/cashlytics
-      NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3333}
+      NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3000}
       AUTH_SECRET: ${AUTH_SECRET:-demo_secret_change_in_production}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SINGLE_USER_MODE: "true"
       NODE_ENV: production
     depends_on:
       postgres:
@@ -61,8 +73,6 @@ services:
       timeout: 10s
       retries: 20
       start_period: 60s
-    networks:
-      - demo_network
 
   # ------------------------------------------------------------
   # Demo seeder
@@ -86,15 +96,8 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    networks:
-      - default
-      - web_network
 
 volumes:
   demo_postgres_data:
     driver: local
-
-networks:
-  web_network:
-    external: true
 
