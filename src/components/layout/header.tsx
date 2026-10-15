@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "./theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SearchDialog } from "@/components/molecules/search-dialog";
+import { NotificationsMenu } from "@/components/molecules/notifications-menu";
 import { useTranslations } from "next-intl";
 
 interface HeaderProps {
@@ -72,20 +73,7 @@ export function Header({ title }: HeaderProps) {
             <Search className="h-4 w-4" />
           </Button>
 
-          {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground relative h-8 w-8 rounded-xl hover:bg-white/5"
-          >
-            <Bell className="h-4 w-4" />
-            {/* Notification dot */}
-            <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-50" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-            </span>
-            <span className="sr-only">{t("notifications")}</span>
-          </Button>
+          <NotificationsMenu />
 
           <ThemeToggle />
 

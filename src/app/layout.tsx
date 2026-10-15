@@ -4,9 +4,8 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import { getLocale, getMessages, getTimeZone } from "next-intl/server";
-import { cookies } from "next/headers";
+import { getUserPreferences } from "@/lib/user-preferences";
 import { type Locale } from "@/i18n/config";
-import { type Currency, currencies, defaultCurrency } from "@/lib/currency";
 
 const syne = Syne({
   variable: "--font-syne",
@@ -64,10 +63,7 @@ export default async function RootLayout({
   const locale = (await getLocale()) as Locale;
   const messages = await getMessages();
   const timeZone = await getTimeZone();
-  const cookieStore = await cookies();
-  const cookieCurrency = cookieStore.get("currency")?.value as Currency | undefined;
-  const initialCurrency: Currency =
-    cookieCurrency && currencies.includes(cookieCurrency) ? cookieCurrency : defaultCurrency;
+  const { currency: initialCurrency } = await getUserPreferences();
 
   return (
     <html lang={locale} suppressHydrationWarning>

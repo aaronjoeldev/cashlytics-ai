@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 const initialState: AuthActionState = {};
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("auth.login");
   return (
     <Button
       type="submit"
@@ -25,10 +27,10 @@ function SubmitButton() {
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Signing in...
+          {t("submitting")}
         </>
       ) : (
-        "Sign in"
+        t("submit")
       )}
     </Button>
   );
@@ -36,15 +38,16 @@ function SubmitButton() {
 
 export function LoginForm() {
   const [state, action] = useActionState(loginAction, initialState);
+  const t = useTranslations("auth");
   const searchParams = useSearchParams();
   const resetSuccess = searchParams.get("reset") === "success";
   const prefilledEmail = searchParams.get("email") || "";
 
   useEffect(() => {
     if (resetSuccess) {
-      toast.success("Password reset successful, please log in");
+      toast.success(t("login.resetSuccess"));
     }
-  }, [resetSuccess]);
+  }, [resetSuccess, t]);
 
   return (
     <div className="w-full max-w-sm">
@@ -66,9 +69,9 @@ export function LoginForm() {
           className="mb-1 text-2xl font-bold tracking-tight"
           style={{ fontFamily: "var(--font-syne)" }}
         >
-          Welcome back
+          {t("login.title")}
         </h1>
-        <p className="text-muted-foreground/70 mb-6 text-sm">Sign in to your account</p>
+        <p className="text-muted-foreground/70 mb-6 text-sm">{t("login.subtitle")}</p>
 
         {/* Global error */}
         {state.error && (
@@ -79,13 +82,13 @@ export function LoginForm() {
 
         <form action={action} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("email")}</Label>
             <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder={t("emailPlaceholder")}
               defaultValue={prefilledEmail}
             />
             {state.fieldErrors?.email && (
@@ -94,7 +97,7 @@ export function LoginForm() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("password")}</Label>
             <Input
               id="password"
               name="password"
@@ -117,19 +120,19 @@ export function LoginForm() {
             href="/forgot-password"
             className="text-muted-foreground text-xs underline-offset-4 transition-colors hover:text-amber-500 hover:underline"
           >
-            Forgot password?
+            {t("login.forgotPassword")}
           </Link>
         </div>
       </div>
 
       {/* Register link */}
       <p className="text-muted-foreground mt-4 text-center text-sm">
-        Don&apos;t have an account?{" "}
+        {t("login.noAccount")}{" "}
         <Link
           href="/register"
           className="text-amber-500 underline-offset-4 transition-colors hover:text-amber-400 hover:underline"
         >
-          Register
+          {t("login.register")}
         </Link>
       </p>
     </div>

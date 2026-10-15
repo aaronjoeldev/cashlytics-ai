@@ -133,18 +133,23 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
     const parsedAmount = parseFloat(amount);
     const isForeignCurrency = selectedCurrency !== accountCurrency;
 
-    const result = await createDailyExpense({
-      accountId: selectedAccountId,
-      categoryId: selectedCategoryId === "none" ? null : selectedCategoryId,
-      description,
-      amount: String(parsedAmount),
-      date: new Date(date),
-      currency: selectedCurrency,
-      originalAmount: isForeignCurrency ? String(parsedAmount) : undefined,
-      exchangeRate: isForeignCurrency
-        ? String(convertCurrency(1, selectedCurrency, accountCurrency))
-        : undefined,
-    });
+    let result: Awaited<ReturnType<typeof createDailyExpense>>;
+    try {
+      result = await createDailyExpense({
+        accountId: selectedAccountId,
+        categoryId: selectedCategoryId === "none" ? null : selectedCategoryId,
+        description,
+        amount: String(parsedAmount),
+        date: new Date(date),
+        currency: selectedCurrency,
+        originalAmount: isForeignCurrency ? String(parsedAmount) : undefined,
+        exchangeRate: isForeignCurrency
+          ? String(convertCurrency(1, selectedCurrency, accountCurrency))
+          : undefined,
+      });
+    } catch {
+      result = { success: false, error: t("errors.saveFailed") };
+    }
 
     if (!result.success) {
       toast.error(result.error ?? t("errors.saveFailed"));
@@ -158,9 +163,11 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
         const docForm = new FormData();
         docForm.append("file", scannedFile);
         docForm.append("dailyExpenseId", result.data.id);
-        await uploadDocument(docForm);
+        const upload = await uploadDocument(docForm);
+        if (!upload.success) toast.warning(t("errors.attachFailed"));
       } catch {
-        // Document upload failure is non-critical
+        // The expense is saved either way; only the receipt is missing
+        toast.warning(t("errors.attachFailed"));
       }
     }
 

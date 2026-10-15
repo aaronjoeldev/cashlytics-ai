@@ -1,21 +1,15 @@
 {
   "common": {
-    "appName": "Cashlytics",
     "search": "Suchen...",
     "notifications": "Benachrichtigungen",
-    "navigation": "Navigation",
     "loading": "Laden...",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "delete": "Löschen",
-    "edit": "Bearbeiten",
-    "add": "Hinzufügen",
     "close": "Schließen",
     "confirm": "Bestätigen",
     "back": "Zurück",
     "next": "Weiter",
-    "yes": "Ja",
-    "no": "Nein",
     "today": "Heute",
     "tomorrow": "Morgen",
     "inDays": "In {count} Tagen",
@@ -23,7 +17,8 @@
     "all": "Alle",
     "withoutCategory": "Ohne Kategorie",
     "subscription": "Abo",
-    "allAccounts": "Alle Konten"
+    "allAccounts": "Alle Konten",
+    "error": "Fehler"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -37,7 +32,6 @@
     "scan": "Belegscanner",
     "accounts": "Konten",
     "analytics": "Analysen",
-    "goals": "Ziele",
     "tools": "Tools",
     "settings": "Einstellungen",
     "assistant": "KI Assistent"
@@ -45,7 +39,6 @@
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Willkommen zurück! Hier ist deine Finanzübersicht.",
-    "totalAssets": "Gesamtvermögen",
     "income": "Einnahmen",
     "expenses": "Ausgaben",
     "savingsRate": "Sparrate",
@@ -53,17 +46,14 @@
     "monthly": "monatlich",
     "incomeVsExpenses": "Einnahmen vs. Ausgaben",
     "expensesByCategory": "Ausgaben nach Kategorie",
-    "chartPlaceholder": "Chart-Komponente kommt hier",
-    "donutPlaceholder": "Donut-Chart kommt hier",
     "recentTransactions": "Letzte Transaktionen",
     "noTransactions": "Noch keine Transaktionen vorhanden. Füge deine erste Ausgabe oder Einnahme hinzu!",
     "monthlyIncome": "Monatliche Einnahmen",
     "monthlyExpenses": "Monatliche Ausgaben",
     "monthlyBalance": "Monatliche Bilanz",
-    "categoriesCount": "{count} Kategorien",
+    "categoriesCount": "{count, plural, one {# Kategorie} other {# Kategorien}}",
     "noExpensesThisMonth": "Noch keine Ausgaben diesen Monat",
     "yourRecentExpenses": "Deine letzten Ausgaben",
-    "allAccountsSummarized": "Alle Konten summiert",
     "allAccountsMonthly": "Alle Konten im aktuellen Monat",
     "surplusThisMonth": "Überschuss diesen Monat",
     "deficitThisMonth": "Defizit diesen Monat",
@@ -95,7 +85,7 @@
     "surplusThisMonth": "Überschuss diesen Monat",
     "deficitThisMonth": "Defizit diesen Monat",
     "activeSubscriptions": "Laufende Abos",
-    "subscriptionsCount": "{count} Abonnement{s}",
+    "subscriptionsCount": "{count, plural, one {# Abonnement} other {# Abonnements}}",
     "monthlyLabel": "Monatlich:",
     "perMonth": "/Mo",
     "expensesByCategory": "Ausgaben nach Kategorie",
@@ -120,8 +110,9 @@
     "financialOutlook": "Finanzielle Vorausschau",
     "addDataForForecast": "Erfasse Einnahmen und Ausgaben für eine Prognose",
     "dayBalance": "Saldo des Tages",
-    "paymentsCount": "{count} Zahlung{plural}",
-    "recurringTransfers": "wiederkehrende Transfers"
+    "paymentsCount": "{count, plural, one {# Zahlung} other {# Zahlungen}}",
+    "recurringTransfers": "wiederkehrende Transfers",
+    "calendarLoadFailed": "Zahlungskalender konnte nicht geladen werden."
   },
   "accounts": {
     "title": "Konten",
@@ -136,7 +127,6 @@
     "addAccount": "Konto hinzufügen",
     "newAccount": "Neues Konto",
     "newAccountDesc": "Füge ein neues Konto zu deiner Übersicht hinzu.",
-    "editAccount": "Konto bearbeiten",
     "deleteAccount": "Konto löschen",
     "deleteConfirm": "Bist du sicher, dass du dieses Konto löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
     "name": "Name",
@@ -146,17 +136,9 @@
     "balance": "Kontostand",
     "currency": "Währung",
     "created": "Erstellt am",
-    "actions": "Aktionen",
-    "saveSuccess": "Konto wurde erfolgreich gespeichert.",
-    "deleteSuccess": "Konto wurde erfolgreich gelöscht.",
     "errorTitle": "Fehler",
     "error": "Ein Fehler ist aufgetreten. Bitte versuche es erneut.",
-    "accountName": "Kontoname",
-    "accountNamePlaceholder": "z.B. Girokonto Sparkasse",
-    "accountType": "Kontotyp",
-    "initialBalance": "Anfangssaldo",
     "initialBalanceLabel": "Anfangssaldo (€)",
-    "totalBalance": "Gesamtsaldo",
     "createAccount": "Konto erstellen",
     "creating": "Wird erstellt...",
     "createdDesc": "{name} wurde erfolgreich angelegt.",
@@ -167,8 +149,6 @@
     },
     "errors": {
       "nameRequired": "Name erforderlich.",
-      "typeRequired": "Typ erforderlich.",
-      "balanceInvalid": "Saldo ungültig.",
       "createFailed": "Erstellen fehlgeschlagen.",
       "updateFailed": "Aktualisieren fehlgeschlagen.",
       "deleteFailed": "Löschen fehlgeschlagen."
@@ -183,7 +163,6 @@
     "forecast": "Prognose",
     "forecastTitle": "Finanz-Prognose",
     "forecastLoadError": "Prognose konnte nicht geladen werden.",
-    "forecastDescription": "Entwicklung basierend auf Einnahmen und Ausgaben",
     "months3": "3 Monate",
     "months6": "6 Monate",
     "months12": "12 Monate",
@@ -200,13 +179,12 @@
     "viewExplanation": {
       "reserve": "Rücklage: Wiederkehrende Zahlungen werden auf einen Monatswert verteilt.",
       "cashflow": "Cashflow: Zeigt die im gewählten Monat tatsächlich fälligen Buchungen."
-    }
+    },
+    "accountsCount": "{count, plural, one {# Konto} other {# Konten}}"
   },
   "expenses": {
     "title": "Ausgaben",
     "description": "Beschreibung",
-    "allExpenses": "Alle Ausgaben",
-    "noExpenses": "Noch keine Ausgaben vorhanden. Füge deine erste Ausgabe hinzu!",
     "addExpense": "Ausgabe hinzufügen",
     "editExpense": "Ausgabe bearbeiten",
     "newExpense": "Neue Ausgabe",
@@ -240,7 +218,6 @@
     "createCategory": "Kategorie erstellen",
     "newCategory": "Neue Kategorie",
     "editCategory": "Kategorie bearbeiten",
-    "createCategoryDesc": "Erstelle eine neue Kategorie für deine Ausgaben.",
     "editCategoryDesc": "Ändere die Details der Kategorie.",
     "createCategoryLabel": "Anlegen",
     "documents": "Dokumente",
@@ -273,7 +250,9 @@
     "reserve": "Rücklage",
     "nextPayment": "Nächste:",
     "until": "bis",
-    "since": "seit"
+    "since": "seit",
+    "recurrenceInterval": "Alle wie viele Monate?",
+    "recurrenceIntervalHint": "Zwischen 1 und 120 Monaten."
   },
   "income": {
     "title": "Einnahmen",
@@ -310,7 +289,6 @@
     "title": "Transfers",
     "description": "Verwalte Geldtransfers zwischen deinen Konten",
     "addTransfer": "Transfer hinzufügen",
-    "editTransfer": "Transfer bearbeiten",
     "newTransfer": "Neuer Transfer",
     "newTransferDesc": "Transfer zwischen Konten planen",
     "sourceAccount": "Von Konto",
@@ -365,7 +343,7 @@
     "createOwn": "Eigene erstellen",
     "adding": "Wird hinzugefügt...",
     "allCategories": "Alle Kategorien",
-    "categoriesCount": "{count} Kategorie{plural} vorhanden",
+    "categoriesCount": "{count, plural, one {# Kategorie} other {# Kategorien}} vorhanden",
     "deleteConfirm": "Kategorie löschen?",
     "deleteConfirmDesc": "Diese Aktion kann nicht rückgängig gemacht werden. Ausgaben mit dieser Kategorie behalten ihre Daten, aber die Kategorie-Referenz wird entfernt.",
     "created": "Kategorie erstellt",
@@ -407,13 +385,15 @@
     "previewNotAvailable": "Vorschau nicht verfügbar",
     "periodic": "Periodisch",
     "daily": "Täglich",
-    "noDocumentsYet": "Keine Dokumente vorhanden"
+    "noDocumentsYet": "Keine Dokumente vorhanden",
+    "loadFailed": "Dokumente konnten nicht geladen werden.",
+    "previewFailed": "Vorschau konnte nicht geladen werden.",
+    "downloadFailed": "Download fehlgeschlagen.",
+    "deleteFailed": "Dokument konnte nicht gelöscht werden."
   },
   "analytics": {
     "title": "Analysen",
     "description": "Detaillierte Einblicke in deine Finanzen.",
-    "financialAnalytics": "Finanzanalysen",
-    "noData": "Füge zuerst Einnahmen und Ausgaben hinzu, um Analysen zu sehen.",
     "monthlyTrend": "Monatlicher Trend",
     "monthlyTrendDescription": "Einnahmen, Ausgaben und Ersparnisse im Verlauf",
     "incomeVsExpenses": "Einnahmen vs. Ausgaben",
@@ -436,7 +416,6 @@
   "assistant": {
     "title": "KI Assistent",
     "description": "Dein persönlicher Finanzberater - unterstützt durch KI.",
-    "chatTitle": "Chat mit dem Assistenten",
     "placeholder": "Chat-Interface kommt hier. Stelle Fragen wie \"Wie viel habe ich diesen Monat ausgegeben?\""
   },
   "floatingActions": {
@@ -476,7 +455,8 @@
         "enabling": "Wird aktiviert…",
         "disabling": "Wird deaktiviert…",
         "enabled": "Aktiviert",
-        "disabled": "Deaktiviert"
+        "disabled": "Deaktiviert",
+        "notConfigured": "Nicht eingerichtet"
       },
       "toasts": {
         "permissionDenied": "Benachrichtigungen wurden nicht erlaubt.",
@@ -492,7 +472,8 @@
       },
       "warnings": {
         "denied": "Benachrichtigungen sind in deinem Browser blockiert. Öffne die Website-Einstellungen deines Browsers und erlaube Benachrichtigungen für diese Seite, um sie zu aktivieren.",
-        "unsupported": "Dein Browser unterstützt keine Push-Benachrichtigungen. <strong>iPhone/iPad:</strong> Öffne Cashlytics in Safari, tippe auf den Teilen-Button und wähle „Zum Home-Bildschirm“. Dann die App von dort starten und Benachrichtigungen hier aktivieren. Außerdem ist HTTPS erforderlich. <strong>Desktop:</strong> Bitte verwende Chrome, Edge oder Firefox."
+        "unsupported": "Dein Browser unterstützt keine Push-Benachrichtigungen. <strong>iPhone/iPad:</strong> Öffne Cashlytics in Safari, tippe auf den Teilen-Button und wähle „Zum Home-Bildschirm“. Dann die App von dort starten und Benachrichtigungen hier aktivieren. Außerdem ist HTTPS erforderlich. <strong>Desktop:</strong> Bitte verwende Chrome, Edge oder Firefox.",
+        "notConfigured": "Push-Benachrichtigungen sind auf diesem Server nicht eingerichtet. Der Betreiber muss VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY und VAPID_SUBJECT setzen."
       }
     }
   },
@@ -532,27 +513,19 @@
       "invalidType": "Ungültiges Format. Bitte JPG oder PNG hochladen.",
       "scanFailed": "Beleg konnte nicht analysiert werden. Bitte versuche es erneut.",
       "saveFailed": "Ausgabe konnte nicht gespeichert werden.",
-      "notEnabled": "KI-Funktion nicht aktiviert."
+      "attachFailed": "Ausgabe gespeichert, aber der Beleg konnte nicht angehängt werden."
     }
   },
   "csvImport": {
     "title": "CSV-Import",
     "description": "Importiere Buchungen aus einer CSV-Datei und gleiche Duplikate vor dem Speichern ab.",
     "actions": {
-      "startImport": "Import starten",
       "uploadFile": "CSV hochladen",
-      "parseFile": "Datei einlesen",
       "runReconciliation": "Moegliche Duplikate finden",
-      "continueToReview": "Zur Pruefung weiter",
-      "saveDecisions": "Entscheidungen speichern",
-      "confirmImport": "Import bestaetigen",
-      "importAnother": "Weitere Datei importieren",
-      "cancelImport": "Import abbrechen"
+      "saveDecisions": "Entscheidungen speichern"
     },
     "steps": {
       "upload": "Hochladen",
-      "mapHeaders": "Spalten zuordnen",
-      "reconcile": "Abgleichen",
       "resolveConflicts": "Konflikte loesen",
       "reviewRows": "Zeilen pruefen",
       "confirm": "Bestaetigen"
@@ -577,12 +550,7 @@
       "closeButton": "Schliessen"
     },
     "mapping": {
-      "title": "CSV-Spalten zuordnen",
-      "detectedHeaders": "Erkannte Spalten",
-      "targetField": "Zielfeld",
-      "sourceColumn": "Quellspalte",
-      "required": "Erforderlich",
-      "optional": "Optional"
+      "title": "CSV-Spalten zuordnen"
     },
     "headerFields": {
       "bookingDate": "Buchungsdatum",
@@ -597,11 +565,8 @@
     },
     "summary": {
       "totalRows": "Zeilen gesamt",
-      "validRows": "Gueltige Zeilen",
-      "invalidRows": "Ungueltige Zeilen",
       "stagedRows": "Vorgemerkte Zeilen",
-      "conflictRows": "Zeilen mit Konflikten",
-      "removedRows": "Entfernte Zeilen"
+      "conflictRows": "Zeilen mit Konflikten"
     },
     "processing": {
       "stagingTitle": "CSV wird hochgeladen und vorgemerkt",
@@ -628,16 +593,13 @@
     "decisions": {
       "keepBoth": "Beide behalten",
       "replaceExisting": "Vorhandenen Eintrag ersetzen",
-      "skipImportRow": "Importierte Zeile ueberspringen",
-      "needsUserReview": "Pruefung erforderlich"
+      "skipImportRow": "Importierte Zeile ueberspringen"
     },
     "review": {
       "title": "Vorgemerkte Zeilen pruefen",
       "subtitle": "Bearbeite oder entferne Zeilen vor der finalen Bestaetigung.",
-      "editRow": "Zeile bearbeiten",
       "removeRow": "Zeile entfernen",
-      "noRowsRemaining": "Keine Zeilen mehr zum Importieren.",
-      "excludedBadge": "Ausgeschlossen"
+      "noRowsRemaining": "Keine Zeilen mehr zum Importieren."
     },
     "table": {
       "bookingDate": "Buchungsdatum",
@@ -648,8 +610,7 @@
       "senderAccount": "Absenderkonto",
       "receiverAccount": "Empfaengerkonto",
       "balanceAfterBooking": "Saldo nach Buchung",
-      "reference": "Referenz",
-      "actions": "Aktionen"
+      "reference": "Referenz"
     },
     "confirm": {
       "title": "Import bestaetigen",
@@ -662,31 +623,21 @@
       "stagedSuccess": "CSV-Datei wurde erfolgreich vorgemerkt.",
       "reconciliationSuccess": "Abgleich wurde abgeschlossen.",
       "decisionsSaved": "Konfliktentscheidungen wurden gespeichert.",
-      "rowUpdated": "Vorgemerkte Zeile wurde aktualisiert.",
       "rowRemoved": "Vorgemerkte Zeile wurde entfernt.",
       "importConfirmed": "Import wurde erfolgreich abgeschlossen.",
       "alreadyImported": "Diese Datei wurde am {date} schon in dieses Konto importiert. Bereits vorhandene Buchungen erscheinen unten als Konflikte.",
       "reconciliationPartial": "Der KI-Abgleich konnte {count} Zeilen nicht prüfen. Für diese Zeilen wurde nur nach exakten Duplikaten gesucht."
     },
     "errors": {
-      "aiDisabled": "CSV-Import ist nicht verfuegbar, weil KI nicht konfiguriert ist.",
-      "unauthorized": "Du musst angemeldet sein, um Daten zu importieren.",
       "accountRequired": "Bitte waehle ein Konto aus.",
-      "accountNotFound": "Das ausgewaehlte Konto wurde nicht gefunden.",
       "fileRequired": "Bitte waehle eine CSV-Datei aus.",
-      "invalidFileType": "Nur CSV-Dateien sind erlaubt.",
       "fileTooLarge": "Die ausgewaehlte Datei ist zu gross.",
-      "emptyFile": "Die Datei ist leer.",
       "parseFailed": "CSV konnte nicht verarbeitet werden. Pruefe das Dateiformat.",
       "mappingRequired": "Ordne alle erforderlichen Felder zu, bevor du fortfaehrst.",
-      "invalidHeaders": "Erforderliche CSV-Spalten fehlen.",
       "reconciliationFailed": "Abgleich fehlgeschlagen. Bitte versuche es erneut.",
       "decisionSaveFailed": "Konfliktentscheidungen konnten nicht gespeichert werden.",
-      "updateRowFailed": "Vorgemerkte Zeile konnte nicht aktualisiert werden.",
       "removeRowFailed": "Vorgemerkte Zeile konnte nicht entfernt werden.",
       "commitFailed": "Import konnte nicht abgeschlossen werden.",
-      "sessionNotFound": "Import-Sitzung nicht gefunden.",
-      "ownershipMismatch": "Du hast keinen Zugriff auf diese Import-Sitzung.",
       "unknown": "Ein unerwarteter Importfehler ist aufgetreten."
     }
   },
@@ -712,9 +663,7 @@
     "ZAR": "Südafrikanischer Rand",
     "BRL": "Brasilianischer Real",
     "DKK": "Dänische Krone",
-    "selectLabel": "Währung",
-    "convertedAmount": "≈ {amount} {currency}",
-    "differentCurrencies": "Gemischte Währungen"
+    "convertedAmount": "≈ {amount} {currency}"
   },
   "tools": {
     "title": "Tools",
@@ -722,16 +671,13 @@
     "hub": {
       "title": "Tools Hub",
       "subtitle": "Schnelle Utilities für alltägliche Finanzaufgaben.",
-      "availableNow": "{count} Tool verfügbar",
-      "openTool": "Öffnen",
       "converter": {
         "title": "Währungsrechner",
         "description": "Live-Umrechnung zwischen den 20 meistgehandelten Währungen."
       },
       "comingSoon": {
         "title": "Weitere Tools folgen",
-        "description": "Der Bereich wird nach und nach erweitert.",
-        "examples": "Demnächst z. B. Budget-Splitter, MwSt.-Helfer und Abo-Rechner"
+        "description": "Der Bereich wird nach und nach erweitert."
       }
     },
     "converter": {
@@ -745,8 +691,6 @@
       "convertedAmount": "Umgerechneter Betrag",
       "rate": "1 {source} = {rate} {target}",
       "swap": "Währungen tauschen",
-      "liveRates": "Live-Kurse über die angebundene API",
-      "fallbackRates": "Fallback-Kurse aktiv",
       "scope": "20 meistgehandelte Währungen weltweit"
     }
   },
@@ -771,5 +715,167 @@
       "sat": "Sa",
       "sun": "So"
     }
+  },
+  "auth": {
+    "taglineLine1": "Deine Finanzen,",
+    "taglineLine2": "unter Kontrolle.",
+    "taglineDescription": "KI-gestützte Budgetplanung für alle, die ihr Geld ernst nehmen.",
+    "email": "E-Mail",
+    "emailPlaceholder": "du@beispiel.de",
+    "password": "Passwort",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Passwort bestätigen",
+    "passwordHint": "Mindestens 8 Zeichen, mindestens eine Ziffer",
+    "login": {
+      "title": "Willkommen zurück",
+      "subtitle": "Melde dich bei deinem Konto an",
+      "submit": "Anmelden",
+      "submitting": "Anmeldung läuft...",
+      "forgotPassword": "Passwort vergessen?",
+      "noAccount": "Noch kein Konto?",
+      "register": "Registrieren",
+      "resetSuccess": "Passwort zurückgesetzt, bitte melde dich an."
+    },
+    "register": {
+      "title": "Konto erstellen",
+      "subtitle": "Behalte deine Finanzen im Blick",
+      "submit": "Konto erstellen",
+      "submitting": "Konto wird erstellt...",
+      "haveAccount": "Schon ein Konto?",
+      "login": "Anmelden"
+    },
+    "forgot": {
+      "title": "Passwort zurücksetzen",
+      "subtitle": "Gib deine E-Mail-Adresse ein, um einen Link zum Zurücksetzen zu erhalten",
+      "submit": "Link senden",
+      "submitting": "Wird gesendet...",
+      "sentTitle": "E-Mail unterwegs",
+      "backToLogin": "Zurück zur Anmeldung",
+      "rememberPassword": "Passwort wieder eingefallen?",
+      "login": "Anmelden"
+    },
+    "reset": {
+      "title": "Neues Passwort festlegen",
+      "subtitle": "Gib unten dein neues Passwort ein",
+      "submit": "Passwort zurücksetzen",
+      "submitting": "Wird zurückgesetzt...",
+      "invalidTitle": "Ungültiger Link",
+      "invalidDescription": "Dieser Link ist ungültig oder abgelaufen.",
+      "requestNew": "Neuen Link anfordern"
+    },
+    "errors": {
+      "invalidCredentials": "E-Mail oder Passwort ist falsch.",
+      "registrationDisabled": "Die Registrierung ist deaktiviert. Diese Instanz ist für einen einzelnen Nutzer eingerichtet.",
+      "tooManyRegistrations": "Zu viele Registrierungsversuche. Bitte versuche es später erneut.",
+      "emailTaken": "Für diese E-Mail-Adresse gibt es bereits ein Konto.",
+      "emailRequired": "Bitte gib deine E-Mail-Adresse ein.",
+      "emailInvalid": "Ungültige E-Mail-Adresse.",
+      "passwordRequired": "Bitte gib dein Passwort ein.",
+      "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+      "passwordTooLong": "Das Passwort ist zu lang.",
+      "passwordNeedsNumber": "Das Passwort muss mindestens eine Ziffer enthalten.",
+      "confirmRequired": "Bitte bestätige dein Passwort.",
+      "passwordsDontMatch": "Die Passwörter stimmen nicht überein.",
+      "resetRequestSent": "Falls ein Konto mit dieser E-Mail-Adresse existiert, erhältst du einen Link zum Zurücksetzen.",
+      "invalidResetLink": "Dieser Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an."
+    }
+  },
+  "chat": {
+    "welcome": "Hallo! Ich bin dein Cashlytics Assistent.\n\nIch kann dir bei deinen Finanzen helfen:\n\n• Ausgaben erfassen: \"45€ Tanken\"\n• Budget prüfen: \"Kann ich mir X leisten?\"\n• Trends analysieren: \"Vergleiche Mai mit April\"\n• Abos überblicken: \"Welche Abos habe ich?\"\n• Hinweise zeigen: \"Gibt es etwas Auffälliges?\"\n\nWie kann ich dir helfen?",
+    "suggestions": {
+      "overview": "Wie sieht es finanziell aus?",
+      "subscriptions": "Welche Abos habe ich?",
+      "compare": "Vergleiche diesen Monat mit dem letzten",
+      "anomalies": "Gibt es etwas Auffälliges bei meinen Ausgaben?",
+      "addExpense": "Ich habe 45€ bei REWE ausgegeben"
+    },
+    "emptyTitle": "Starte eine Konversation",
+    "emptyDescription": "Dein KI-Assistent hilft dir bei allen Finanzfragen",
+    "error": "Ein Fehler ist aufgetreten. Bitte versuche es erneut.",
+    "retry": "Wiederholen",
+    "retryLabel": "Erneut versuchen",
+    "inputPlaceholder": "Schreibe eine Nachricht... oder '45€ REWE'",
+    "inputLabel": "Chat-Nachricht eingeben",
+    "send": "Nachricht senden",
+    "inputHint": "Enter zum Senden · Shift+Enter für neue Zeile",
+    "chats": "Chats",
+    "newChat": "Neuer Chat",
+    "deleteChat": "Chat löschen",
+    "openHistory": "Chatverlauf öffnen",
+    "today": "Heute",
+    "yesterday": "Gestern",
+    "daysAgo": "Vor {count} Tagen",
+    "toolCard": {
+      "approve": "Annehmen",
+      "deny": "Ablehnen",
+      "none": "Keine",
+      "noEndDate": "Keins",
+      "notFound": "Nicht gefunden",
+      "defaultCurrency": "Standard",
+      "warnings": {
+        "deleteAccount": "Alle Buchungen dieses Kontos werden ebenfalls gelöscht.",
+        "deleteExpense": "Diese wiederkehrende Ausgabe wird dauerhaft entfernt.",
+        "deleteDailyExpense": "Diese Ausgabe wird dauerhaft gelöscht.",
+        "deleteIncome": "Diese Einnahme wird dauerhaft entfernt."
+      },
+      "titles": {
+        "createAccount": "Neues Konto erstellen",
+        "updateAccount": "Konto aktualisieren",
+        "deleteAccount": "Konto löschen",
+        "createExpense": "Wiederkehrende Ausgabe erstellen",
+        "updateExpense": "Wiederkehrende Ausgabe aktualisieren",
+        "deleteExpense": "Wiederkehrende Ausgabe löschen",
+        "createDailyExpense": "Ausgabe erfassen",
+        "updateDailyExpense": "Ausgabe aktualisieren",
+        "deleteDailyExpense": "Ausgabe löschen",
+        "createIncome": "Einnahme erfassen",
+        "updateIncome": "Einnahme aktualisieren",
+        "deleteIncome": "Einnahme löschen",
+        "createCategory": "Kategorie erstellen",
+        "createTransfer": "Transfer erstellen",
+        "markInsightRead": "Hinweis als gelesen markieren"
+      },
+      "fields": {
+        "entry": "Eintrag",
+        "amount": "Betrag",
+        "date": "Datum",
+        "recurrence": "Turnus",
+        "name": "Name",
+        "type": "Typ",
+        "balance": "Kontostand",
+        "currency": "Währung",
+        "account": "Konto",
+        "category": "Kategorie",
+        "from": "Ab",
+        "until": "Bis",
+        "endDate": "Enddatum",
+        "description": "Beschreibung",
+        "source": "Quelle",
+        "icon": "Icon",
+        "color": "Farbe",
+        "sourceAccount": "Von",
+        "targetAccount": "An"
+      }
+    },
+    "mini": {
+      "title": "Cashlytics Assistent",
+      "empty": "Frag mich nach deinen Finanzen oder buche schnell eine Ausgabe.",
+      "placeholder": "z.B. '45€ REWE'",
+      "openFullView": "Vollansicht öffnen",
+      "close": "Chat schließen",
+      "open": "Chat öffnen",
+      "send": "Senden",
+      "prompts": {
+        "fuel": "45€ Tanken",
+        "budget": "Budget diesen Monat?",
+        "income": "Einnahmen zeigen"
+      }
+    }
+  },
+  "notificationsMenu": {
+    "empty": "Keine neuen Hinweise.",
+    "markRead": "Als gelesen markieren",
+    "loadFailed": "Hinweise konnten nicht geladen werden.",
+    "markReadFailed": "Hinweis konnte nicht markiert werden."
   }
 }

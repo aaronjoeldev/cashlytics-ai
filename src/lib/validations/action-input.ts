@@ -137,8 +137,8 @@ const expenseFields = z.object({
   exchangeRate: exchangeRate.nullable().optional(),
   info,
 });
-// A custom recurrence without interval counts as monthly (see src/lib/recurrence.ts); the forms
-// have no interval input yet, so it is not required here.
+// A custom recurrence without interval counts as monthly (see src/lib/recurrence.ts), so the
+// interval stays optional for older entries and the assistant.
 export const createExpenseInput = expenseFields.refine(endNotBeforeStart, endDateIssue);
 export const updateExpenseInput = expenseFields.partial().refine(endNotBeforeStart, endDateIssue);
 

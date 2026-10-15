@@ -138,7 +138,6 @@ export function AccountsClient({
 
   const totalBalance = accounts.reduce((sum, a) => sum + (monthlyBalances.get(a.id) ?? 0), 0);
   const accountCount = accounts.length;
-  const accountLabel = accountCount === 1 ? t("types.checking").split(" ")[0] : t("title");
 
   return (
     <div className="space-y-6">
@@ -161,7 +160,7 @@ export function AccountsClient({
         <CardContent>
           <div className="text-3xl font-bold">{formatCurrency(totalBalance)}</div>
           <p className="text-muted-foreground mt-1 text-xs">
-            {accountCount} {accountLabel}
+            {t("accountsCount", { count: accountCount })}
           </p>
         </CardContent>
       </Card>

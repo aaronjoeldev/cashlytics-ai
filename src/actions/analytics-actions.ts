@@ -21,19 +21,8 @@ import {
   normalizeToMonthly,
   type RecurringItem,
 } from "@/lib/recurrence";
-import { cookies } from "next/headers";
-import { convertCurrency, defaultCurrency, currencies, type Currency } from "@/lib/currency";
-
-/**
- * Reads the user's display (base) currency from the cookie set by SettingsProvider.
- * Falls back to defaultCurrency when the cookie is absent or invalid.
- */
-async function getBaseCurrency(): Promise<Currency> {
-  const cookieStore = await cookies();
-  const value = cookieStore.get("currency")?.value;
-  if (value && currencies.includes(value as Currency)) return value as Currency;
-  return defaultCurrency;
-}
+import { getBaseCurrency } from "@/lib/user-preferences";
+import { convertCurrency, currencies, type Currency } from "@/lib/currency";
 
 /**
  * Converts an amount from `fromCurrency` to `baseCurrency`.

@@ -9,11 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 const initialState: AuthActionState = {};
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("auth.register");
   return (
     <Button
       type="submit"
@@ -23,10 +25,10 @@ function SubmitButton() {
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Creating account...
+          {t("submitting")}
         </>
       ) : (
-        "Create account"
+        t("submit")
       )}
     </Button>
   );
@@ -34,6 +36,7 @@ function SubmitButton() {
 
 export function RegisterForm() {
   const [state, action] = useActionState(registerAction, initialState);
+  const t = useTranslations("auth");
 
   return (
     <div className="w-full max-w-sm">
@@ -55,9 +58,9 @@ export function RegisterForm() {
           className="mb-1 text-2xl font-bold tracking-tight"
           style={{ fontFamily: "var(--font-syne)" }}
         >
-          Create account
+          {t("register.title")}
         </h1>
-        <p className="text-muted-foreground/70 mb-6 text-sm">Start tracking your finances</p>
+        <p className="text-muted-foreground/70 mb-6 text-sm">{t("register.subtitle")}</p>
 
         {/* Global error */}
         {state.error && (
@@ -68,13 +71,13 @@ export function RegisterForm() {
 
         <form action={action} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("email")}</Label>
             <Input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder={t("emailPlaceholder")}
             />
             {state.fieldErrors?.email && (
               <p className="text-destructive text-xs">{state.fieldErrors.email}</p>
@@ -82,7 +85,7 @@ export function RegisterForm() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("password")}</Label>
             <Input
               id="password"
               name="password"
@@ -90,16 +93,14 @@ export function RegisterForm() {
               autoComplete="new-password"
               placeholder="••••••••"
             />
-            <p className="text-muted-foreground/60 text-xs">
-              Min. 8 characters, at least one number
-            </p>
+            <p className="text-muted-foreground/60 text-xs">{t("passwordHint")}</p>
             {state.fieldErrors?.password && (
               <p className="text-destructive text-xs">{state.fieldErrors.password}</p>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <Label htmlFor="confirmPassword">{t("confirmPassword")}</Label>
             <Input
               id="confirmPassword"
               name="confirmPassword"
@@ -120,12 +121,12 @@ export function RegisterForm() {
 
       {/* Login link */}
       <p className="text-muted-foreground mt-4 text-center text-sm">
-        Already have an account?{" "}
+        {t("register.haveAccount")}{" "}
         <Link
           href="/login"
           className="text-amber-500 underline-offset-4 transition-colors hover:text-amber-400 hover:underline"
         >
-          Sign in
+          {t("register.login")}
         </Link>
       </p>
     </div>

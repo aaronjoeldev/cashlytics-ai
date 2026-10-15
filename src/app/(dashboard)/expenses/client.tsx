@@ -17,6 +17,7 @@ import { ExpenseForm } from "@/components/organisms/expense-form";
 import { deleteExpense, deleteDailyExpense } from "@/actions/expense-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
+import { formatCalendarDate } from "@/lib/format-date";
 import { currencySymbols, convertCurrency, type Currency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type {
@@ -35,10 +36,6 @@ interface ExpensesClientProps {
   initialDailyExpenses: DailyExpenseWithDetails[];
 }
 
-function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat().format(new Date(date));
-}
-
 function formatNextPayment(
   expense: {
     recurrenceType: string;
@@ -46,7 +43,8 @@ function formatNextPayment(
     recurrenceInterval: number | null;
     endDate?: Date | string | null;
   },
-  t: (key: string, params?: Record<string, number>) => string
+  t: (key: string, params?: Record<string, number>) => string,
+  locale: string
 ): string | null {
   const today = getLocalCalendarDay();
   const nextDate = getNextOccurrence(expense, today);
@@ -58,11 +56,7 @@ function formatNextPayment(
   if (diffDays === 1) return t("tomorrow");
   if (diffDays <= 7) return t("inDays", { count: diffDays });
 
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  }).format(nextDate);
+  return formatCalendarDate(nextDate, locale, { day: "numeric", month: "short" });
 }
 
 export function ExpensesClient({
@@ -72,7 +66,8 @@ export function ExpensesClient({
   initialDailyExpenses,
 }: ExpensesClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency, locale } = useSettings();
+  const formatDate = (date: Date | string) => formatCalendarDate(date, locale);
   const t = useTranslations("expenses");
   const tCommon = useTranslations("common");
   const tRecurrence = useTranslations("recurrence");
@@ -141,8 +136,8 @@ export function ExpensesClient({
     recurrenceInterval: number | null;
   }): string => {
     const date = new Date(expense.startDate);
-    const day = date.getDate();
-    const month = date.toLocaleDateString(undefined, { month: "short" });
+    const day = date.getUTCDate();
+    const month = formatCalendarDate(date, locale, { month: "short" });
 
     switch (expense.recurrenceType) {
       case "monthly":
@@ -265,7 +260,7 @@ export function ExpensesClient({
     const isMonthly = expense.recurrenceType === "monthly";
     const isOnce = expense.recurrenceType === "once";
     const debitLabel = !isOnce ? getDebitLabel(expense) : null;
-    const nextPaymentLabel = !isOnce ? formatNextPayment(expense, tCommon) : null;
+    const nextPaymentLabel = !isOnce ? formatNextPayment(expense, tCommon, locale) : null;
 
     return (
       <div className="hover:bg-accent/30 flex items-start gap-3 rounded-xl p-4 transition-colors duration-200 dark:hover:bg-white/5">

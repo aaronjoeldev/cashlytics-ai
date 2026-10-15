@@ -34,15 +34,6 @@ export default function ToolsPage() {
   const [targetCurrency, setTargetCurrency] = useState<Currency>("USD");
   const [rates, setRates] = useState<RatesResponse>(fallbackRates);
   const [isLoading, setIsLoading] = useState(true);
-  const [sourceSynced, setSourceSynced] = useState(false);
-
-  // One-time sync: once DB settings load and override cookie value, align sourceCurrency
-  useEffect(() => {
-    if (!sourceSynced) {
-      setSourceCurrency(baseCurrency);
-      setSourceSynced(true);
-    }
-  }, [baseCurrency, sourceSynced]);
 
   useEffect(() => {
     let isMounted = true;
@@ -259,7 +250,6 @@ export default function ToolsPage() {
               </p>
             </div>
           </div>
-
         </CardContent>
       </Card>
     </div>

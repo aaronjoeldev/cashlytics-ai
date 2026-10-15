@@ -15,36 +15,25 @@ import { ChatMessage, ChatMessageLoading } from "@/components/molecules/chat-mes
 import { ChatInput } from "@/components/molecules/chat-input";
 import { ChatHistorySidebar } from "@/components/organisms/chat-history-sidebar";
 import { useConversations } from "@/hooks/use-conversations";
-
-const WELCOME_TEXT = `Hallo! Ich bin dein Cashlytics Assistent.
-
-Ich kann dir bei deinen Finanzen helfen:
-
-• Ausgaben erfassen: "45€ Tanken"
-• Budget prüfen: "Kann ich mir X leisten?"
-• Trends analysieren: "Vergleiche Mai mit April"
-• Abos überblicken: "Welche Subscriptions habe ich?"
-• Insights zeigen: "Gibt es etwas Auffälliges?"
-
-Wie kann ich dir helfen?`;
-
-const WELCOME_MESSAGE = {
-  id: "welcome",
-  role: "assistant" as const,
-  parts: [{ type: "text" as const, text: WELCOME_TEXT }],
-};
+import { useTranslations } from "next-intl";
 
 const SUGGESTED_PROMPTS = [
-  { icon: Sparkles, text: "Wie sieht es finanziell aus?" },
-  { icon: CreditCard, text: "Welche Abos habe ich?" },
-  { icon: TrendingUp, text: "Vergleiche diesen Monat mit dem letzten" },
-  { icon: AlertCircle, text: "Gibt es etwas Auffälliges bei meinen Ausgaben?" },
-  { icon: MessageSquare, text: "Ich habe 45€ bei REWE ausgegeben" },
-];
+  { icon: Sparkles, key: "overview" },
+  { icon: CreditCard, key: "subscriptions" },
+  { icon: TrendingUp, key: "compare" },
+  { icon: AlertCircle, key: "anomalies" },
+  { icon: MessageSquare, key: "addExpense" },
+] as const;
 
 export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
+  const t = useTranslations("chat");
+  const welcomeMessage = {
+    id: "welcome",
+    role: "assistant" as const,
+    parts: [{ type: "text" as const, text: t("welcome") }],
+  };
 
   const {
     conversations,
@@ -130,9 +119,7 @@ export function ChatInterface() {
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto px-2 py-4">
             <div className="mx-auto max-w-3xl space-y-1">
-              {!hasMessages && !isLoading && (
-                <ChatMessage key="welcome" message={WELCOME_MESSAGE} />
-              )}
+              {!hasMessages && !isLoading && <ChatMessage key="welcome" message={welcomeMessage} />}
               {messages.map((message, index) => (
                 <ChatMessage
                   key={message.id}
@@ -152,22 +139,20 @@ export function ChatInterface() {
                     <MessageSquare className="text-primary h-8 w-8" />
                   </div>
                   <div className="text-center">
-                    <h3 className="text-lg font-semibold">Starte eine Konversation</h3>
-                    <p className="text-muted-foreground mt-1 text-sm">
-                      Dein AI-Assistent hilft dir bei allen Finanzfragen
-                    </p>
+                    <h3 className="text-lg font-semibold">{t("emptyTitle")}</h3>
+                    <p className="text-muted-foreground mt-1 text-sm">{t("emptyDescription")}</p>
                   </div>
 
                   <div className="grid w-full max-w-md gap-2">
-                    {SUGGESTED_PROMPTS.map((prompt, index) => (
+                    {SUGGESTED_PROMPTS.map((prompt) => (
                       <Card
-                        key={index}
+                        key={prompt.key}
                         className="cursor-pointer p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:hover:bg-white/[0.08]"
-                        onClick={() => handleSuggestedPrompt(prompt.text)}
+                        onClick={() => handleSuggestedPrompt(t(`suggestions.${prompt.key}`))}
                       >
                         <div className="flex items-center gap-3">
                           <prompt.icon className="text-primary h-4 w-4 flex-shrink-0" />
-                          <span className="text-sm">{prompt.text}</span>
+                          <span className="text-sm">{t(`suggestions.${prompt.key}`)}</span>
                         </div>
                       </Card>
                     ))}
@@ -181,19 +166,17 @@ export function ChatInterface() {
                 <Card className="border-destructive/50 bg-destructive/10 p-4 dark:border-red-500/20 dark:bg-red-500/10">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <p className="text-destructive text-sm">
-                        Ein Fehler ist aufgetreten. Bitte versuche es erneut.
-                      </p>
+                      <p className="text-destructive text-sm">{t("error")}</p>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleRetry}
                       disabled={isLoading}
-                      aria-label="Erneut versuchen"
+                      aria-label={t("retryLabel")}
                     >
                       <RefreshCw className="h-4 w-4" />
-                      Wiederholen
+                      {t("retry")}
                     </Button>
                   </div>
                 </Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, X, AlertTriangle, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,36 +30,23 @@ interface OperationInfo {
 
 type FormatAmount = (amount: number | string, currency?: string | null) => string;
 
-const RECURRENCE_LABELS: Record<string, string> = {
-  once: "Einmalig",
-  daily: "Täglich",
-  weekly: "Wöchentlich",
-  monthly: "Monatlich",
-  quarterly: "Quartalsweise",
-  semiannual: "Halbjährlich",
-  yearly: "Jährlich",
-  custom: "Benutzerdefiniert",
-};
-
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  checking: "Girokonto",
-  savings: "Sparkonto",
-  etf: "ETF-Portfolio",
-};
+/** Translators for the card: its own texts, recurrence and account type labels */
+interface CardTranslations {
+  t: (key: string) => string;
+  recurrence: (value: unknown) => string;
+  accountType: (value: unknown) => string;
+  formatDate: (value: unknown) => string;
+}
 
 const EMPTY_PREVIEW: ToolPreview = { accounts: {}, categories: {} };
 
-function formatDate(value: unknown): string {
+function formatDateIn(locale: string, value: unknown): string {
   if (!value || typeof value !== "string") return "–";
   const date = new Date(value);
   // Dates are calendar days; format in UTC so the day does not shift
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleDateString("de-DE", { timeZone: "UTC" });
-}
-
-function label(map: Record<string, string>, value: unknown): string {
-  return value == null ? "–" : (map[String(value)] ?? String(value));
+    : date.toLocaleDateString(locale, { timeZone: "UTC" });
 }
 
 function text(value: unknown): string {
@@ -69,15 +57,16 @@ function getOperationInfo(
   toolName: string,
   args: Record<string, unknown>,
   preview: ToolPreview,
-  formatAmount: FormatAmount
+  formatAmount: FormatAmount,
+  { t, recurrence, accountType, formatDate }: CardTranslations
 ): OperationInfo {
-  const title = MUTATING_TOOL_TITLES[toolName] ?? toolName;
+  const title = toolName in MUTATING_TOOL_TITLES ? t(`titles.${toolName}`) : toolName;
   const record = preview.record;
   const accountOf = (key: string) =>
     typeof args[key] === "string" ? preview.accounts[args[key] as string] : undefined;
   const accountName = (key: string) => accountOf(key)?.name ?? "–";
   const categoryName = (value: unknown) =>
-    value == null ? "Keine" : (preview.categories[String(value)] ?? "–");
+    value == null ? t("none") : (preview.categories[String(value)] ?? "–");
   // Amounts of new entries are in the given currency, otherwise in the account's currency
   const newAmount = (amount: unknown, accountKey = "accountId") =>
     amount == null
@@ -95,9 +84,9 @@ function getOperationInfo(
     value: record ? `${before} → ${after}` : after,
   });
   const target = record
-    ? [{ label: "Eintrag", value: record.name }]
+    ? [{ label: t("fields.entry"), value: record.name }]
     : record === null
-      ? [{ label: "Eintrag", value: "Nicht gefunden" }]
+      ? [{ label: t("fields.entry"), value: t("notFound") }]
       : [];
   const deleteDetails = (warning: string): OperationInfo => ({
     title,
@@ -105,10 +94,12 @@ function getOperationInfo(
     warning,
     details: [
       ...target,
-      ...(record?.amount != null ? [{ label: "Betrag", value: recordAmount(record.amount) }] : []),
-      ...(record?.date ? [{ label: "Datum", value: formatDate(record.date) }] : []),
+      ...(record?.amount != null
+        ? [{ label: t("fields.amount"), value: recordAmount(record.amount) }]
+        : []),
+      ...(record?.date ? [{ label: t("fields.date"), value: formatDate(record.date) }] : []),
       ...(record?.recurrenceType
-        ? [{ label: "Turnus", value: label(RECURRENCE_LABELS, record.recurrenceType) }]
+        ? [{ label: t("fields.recurrence"), value: recurrence(record.recurrenceType) }]
         : []),
     ],
   });
@@ -119,13 +110,13 @@ function getOperationInfo(
         title,
         kind: "create",
         details: [
-          { label: "Name", value: text(args.name) },
-          { label: "Typ", value: label(ACCOUNT_TYPE_LABELS, args.type) },
+          { label: t("fields.name"), value: text(args.name) },
+          { label: t("fields.type"), value: accountType(args.type) },
           {
-            label: "Kontostand",
+            label: t("fields.balance"),
             value: formatAmount((args.balance as string) ?? 0, (args.currency as string) ?? null),
           },
-          { label: "Währung", value: text(args.currency ?? "Standard") },
+          { label: t("fields.currency"), value: text(args.currency ?? t("defaultCurrency")) },
         ],
       };
 
@@ -135,20 +126,16 @@ function getOperationInfo(
         kind: "update",
         details: [
           ...target,
-          ...(args.name != null ? [change("Name", text(record?.name), text(args.name))] : []),
+          ...(args.name != null
+            ? [change(t("fields.name"), text(record?.name), text(args.name))]
+            : []),
           ...(args.type != null
-            ? [
-                change(
-                  "Typ",
-                  label(ACCOUNT_TYPE_LABELS, record?.type),
-                  label(ACCOUNT_TYPE_LABELS, args.type)
-                ),
-              ]
+            ? [change(t("fields.type"), accountType(record?.type), accountType(args.type))]
             : []),
           ...(args.balance != null
             ? [
                 change(
-                  "Kontostand",
+                  t("fields.balance"),
                   recordAmount(record?.amount),
                   formatAmount(args.balance as string, record?.currency)
                 ),
@@ -158,20 +145,20 @@ function getOperationInfo(
       };
 
     case "deleteAccount":
-      return deleteDetails("Alle Buchungen dieses Kontos werden ebenfalls gelöscht.");
+      return deleteDetails(t("warnings.deleteAccount"));
 
     case "createExpense":
       return {
         title,
         kind: "create",
         details: [
-          { label: "Name", value: text(args.name) },
-          { label: "Betrag", value: newAmount(args.amount) },
-          { label: "Turnus", value: label(RECURRENCE_LABELS, args.recurrenceType) },
-          { label: "Konto", value: accountName("accountId") },
-          { label: "Kategorie", value: categoryName(args.categoryId) },
-          { label: "Ab", value: formatDate(args.startDate) },
-          ...(args.endDate ? [{ label: "Bis", value: formatDate(args.endDate) }] : []),
+          { label: t("fields.name"), value: text(args.name) },
+          { label: t("fields.amount"), value: newAmount(args.amount) },
+          { label: t("fields.recurrence"), value: recurrence(args.recurrenceType) },
+          { label: t("fields.account"), value: accountName("accountId") },
+          { label: t("fields.category"), value: categoryName(args.categoryId) },
+          { label: t("fields.from"), value: formatDate(args.startDate) },
+          ...(args.endDate ? [{ label: t("fields.until"), value: formatDate(args.endDate) }] : []),
         ],
       };
 
@@ -181,11 +168,13 @@ function getOperationInfo(
         kind: "update",
         details: [
           ...target,
-          ...(args.name != null ? [change("Name", text(record?.name), text(args.name))] : []),
+          ...(args.name != null
+            ? [change(t("fields.name"), text(record?.name), text(args.name))]
+            : []),
           ...(args.amount != null
             ? [
                 change(
-                  "Betrag",
+                  t("fields.amount"),
                   recordAmount(record?.amount),
                   formatAmount(args.amount as number, record?.currency)
                 ),
@@ -194,18 +183,18 @@ function getOperationInfo(
           ...(args.recurrenceType != null
             ? [
                 change(
-                  "Turnus",
-                  label(RECURRENCE_LABELS, record?.recurrenceType),
-                  label(RECURRENCE_LABELS, args.recurrenceType)
+                  t("fields.recurrence"),
+                  recurrence(record?.recurrenceType),
+                  recurrence(args.recurrenceType)
                 ),
               ]
             : []),
           ...(args.endDate !== undefined
             ? [
                 change(
-                  "Enddatum",
-                  record?.endDate ? formatDate(record.endDate) : "Keins",
-                  args.endDate ? formatDate(args.endDate) : "Keins"
+                  t("fields.endDate"),
+                  record?.endDate ? formatDate(record.endDate) : t("noEndDate"),
+                  args.endDate ? formatDate(args.endDate) : t("noEndDate")
                 ),
               ]
             : []),
@@ -213,18 +202,18 @@ function getOperationInfo(
       };
 
     case "deleteExpense":
-      return deleteDetails("Diese wiederkehrende Ausgabe wird dauerhaft entfernt.");
+      return deleteDetails(t("warnings.deleteExpense"));
 
     case "createDailyExpense":
       return {
         title,
         kind: "create",
         details: [
-          { label: "Beschreibung", value: text(args.description) },
-          { label: "Betrag", value: newAmount(args.amount) },
-          { label: "Datum", value: formatDate(args.date) },
-          { label: "Konto", value: accountName("accountId") },
-          { label: "Kategorie", value: categoryName(args.categoryId) },
+          { label: t("fields.description"), value: text(args.description) },
+          { label: t("fields.amount"), value: newAmount(args.amount) },
+          { label: t("fields.date"), value: formatDate(args.date) },
+          { label: t("fields.account"), value: accountName("accountId") },
+          { label: t("fields.category"), value: categoryName(args.categoryId) },
         ],
       };
 
@@ -235,39 +224,45 @@ function getOperationInfo(
         details: [
           ...target,
           ...(args.description != null
-            ? [change("Beschreibung", text(record?.name), text(args.description))]
+            ? [change(t("fields.description"), text(record?.name), text(args.description))]
             : []),
           ...(args.amount != null
             ? [
                 change(
-                  "Betrag",
+                  t("fields.amount"),
                   recordAmount(record?.amount),
                   formatAmount(args.amount as number, record?.currency)
                 ),
               ]
             : []),
           ...(args.date != null
-            ? [change("Datum", formatDate(record?.date), formatDate(args.date))]
+            ? [change(t("fields.date"), formatDate(record?.date), formatDate(args.date))]
             : []),
           ...(args.categoryId !== undefined
-            ? [change("Kategorie", record?.categoryName ?? "Keine", categoryName(args.categoryId))]
+            ? [
+                change(
+                  t("fields.category"),
+                  record?.categoryName ?? t("none"),
+                  categoryName(args.categoryId)
+                ),
+              ]
             : []),
         ],
       };
 
     case "deleteDailyExpense":
-      return deleteDetails("Diese Ausgabe wird dauerhaft gelöscht.");
+      return deleteDetails(t("warnings.deleteDailyExpense"));
 
     case "createIncome":
       return {
         title,
         kind: "create",
         details: [
-          { label: "Quelle", value: text(args.source) },
-          { label: "Betrag", value: newAmount(args.amount) },
-          { label: "Turnus", value: label(RECURRENCE_LABELS, args.recurrenceType) },
-          { label: "Konto", value: accountName("accountId") },
-          { label: "Ab", value: formatDate(args.startDate) },
+          { label: t("fields.source"), value: text(args.source) },
+          { label: t("fields.amount"), value: newAmount(args.amount) },
+          { label: t("fields.recurrence"), value: recurrence(args.recurrenceType) },
+          { label: t("fields.account"), value: accountName("accountId") },
+          { label: t("fields.from"), value: formatDate(args.startDate) },
         ],
       };
 
@@ -277,11 +272,13 @@ function getOperationInfo(
         kind: "update",
         details: [
           ...target,
-          ...(args.source != null ? [change("Quelle", text(record?.name), text(args.source))] : []),
+          ...(args.source != null
+            ? [change(t("fields.source"), text(record?.name), text(args.source))]
+            : []),
           ...(args.amount != null
             ? [
                 change(
-                  "Betrag",
+                  t("fields.amount"),
                   recordAmount(record?.amount),
                   formatAmount(args.amount as number, record?.currency)
                 ),
@@ -290,9 +287,9 @@ function getOperationInfo(
           ...(args.recurrenceType != null
             ? [
                 change(
-                  "Turnus",
-                  label(RECURRENCE_LABELS, record?.recurrenceType),
-                  label(RECURRENCE_LABELS, args.recurrenceType)
+                  t("fields.recurrence"),
+                  recurrence(record?.recurrenceType),
+                  recurrence(args.recurrenceType)
                 ),
               ]
             : []),
@@ -300,16 +297,16 @@ function getOperationInfo(
       };
 
     case "deleteIncome":
-      return deleteDetails("Diese Einnahme wird dauerhaft entfernt.");
+      return deleteDetails(t("warnings.deleteIncome"));
 
     case "createCategory":
       return {
         title,
         kind: "create",
         details: [
-          { label: "Name", value: text(args.name) },
-          ...(args.icon ? [{ label: "Icon", value: String(args.icon) }] : []),
-          ...(args.color ? [{ label: "Farbe", value: String(args.color) }] : []),
+          { label: t("fields.name"), value: text(args.name) },
+          ...(args.icon ? [{ label: t("fields.icon"), value: String(args.icon) }] : []),
+          ...(args.color ? [{ label: t("fields.color"), value: String(args.color) }] : []),
         ],
       };
 
@@ -318,13 +315,15 @@ function getOperationInfo(
         title,
         kind: "create",
         details: [
-          { label: "Von", value: accountName("sourceAccountId") },
-          { label: "An", value: accountName("targetAccountId") },
-          { label: "Betrag", value: newAmount(args.amount, "sourceAccountId") },
-          { label: "Turnus", value: label(RECURRENCE_LABELS, args.recurrenceType) },
-          { label: "Ab", value: formatDate(args.startDate) },
-          ...(args.endDate ? [{ label: "Bis", value: formatDate(args.endDate) }] : []),
-          ...(args.description ? [{ label: "Beschreibung", value: String(args.description) }] : []),
+          { label: t("fields.sourceAccount"), value: accountName("sourceAccountId") },
+          { label: t("fields.targetAccount"), value: accountName("targetAccountId") },
+          { label: t("fields.amount"), value: newAmount(args.amount, "sourceAccountId") },
+          { label: t("fields.recurrence"), value: recurrence(args.recurrenceType) },
+          { label: t("fields.from"), value: formatDate(args.startDate) },
+          ...(args.endDate ? [{ label: t("fields.until"), value: formatDate(args.endDate) }] : []),
+          ...(args.description
+            ? [{ label: t("fields.description"), value: String(args.description) }]
+            : []),
         ],
       };
 
@@ -359,7 +358,10 @@ export function ToolConfirmationCard({
   onApprove,
   onDeny,
 }: ToolConfirmationCardProps) {
-  const { formatAmount } = useSettings();
+  const { formatAmount, locale } = useSettings();
+  const t = useTranslations("chat.toolCard");
+  const tRecurrence = useTranslations("recurrence");
+  const tAccountTypes = useTranslations("accounts.types");
   const [preview, setPreview] = useState<ToolPreview>(EMPTY_PREVIEW);
   const argsKey = JSON.stringify(args);
 
@@ -376,7 +378,29 @@ export function ToolConfirmationCard({
     };
   }, [toolName, argsKey]);
 
-  const { title, warning, details, kind } = getOperationInfo(toolName, args, preview, formatAmount);
+  const translations: CardTranslations = {
+    t,
+    recurrence: (value) =>
+      value == null
+        ? "–"
+        : tRecurrence.has(String(value))
+          ? tRecurrence(String(value))
+          : String(value),
+    accountType: (value) =>
+      value == null
+        ? "–"
+        : tAccountTypes.has(String(value))
+          ? tAccountTypes(String(value))
+          : String(value),
+    formatDate: (value) => formatDateIn(locale === "en" ? "en-US" : "de-DE", value),
+  };
+  const { title, warning, details, kind } = getOperationInfo(
+    toolName,
+    args,
+    preview,
+    formatAmount,
+    translations
+  );
   const Icon = KIND_ICON[kind];
   const isDelete = kind === "delete";
 
@@ -422,7 +446,7 @@ export function ToolConfirmationCard({
       <CardFooter className="border-border/40 flex justify-end gap-2 border-t px-4 py-3">
         <Button variant="outline" size="sm" disabled={!onDeny} onClick={() => onDeny?.(approvalId)}>
           <X className="h-3.5 w-3.5" />
-          Ablehnen
+          {t("deny")}
         </Button>
         <Button
           variant={isDelete ? "destructive" : "default"}
@@ -431,7 +455,7 @@ export function ToolConfirmationCard({
           onClick={() => onApprove?.(approvalId)}
         >
           <Check className="h-3.5 w-3.5" />
-          Annehmen
+          {t("approve")}
         </Button>
       </CardFooter>
     </Card>

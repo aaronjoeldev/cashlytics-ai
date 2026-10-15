@@ -1,14 +1,16 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import { type Locale, defaultLocale, locales } from "@/i18n/config";
+import { createContext, useContext, useCallback, useEffect, type ReactNode } from "react";
+import { type Locale, defaultLocale } from "@/i18n/config";
 import {
   type Currency,
   defaultCurrency,
   currencies,
   formatCurrency as formatCurrencyUtil,
 } from "@/lib/currency";
-import { getUserSettings, updateBaseCurrency, updateLocale } from "@/actions/settings-actions";
+import { updateBaseCurrency, updateLocale } from "@/actions/settings-actions";
+import { toast } from "sonner";
+import type { ApiResponse } from "@/types/database";
 
 export interface SettingsContextType {
   locale: Locale;
@@ -29,14 +31,6 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 const LOCALE_COOKIE = "locale";
 const CURRENCY_COOKIE = "currency";
 
-function getCookie(name: string): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(";").shift();
-  return undefined;
-}
-
 function setCookie(name: string, value: string, days: number = 365): void {
   if (typeof document === "undefined") return;
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
@@ -49,75 +43,54 @@ interface SettingsProviderProps {
   initialCurrency?: Currency;
 }
 
-function getInitialLocale(fallback: Locale): Locale {
-  if (typeof document === "undefined") return fallback;
-  const cookieLocale = getCookie(LOCALE_COOKIE) as Locale | undefined;
-  return cookieLocale && locales.includes(cookieLocale) ? cookieLocale : fallback;
-}
-
-function getInitialCurrency(fallback: Currency): Currency {
-  if (typeof document === "undefined") return fallback;
-  const cookieCurrency = getCookie(CURRENCY_COOKIE) as Currency | undefined;
-  return cookieCurrency && currencies.includes(cookieCurrency) ? cookieCurrency : fallback;
-}
-
+/**
+ * Locale and currency come from the server (stored user settings, cookie as fallback), so client
+ * and server always format and compute with the same values. Changing one saves it and reloads.
+ */
 export function SettingsProvider({
   children,
   initialLocale,
   initialCurrency,
 }: SettingsProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(() =>
-    getInitialLocale(initialLocale || defaultLocale)
-  );
-  const [currency, setCurrencyState] = useState<Currency>(() =>
-    getInitialCurrency(initialCurrency || defaultCurrency)
-  );
+  const locale = initialLocale ?? defaultLocale;
+  const currency = initialCurrency ?? defaultCurrency;
 
-  // On mount: load DB settings and override cookie values (DB is source of truth)
+  // Keep the cookies in line with the stored settings, so signed-out pages use them too
   useEffect(() => {
-    getUserSettings()
-      .then((dbSettings) => {
-        const dbCurrency = dbSettings.baseCurrency as Currency;
-        const dbLocale = dbSettings.locale as Locale;
+    setCookie(LOCALE_COOKIE, locale);
+    setCookie(CURRENCY_COOKIE, currency);
+  }, [locale, currency]);
 
-        if (currencies.includes(dbCurrency)) {
-          setCurrencyState(dbCurrency);
-          setCookie(CURRENCY_COOKIE, dbCurrency);
-        }
+  const saveAndReload = useCallback(
+    async (save: () => Promise<ApiResponse<void>>, cookie: string, value: string) => {
+      let result: ApiResponse<void>;
+      try {
+        result = await save();
+      } catch {
+        result = { success: false, error: "Einstellung konnte nicht gespeichert werden." };
+      }
+      // Signed out there is nothing to store; the cookie alone carries the choice
+      if (!result.success && result.error !== "Unauthorized") {
+        toast.error(result.error);
+        return;
+      }
+      setCookie(cookie, value);
+      window.location.reload();
+    },
+    []
+  );
 
-        if (locales.includes(dbLocale)) {
-          setLocaleState(dbLocale);
-          setCookie(LOCALE_COOKIE, dbLocale);
-        }
-      })
-      .catch(() => {
-        // If DB is unavailable, keep cookie/default values silently
-      });
-  }, []);
+  const setLocale = useCallback(
+    (newLocale: Locale) =>
+      void saveAndReload(() => updateLocale(newLocale), LOCALE_COOKIE, newLocale),
+    [saveAndReload]
+  );
 
-  const setLocale = useCallback(async (newLocale: Locale) => {
-    setLocaleState(newLocale);
-    setCookie(LOCALE_COOKIE, newLocale);
-    // Await DB write before reloading — reload cancels inflight requests
-    try {
-      await updateLocale(newLocale);
-    } catch {
-      /* cookie already set */
-    }
-    window.location.reload();
-  }, []);
-
-  const setCurrency = useCallback(async (newCurrency: Currency) => {
-    setCurrencyState(newCurrency);
-    setCookie(CURRENCY_COOKIE, newCurrency);
-    // Await DB write before reloading — reload cancels inflight requests
-    try {
-      await updateBaseCurrency(newCurrency);
-    } catch {
-      /* cookie already set */
-    }
-    window.location.reload();
-  }, []);
+  const setCurrency = useCallback(
+    (newCurrency: Currency) =>
+      void saveAndReload(() => updateBaseCurrency(newCurrency), CURRENCY_COOKIE, newCurrency),
+    [saveAndReload]
+  );
 
   const formatCurrency = useCallback(
     (amount: number) => {

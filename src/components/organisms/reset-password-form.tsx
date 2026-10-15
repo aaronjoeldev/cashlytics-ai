@@ -11,11 +11,13 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 const initialState: ResetPasswordState = {};
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("auth.reset");
   return (
     <Button
       type="submit"
@@ -25,10 +27,10 @@ function SubmitButton() {
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Resetting...
+          {t("submitting")}
         </>
       ) : (
-        "Reset password"
+        t("submit")
       )}
     </Button>
   );
@@ -39,13 +41,14 @@ export function ResetPasswordForm() {
   const token = searchParams.get("token") || "";
   const router = useRouter();
   const [state, action] = useActionState(resetPasswordAction, initialState);
+  const t = useTranslations("auth");
 
   useEffect(() => {
     if (state.success) {
-      toast.success("Password reset successful, please log in");
+      toast.success(t("login.resetSuccess"));
       router.push("/login");
     }
-  }, [state.success, router]);
+  }, [state.success, router, t]);
 
   // No token - show error state
   if (!token) {
@@ -69,16 +72,14 @@ export function ResetPasswordForm() {
             className="mb-1 text-2xl font-bold tracking-tight"
             style={{ fontFamily: "var(--font-syne)" }}
           >
-            Invalid link
+            {t("reset.invalidTitle")}
           </h1>
-          <p className="text-muted-foreground mb-6 text-sm">
-            This reset link is invalid or has expired.
-          </p>
+          <p className="text-muted-foreground mb-6 text-sm">{t("reset.invalidDescription")}</p>
           <Link
             href="/forgot-password"
             className="text-amber-500 underline-offset-4 transition-colors hover:text-amber-400 hover:underline"
           >
-            Request a new reset link
+            {t("reset.requestNew")}
           </Link>
         </div>
       </div>
@@ -106,9 +107,9 @@ export function ResetPasswordForm() {
           className="mb-1 text-2xl font-bold tracking-tight"
           style={{ fontFamily: "var(--font-syne)" }}
         >
-          Set new password
+          {t("reset.title")}
         </h1>
-        <p className="text-muted-foreground/70 mb-6 text-sm">Enter your new password below</p>
+        <p className="text-muted-foreground/70 mb-6 text-sm">{t("reset.subtitle")}</p>
 
         {/* Global error with forgot-password link */}
         {state.error && (
@@ -118,7 +119,7 @@ export function ResetPasswordForm() {
               href="/forgot-password"
               className="text-destructive/80 hover:text-destructive mt-2 block text-sm underline"
             >
-              Request a new reset link
+              {t("reset.requestNew")}
             </Link>
           </div>
         )}
@@ -128,7 +129,7 @@ export function ResetPasswordForm() {
           <input type="hidden" name="token" value={token} />
 
           <div className="space-y-1.5">
-            <Label htmlFor="password">New password</Label>
+            <Label htmlFor="password">{t("newPassword")}</Label>
             <Input
               id="password"
               name="password"
@@ -136,14 +137,14 @@ export function ResetPasswordForm() {
               autoComplete="new-password"
               placeholder="••••••••"
             />
-            <p className="text-muted-foreground text-xs">Min. 8 characters, at least one number</p>
+            <p className="text-muted-foreground text-xs">{t("passwordHint")}</p>
             {state.fieldErrors?.password && (
               <p className="text-destructive text-xs">{state.fieldErrors.password}</p>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <Label htmlFor="confirmPassword">{t("confirmPassword")}</Label>
             <Input
               id="confirmPassword"
               name="confirmPassword"
