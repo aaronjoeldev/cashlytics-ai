@@ -134,6 +134,13 @@
       "when": 1792045670873,
       "tag": "0018_transfer_currency_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792050471278,
+      "tag": "0019_import_reconciled_at",
+      "breakpoints": true
     }
   ]
 }

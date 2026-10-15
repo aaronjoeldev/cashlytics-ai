@@ -52,8 +52,10 @@ interface ImportClientProps {
   accounts: Account[];
 }
 
-const requiredFieldKeys = ["bookingDate", "amount", "currency"] as const;
+const requiredFieldKeys = ["bookingDate", "amount"] as const;
+// Without a currency column the rows get the currency of the selected account
 const optionalFieldKeys = [
+  "currency",
   "description",
   "counterparty",
   "senderAccount",
@@ -128,6 +130,8 @@ export function ImportClient({ accounts }: ImportClientProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [snapshot, setSnapshot] = useState<ImportSessionSnapshot | null>(null);
   const [uploadProcessingStage, setUploadProcessingStage] = useState<UploadProcessingStage>("idle");
+  // Shown in the review card; a toast would be replaced by the next one
+  const [alreadyImportedAt, setAlreadyImportedAt] = useState<Date | null>(null);
 
   const isMissingHeaderMappingError = (errorMessage: string): boolean => {
     const normalized = errorMessage.toLowerCase();
@@ -205,23 +209,53 @@ export function ImportClient({ accounts }: ImportClientProps) {
       }
 
       toast({ title: t("toasts.stagedSuccess") });
+      setAlreadyImportedAt(
+        stageResult.data.alreadyImportedAt ? new Date(stageResult.data.alreadyImportedAt) : null
+      );
 
-      setUploadProcessingStage("reconciling");
-      const reconciliationResult = await runImportReconciliation(stageResult.data.sessionId);
-      if (!reconciliationResult.success) {
-        setUploadProcessingStage("error");
-        toast({
-          title: t("errors.reconciliationFailed"),
-          description: reconciliationResult.error,
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: t("toasts.reconciliationSuccess") });
-      }
+      await reconcileAndLoad(stageResult.data.sessionId);
+    } catch {
+      setUploadProcessingStage("error");
+      toast({ title: t("errors.unknown"), variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-      setUploadProcessingStage("loadingSnapshot");
-      await refreshSnapshot(stageResult.data.sessionId);
-      setUploadProcessingStage("done");
+  /** Runs the duplicate check and loads the review data; a failed check keeps the import blocked */
+  const reconcileAndLoad = async (sessionId: string) => {
+    setUploadProcessingStage("reconciling");
+    const reconciliationResult = await runImportReconciliation(sessionId);
+    if (!reconciliationResult.success) {
+      toast({
+        title: t("errors.reconciliationFailed"),
+        description: reconciliationResult.error,
+        variant: "destructive",
+      });
+    } else if (reconciliationResult.data.uncheckedRowCount > 0) {
+      toast({
+        title: t("toasts.reconciliationPartial", {
+          count: reconciliationResult.data.uncheckedRowCount,
+        }),
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: t("toasts.reconciliationSuccess") });
+    }
+
+    setUploadProcessingStage("loadingSnapshot");
+    const loaded = await refreshSnapshot(sessionId);
+    setUploadProcessingStage(loaded && reconciliationResult.success ? "done" : "error");
+  };
+
+  const handleRetryReconciliation = async () => {
+    if (!snapshot) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await reconcileAndLoad(snapshot.session.id);
     } catch {
       setUploadProcessingStage("error");
       toast({ title: t("errors.unknown"), variant: "destructive" });
@@ -394,7 +428,7 @@ export function ImportClient({ accounts }: ImportClientProps) {
             <Label>{t("form.fileLabel")}</Label>
             <Input
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.txt,text/csv"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </div>
@@ -496,6 +530,11 @@ export function ImportClient({ accounts }: ImportClientProps) {
                 {t("summary.conflictRows")}: <strong>{snapshot.conflicts.length}</strong>
               </p>
             </div>
+            {alreadyImportedAt && (
+              <p className="text-destructive mt-3 text-sm">
+                {t("toasts.alreadyImported", { date: alreadyImportedAt.toLocaleDateString() })}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -618,10 +657,27 @@ export function ImportClient({ accounts }: ImportClientProps) {
             <CardDescription>{t("confirm.subtitle")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!snapshot.session.reconciled && (
+              <div className="space-y-2">
+                <p className="text-destructive text-sm">{t("confirm.reconciliationMissing")}</p>
+                <Button
+                  variant="outline"
+                  onClick={handleRetryReconciliation}
+                  disabled={isSubmitting}
+                >
+                  {t("actions.runReconciliation")}
+                </Button>
+              </div>
+            )}
             <p className="text-muted-foreground text-sm">{t("confirm.irreversibleWarning")}</p>
             <Button
               onClick={handleConfirmImport}
-              disabled={isSubmitting || snapshot.rows.length === 0 || unresolvedConflictCount > 0}
+              disabled={
+                isSubmitting ||
+                !snapshot.session.reconciled ||
+                snapshot.rows.length === 0 ||
+                unresolvedConflictCount > 0
+              }
             >
               {t("confirm.confirmButton")}
             </Button>

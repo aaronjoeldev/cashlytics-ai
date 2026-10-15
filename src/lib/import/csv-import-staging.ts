@@ -4,8 +4,9 @@ import { z } from "zod";
 const MAX_CSV_UPLOAD_BYTES = 1 * 1024 * 1024;
 const MAX_CSV_ROWS = 5000;
 const CSV_MIME_TYPES = ["text/csv", "application/csv", "application/vnd.ms-excel"];
-
-const requiredCanonicalHeaders = ["booking_date", "amount", "currency"] as const;
+// Some browsers and systems send these for .csv files
+const GENERIC_MIME_TYPES = ["", "text/plain", "application/octet-stream"];
+const MAX_TEXT_LENGTH = 255;
 
 const csvRowSchema = z.object({
   bookingDate: z.date(),
@@ -14,7 +15,7 @@ const csvRowSchema = z.object({
     .min(1)
     .refine((value) => !Number.isNaN(Number.parseFloat(value)), "Amount must be numeric"),
   currency: z.string().trim().min(1).max(10),
-  description: z.string().trim().min(1).max(255),
+  description: z.string().trim().min(1).max(MAX_TEXT_LENGTH),
   counterparty: z.string().trim().max(255).nullable(),
   senderAccount: z.string().trim().max(255).nullable(),
   receiverAccount: z.string().trim().max(255).nullable(),
@@ -77,6 +78,8 @@ export type CsvImportStagingSuccess = {
     sessionId: string;
     stagedRows: number;
     totalRows: number;
+    /** When the same file was already imported into this account */
+    alreadyImportedAt: Date | null;
   };
 };
 
@@ -88,7 +91,14 @@ export type CsvImportStagingFailure = {
 export type CsvImportStagingResult = CsvImportStagingSuccess | CsvImportStagingFailure;
 
 export type CsvStagingStore = {
-  isAccountOwnedByUser(userId: string, accountId: string): Promise<boolean>;
+  /** Currency of the account if it belongs to the user, otherwise null */
+  getOwnedAccountCurrency(userId: string, accountId: string): Promise<string | null>;
+  /** When a confirmed import of the same file into the account finished, or null */
+  findConfirmedImportOfFile(
+    userId: string,
+    accountId: string,
+    sourceFileHash: string
+  ): Promise<Date | null>;
   createSessionWithRows(params: {
     userId: string;
     accountId: string;
@@ -106,7 +116,7 @@ const canonicalHeaderAliases: Record<CanonicalHeader, string[]> = {
   booking_date: ["booking_date", "bookingdate", "buchungsdatum", "bogforingsdato", "date"],
   amount: ["amount", "betrag", "belob", "belobdkk"],
   currency: ["currency", "valuta", "waehrung", "wahrung"],
-  description: ["description", "beskrivelse", "verwendungszweck", "text", "beschreibung"],
+  description: ["description", "beskrivelse", "verwendungszweck", "text", "tekst", "beschreibung"],
   counterparty: ["counterparty", "navn", "name", "gegenpartei"],
   sender_account: ["sender_account", "senderaccount", "afsender", "absender"],
   receiver_account: ["receiver_account", "receiveraccount", "modtager", "empfanger"],
@@ -115,14 +125,20 @@ const canonicalHeaderAliases: Record<CanonicalHeader, string[]> = {
 };
 
 function normalizeHeader(value: string): string {
-  return value
-    .replace(/^\uFEFF/, "")
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  return (
+    value
+      .replace(/^\uFEFF/, "")
+      // Letters that NFKD does not decompose ("Beløb", "Bogføringsdato")
+      .replace(/[øØ]/g, "o")
+      .replace(/[æÆ]/g, "ae")
+      .replace(/ß/g, "ss")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+  );
 }
 
 function splitCsvLine(line: string, delimiter: ";" | ","): string[] {
@@ -155,6 +171,44 @@ function splitCsvLine(line: string, delimiter: ";" | ","): string[] {
 
   values.push(current);
   return values.map((value) => value.trim());
+}
+
+/** Splits CSV content into records; line breaks inside quoted fields stay part of the field. */
+export function splitCsvRecords(content: string): string[] {
+  const records: string[] = [];
+  let current = "";
+  let insideQuotes = false;
+
+  for (const char of content) {
+    if (char === '"') {
+      // An escaped quote ("") toggles twice, so the state stays correct
+      insideQuotes = !insideQuotes;
+    } else if (char === "\n" && !insideQuotes) {
+      records.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  records.push(current);
+  return records;
+}
+
+/**
+ * Decodes an uploaded file. UTF-8 is tried first; files that are not valid UTF-8 are read as
+ * Windows-1252, the encoding of most German and Danish bank exports.
+ */
+export function decodeCsvBytes(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
+}
+
+function truncateText(value: string): string {
+  return value.length > MAX_TEXT_LENGTH ? value.slice(0, MAX_TEXT_LENGTH).trimEnd() : value;
 }
 
 function detectDelimiter(headerLine: string): ";" | "," {
@@ -336,19 +390,23 @@ function getMappedValue(
   return row[index] ?? "";
 }
 
+/**
+ * @param defaultCurrency used for rows when the file has no currency column (the account currency)
+ */
 export function parseAndNormalizeCsv(
   csvContent: string,
-  headerMapping?: HeaderMapping
+  headerMapping?: HeaderMapping,
+  defaultCurrency?: string
 ): ParseCsvResult {
   const normalizedContent = csvContent
     .replace(/^\uFEFF/, "")
-    .replace(/\r\n/g, "\n")
+    .replace(/\r\n?/g, "\n")
     .trim();
   if (!normalizedContent) {
     return { success: false, error: "CSV file is empty" };
   }
 
-  const lines = normalizedContent.split("\n");
+  const lines = splitCsvRecords(normalizedContent);
   if (lines.length < 2) {
     return { success: false, error: "CSV file must include header and at least one row" };
   }
@@ -361,7 +419,10 @@ export function parseAndNormalizeCsv(
   const headers = splitCsvLine(lines[0], delimiter);
   const mapping = resolveHeaderMapping(headers, headerMapping);
 
-  const missingHeaders = requiredCanonicalHeaders.filter((header) => !mapping.has(header));
+  const requiredHeaders: CanonicalHeader[] = defaultCurrency
+    ? ["booking_date", "amount"]
+    : ["booking_date", "amount", "currency"];
+  const missingHeaders = requiredHeaders.filter((header) => !mapping.has(header));
   if (missingHeaders.length > 0) {
     return {
       success: false,
@@ -380,21 +441,28 @@ export function parseAndNormalizeCsv(
     try {
       const bookingDate = normalizeDate(getMappedValue(parsedLine, mapping, "booking_date"));
       const amount = normalizeAmount(getMappedValue(parsedLine, mapping, "amount"));
-      const currency = getMappedValue(parsedLine, mapping, "currency").trim().toUpperCase();
-      const description =
+      const currency =
+        getMappedValue(parsedLine, mapping, "currency").trim().toUpperCase() ||
+        defaultCurrency ||
+        "";
+      const description = truncateText(
         getMappedValue(parsedLine, mapping, "description").trim() ||
-        getMappedValue(parsedLine, mapping, "counterparty").trim() ||
-        `Imported row ${lineIndex}`;
-      const counterparty = getMappedValue(parsedLine, mapping, "counterparty").trim() || null;
-      const senderAccount = getMappedValue(parsedLine, mapping, "sender_account").trim() || null;
+          getMappedValue(parsedLine, mapping, "counterparty").trim() ||
+          `Imported row ${lineIndex}`
+      );
+      const counterparty =
+        truncateText(getMappedValue(parsedLine, mapping, "counterparty").trim()) || null;
+      const senderAccount =
+        truncateText(getMappedValue(parsedLine, mapping, "sender_account").trim()) || null;
       const receiverAccount =
-        getMappedValue(parsedLine, mapping, "receiver_account").trim() || null;
+        truncateText(getMappedValue(parsedLine, mapping, "receiver_account").trim()) || null;
       const balanceAfterBookingRaw =
         getMappedValue(parsedLine, mapping, "balance_after_booking").trim() || null;
       const balanceAfterBooking = balanceAfterBookingRaw
         ? normalizeAmount(balanceAfterBookingRaw)
         : null;
-      const reference = getMappedValue(parsedLine, mapping, "reference").trim() || null;
+      const reference =
+        truncateText(getMappedValue(parsedLine, mapping, "reference").trim()) || null;
 
       const validatedRow = csvRowSchema.safeParse({
         bookingDate,
@@ -435,8 +503,11 @@ export function parseAndNormalizeCsv(
   return { success: true, delimiter, rows };
 }
 
-function isAllowedCsvMimeType(mimeType: string): boolean {
-  return CSV_MIME_TYPES.includes(mimeType);
+function isAllowedCsvFile(mimeType: string, fileName: string): boolean {
+  if (CSV_MIME_TYPES.includes(mimeType)) {
+    return true;
+  }
+  return GENERIC_MIME_TYPES.includes(mimeType) && /\.(csv|txt)$/i.test(fileName);
 }
 
 export function createCsvImportStagingService(deps: CsvImportStagingServiceDeps) {
@@ -453,24 +524,33 @@ export function createCsvImportStagingService(deps: CsvImportStagingServiceDeps)
         };
       }
 
-      if (!isAllowedCsvMimeType(input.mimeType)) {
+      if (!isAllowedCsvFile(input.mimeType, input.fileName)) {
         return { success: false, error: "Unsupported file type. Please upload a CSV file" };
       }
 
-      const accountOwnedByUser = await deps.store.isAccountOwnedByUser(
+      const accountCurrency = await deps.store.getOwnedAccountCurrency(
         input.userId,
         input.accountId
       );
-      if (!accountOwnedByUser) {
+      if (!accountCurrency) {
         return { success: false, error: "Account not found or not owned by user" };
       }
 
-      const parseResult = parseAndNormalizeCsv(input.csvContent, input.headerMapping);
+      const parseResult = parseAndNormalizeCsv(
+        input.csvContent,
+        input.headerMapping,
+        accountCurrency
+      );
       if (!parseResult.success) {
         return { success: false, error: parseResult.error };
       }
 
       const sourceFileHash = createHash("sha256").update(input.csvContent).digest("hex");
+      const alreadyImportedAt = await deps.store.findConfirmedImportOfFile(
+        input.userId,
+        input.accountId,
+        sourceFileHash
+      );
       const { sessionId } = await deps.store.createSessionWithRows({
         userId: input.userId,
         accountId: input.accountId,
@@ -485,6 +565,7 @@ export function createCsvImportStagingService(deps: CsvImportStagingServiceDeps)
           sessionId,
           stagedRows: parseResult.rows.length,
           totalRows: parseResult.rows.length,
+          alreadyImportedAt,
         },
       };
     },

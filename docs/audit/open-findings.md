@@ -109,18 +109,19 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       as match candidates and the update writes `recurrenceType: "once"`.
 - [x] **Concurrent commits import every row twice** (`import-commit-engine.ts`): the session status
       is read with a plain select and updated without a status guard.
-- [ ] **Two identical CSV rows match the same existing record**; AI near-matches are not checked
+- [x] **Two identical CSV rows match the same existing record**; AI near-matches are not checked
       for direction and can pair an expense row with an income.
-- [ ] **Files are always decoded as UTF-8** (`src/actions/import-actions.ts`). Windows-1252 bank
+- [x] **Files are always decoded as UTF-8** (`src/actions/import-actions.ts`). Windows-1252 bank
       exports fail on the `Währung` header.
 - [x] **Currency is dropped** for imported incomes and when replacing an expense.
-- [ ] **AI near-match is one unbounded call** with free-text JSON output. Large files overflow the
-      output, the result is treated as "no matches" and reported as success.
-- [ ] **A failed reconciliation is displayed as done** (`import/client.tsx`), and the user can
+- [x] **AI near-match is one unbounded call** with free-text JSON output. Large files overflow the
+      output, the result is treated as "no matches" and reported as success. (Now batched and
+      reported; the answer is still free-text JSON checked with zod, not structured output.)
+- [x] **A failed reconciliation is displayed as done** (`import/client.tsx`), and the user can
       confirm without conflict detection.
-- [ ] **"Remove row" leaves the row on screen**; the snapshot query does not filter excluded rows.
-- [ ] **Commit does one insert per row** inside a single transaction (5000 rows, 5000 round trips).
-- [ ] Smaller parser gaps: quoted multi-line fields, required `currency` column with no account
+- [x] **"Remove row" leaves the row on screen**; the snapshot query does not filter excluded rows.
+- [x] **Commit does one insert per row** inside a single transaction (5000 rows, 5000 round trips).
+- [x] Smaller parser gaps: quoted multi-line fields, required `currency` column with no account
       default, descriptions over 255 characters fail the file, `ø` in Danish headers, `text/plain`
       and empty MIME types rejected, `sourceFileHash` stored but never compared.
 

@@ -1,0 +1,1 @@
+ALTER TABLE "import_sessions" ADD COLUMN "reconciled_at" timestamp;

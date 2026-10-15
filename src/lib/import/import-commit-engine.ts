@@ -39,6 +39,7 @@ type ImportSessionRecord = {
   accountId: string;
   accountCurrency: string;
   status: "draft" | "review" | "confirmed" | "cancelled";
+  reconciledAt: Date | null;
 };
 
 type ImportRowRecord = {
@@ -67,6 +68,31 @@ type ImportDecisionRecord = {
   decision: ImportDecisionValue;
 };
 
+type IncomeInsert = {
+  userId: string;
+  accountId: string;
+  source: string;
+  amount: string;
+  currency: string;
+  originalAmount: string | null;
+  startDate: Date;
+  info: string;
+};
+
+type ExpenseInsert = {
+  userId: string;
+  accountId: string;
+  description: string;
+  amount: string;
+  currency: string;
+  originalAmount: string | null;
+  date: Date;
+  info: string;
+};
+
+/** Rows per INSERT statement; stays far below the Postgres parameter limit */
+const INSERT_CHUNK_SIZE = 500;
+
 type ImportCommitDataStore = {
   getSessionById(userId: string, sessionId: string): Promise<ImportSessionRecord | null>;
   isAccountOwnedByUser(userId: string, accountId: string): Promise<boolean>;
@@ -78,26 +104,8 @@ type ImportCommitDataStore = {
     decisions: ImportConflictDecisionInput[]
   ): Promise<void>;
   getSessionDecisions(userId: string, sessionId: string): Promise<ImportDecisionRecord[]>;
-  insertIncome(params: {
-    userId: string;
-    accountId: string;
-    source: string;
-    amount: string;
-    currency: string;
-    originalAmount: string | null;
-    startDate: Date;
-    info: string;
-  }): Promise<void>;
-  insertExpense(params: {
-    userId: string;
-    accountId: string;
-    description: string;
-    amount: string;
-    currency: string;
-    originalAmount: string | null;
-    date: Date;
-    info: string;
-  }): Promise<void>;
+  insertIncomes(rows: IncomeInsert[]): Promise<void>;
+  insertExpenses(rows: ExpenseInsert[]): Promise<void>;
   updateIncome(
     userId: string,
     incomeId: string,
@@ -188,6 +196,12 @@ function getRowResolutionByRowId(
   return resolutionByRowId;
 }
 
+type PendingInserts = {
+  incomes: IncomeInsert[];
+  expenses: ExpenseInsert[];
+  replacedTargetIds: Set<string>;
+};
+
 async function applyRow(
   store: ImportCommitDataStore,
   session: ImportSessionRecord,
@@ -199,7 +213,8 @@ async function applyRow(
     replacedIncomeCount: number;
     replacedExpenseCount: number;
     skippedCount: number;
-  }
+  },
+  pending: PendingInserts
 ): Promise<void> {
   const amount = parseAmountToDecimalString(row.amount);
   const amountDirection = Number.parseFloat(row.amount);
@@ -219,6 +234,15 @@ async function applyRow(
   }
 
   if (decision === "replace_existing") {
+    const targetId = rowResolution?.existingIncomeId ?? rowResolution?.existingExpenseId;
+    if (targetId) {
+      // Two rows replacing the same entry would silently drop one of them
+      if (pending.replacedTargetIds.has(targetId)) {
+        throw new Error(`Existing entry ${targetId} is replaced by more than one import row`);
+      }
+      pending.replacedTargetIds.add(targetId);
+    }
+
     if (rowResolution?.existingIncomeId) {
       await store.updateIncome(session.userId, rowResolution.existingIncomeId, {
         accountId: session.accountId,
@@ -251,7 +275,7 @@ async function applyRow(
   }
 
   if (amountDirection >= 0) {
-    await store.insertIncome({
+    pending.incomes.push({
       userId: session.userId,
       accountId: session.accountId,
       source: row.description,
@@ -265,7 +289,7 @@ async function applyRow(
     return;
   }
 
-  await store.insertExpense({
+  pending.expenses.push({
     userId: session.userId,
     accountId: session.accountId,
     description: row.description,
@@ -303,6 +327,10 @@ export function createImportCommitEngine(deps: ImportCommitEngineDeps) {
           throw new Error("Cancelled import session cannot be committed");
         }
 
+        if (!session.reconciledAt) {
+          throw new Error("Duplicate check has not run for this import session");
+        }
+
         const accountOwnedByUser = await store.isAccountOwnedByUser(
           input.userId,
           session.accountId
@@ -330,6 +358,11 @@ export function createImportCommitEngine(deps: ImportCommitEngineDeps) {
           skippedCount: 0,
         };
 
+        const pending: PendingInserts = {
+          incomes: [],
+          expenses: [],
+          replacedTargetIds: new Set(),
+        };
         for (const row of rows) {
           if (row.excludedByUser) {
             counters.skippedCount += 1;
@@ -337,7 +370,14 @@ export function createImportCommitEngine(deps: ImportCommitEngineDeps) {
           }
 
           const rowResolution = resolutionByRowId.get(row.id);
-          await applyRow(store, session, row, rowResolution, counters);
+          await applyRow(store, session, row, rowResolution, counters, pending);
+        }
+
+        for (let start = 0; start < pending.incomes.length; start += INSERT_CHUNK_SIZE) {
+          await store.insertIncomes(pending.incomes.slice(start, start + INSERT_CHUNK_SIZE));
+        }
+        for (let start = 0; start < pending.expenses.length; start += INSERT_CHUNK_SIZE) {
+          await store.insertExpenses(pending.expenses.slice(start, start + INSERT_CHUNK_SIZE));
         }
 
         await store.markSessionConfirmed(input.userId, input.sessionId);
@@ -363,6 +403,7 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
           userId: importSessions.userId,
           accountId: importSessions.accountId,
           status: importSessions.status,
+          reconciledAt: importSessions.reconciledAt,
           accountCurrency: accounts.currency,
         })
         .from(importSessions)
@@ -378,6 +419,7 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
         userId: row.userId,
         accountId: row.accountId,
         status: row.status,
+        reconciledAt: row.reconciledAt,
         accountCurrency: row.accountCurrency ?? "EUR",
       };
     },
@@ -460,33 +502,39 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
         .where(and(eq(importDecisions.sessionId, sessionId), eq(importDecisions.userId, userId)));
     },
 
-    async insertIncome(params) {
-      await tx.insert(incomes).values({
-        userId: params.userId,
-        accountId: params.accountId,
-        source: params.source,
-        amount: params.amount,
-        currency: params.currency,
-        originalAmount: params.originalAmount,
-        recurrenceType: "once",
-        startDate: params.startDate,
-        endDate: null,
-        info: params.info,
-      });
+    async insertIncomes(rows) {
+      if (rows.length === 0) return;
+      await tx.insert(incomes).values(
+        rows.map((params) => ({
+          userId: params.userId,
+          accountId: params.accountId,
+          source: params.source,
+          amount: params.amount,
+          currency: params.currency,
+          originalAmount: params.originalAmount,
+          recurrenceType: "once" as const,
+          startDate: params.startDate,
+          endDate: null,
+          info: params.info,
+        }))
+      );
     },
 
-    async insertExpense(params) {
-      await tx.insert(dailyExpenses).values({
-        userId: params.userId,
-        accountId: params.accountId,
-        description: params.description,
-        amount: params.amount,
-        currency: params.currency,
-        originalAmount: params.originalAmount ?? null,
-        // exchangeRate: null, // TODO: Phase 2 — getExchangeRate(row.currency, account.currency)
-        date: params.date,
-        info: params.info,
-      });
+    async insertExpenses(rows) {
+      if (rows.length === 0) return;
+      await tx.insert(dailyExpenses).values(
+        rows.map((params) => ({
+          userId: params.userId,
+          accountId: params.accountId,
+          description: params.description,
+          amount: params.amount,
+          currency: params.currency,
+          originalAmount: params.originalAmount ?? null,
+          // exchangeRate: null, // TODO: Phase 2 — getExchangeRate(row.currency, account.currency)
+          date: params.date,
+          info: params.info,
+        }))
+      );
     },
 
     async updateIncome(userId, incomeId, params) {

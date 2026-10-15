@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import {
@@ -22,6 +22,7 @@ import { importReconciliationEngine } from "@/lib/import/import-reconciliation-e
 import { importReviewService, type ImportDecisionValue } from "@/lib/import/import-review-service";
 import {
   createCsvImportStagingService,
+  decodeCsvBytes,
   type HeaderMapping,
   type NormalizedCsvRow,
 } from "@/lib/import/csv-import-staging";
@@ -38,6 +39,8 @@ export type ImportSessionSnapshot = {
     totalRows: number;
     stagedRows: number;
     conflictRows: number;
+    /** False until the duplicate check ran on the current rows */
+    reconciled: boolean;
   };
   rows: Array<{
     id: string;
@@ -107,19 +110,43 @@ function resolveImportActionErrorMessage(error: unknown, fallback: string): stri
     return "Import database schema is missing. Please run database migrations.";
   }
 
+  if (message.includes("duplicate check has not run")) {
+    return "Run the duplicate check before confirming the import.";
+  }
+
   return fallback;
 }
 
 const csvImportStagingService = createCsvImportStagingService({
   store: {
-    async isAccountOwnedByUser(userId, accountId) {
+    async getOwnedAccountCurrency(userId, accountId) {
       const [ownedAccount] = await db
-        .select({ id: accounts.id })
+        .select({ currency: accounts.currency })
         .from(accounts)
         .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
         .limit(1);
 
-      return Boolean(ownedAccount);
+      return ownedAccount ? (ownedAccount.currency ?? "EUR") : null;
+    },
+
+    async findConfirmedImportOfFile(userId, accountId, sourceFileHash) {
+      const [previous] = await db
+        .select({
+          importedAt: sql<Date>`coalesce(${importSessions.completedAt}, ${importSessions.updatedAt})`,
+        })
+        .from(importSessions)
+        .where(
+          and(
+            eq(importSessions.userId, userId),
+            eq(importSessions.accountId, accountId),
+            eq(importSessions.sourceFileHash, sourceFileHash),
+            eq(importSessions.status, "confirmed")
+          )
+        )
+        .orderBy(desc(importSessions.completedAt))
+        .limit(1);
+
+      return previous ? new Date(previous.importedAt) : null;
     },
 
     async createSessionWithRows({ userId, accountId, sourceFileName, sourceFileHash, rows }) {
@@ -176,14 +203,15 @@ function buildImportRowInsert(sessionId: string, userId: string, row: Normalized
   };
 }
 
-export async function stageCsvImportUpload(
-  formData: FormData
-): Promise<ApiResponse<{ sessionId: string; stagedRows: number; totalRows: number }>> {
-  const featureGateError = rejectIfImportFeatureDisabled<{
-    sessionId: string;
-    stagedRows: number;
-    totalRows: number;
-  }>();
+type StagedUpload = {
+  sessionId: string;
+  stagedRows: number;
+  totalRows: number;
+  alreadyImportedAt: Date | null;
+};
+
+export async function stageCsvImportUpload(formData: FormData): Promise<ApiResponse<StagedUpload>> {
+  const featureGateError = rejectIfImportFeatureDisabled<StagedUpload>();
   if (featureGateError) {
     return featureGateError;
   }
@@ -210,7 +238,7 @@ export async function stageCsvImportUpload(
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
-      csvContent: await file.text(),
+      csvContent: decodeCsvBytes(new Uint8Array(await file.arrayBuffer())),
       headerMapping: parseHeaderMapping(formData.get("headerMapping")),
     });
 
@@ -267,20 +295,19 @@ export async function confirmImportSession(
   }
 }
 
-export async function runImportReconciliation(sessionId: string): Promise<
-  ApiResponse<{
-    sessionId: string;
-    exactMatchCount: number;
-    nearMatchCount: number;
-    conflictRows: number;
-  }>
-> {
-  const featureGateError = rejectIfImportFeatureDisabled<{
-    sessionId: string;
-    exactMatchCount: number;
-    nearMatchCount: number;
-    conflictRows: number;
-  }>();
+type ReconciliationSummary = {
+  sessionId: string;
+  exactMatchCount: number;
+  nearMatchCount: number;
+  conflictRows: number;
+  /** Rows the AI near-match check could not process; only exact duplicates were looked for */
+  uncheckedRowCount: number;
+};
+
+export async function runImportReconciliation(
+  sessionId: string
+): Promise<ApiResponse<ReconciliationSummary>> {
+  const featureGateError = rejectIfImportFeatureDisabled<ReconciliationSummary>();
   if (featureGateError) {
     return featureGateError;
   }
@@ -304,6 +331,7 @@ export async function runImportReconciliation(sessionId: string): Promise<
         exactMatchCount: result.exactMatchCount,
         nearMatchCount: result.nearMatchCount,
         conflictRows: result.conflictRows,
+        uncheckedRowCount: result.uncheckedRowCount,
       },
     };
   } catch (error) {
@@ -338,6 +366,7 @@ export async function getImportSessionSnapshot(
         totalRows: importSessions.totalRows,
         stagedRows: importSessions.stagedRows,
         conflictRows: importSessions.conflictRows,
+        reconciledAt: importSessions.reconciledAt,
       })
       .from(importSessions)
       .where(and(eq(importSessions.id, sessionId), eq(importSessions.userId, authResult.userId)))
@@ -346,6 +375,7 @@ export async function getImportSessionSnapshot(
     if (!session) {
       return { success: false, error: "Import session not found" };
     }
+    const { reconciledAt, ...sessionFields } = session;
 
     const [rows, conflicts, decisions] = await Promise.all([
       db
@@ -363,7 +393,14 @@ export async function getImportSessionSnapshot(
           excludedByUser: importRows.excludedByUser,
         })
         .from(importRows)
-        .where(and(eq(importRows.sessionId, sessionId), eq(importRows.userId, authResult.userId))),
+        .where(
+          and(
+            eq(importRows.sessionId, sessionId),
+            eq(importRows.userId, authResult.userId),
+            // Rows the user removed are kept for the audit trail but not shown
+            eq(importRows.excludedByUser, false)
+          )
+        ),
       db
         .select({
           id: importConflicts.id,
@@ -444,7 +481,7 @@ export async function getImportSessionSnapshot(
     return {
       success: true,
       data: {
-        session,
+        session: { ...sessionFields, reconciled: reconciledAt !== null },
         rows: rows.sort((a, b) => a.rowIndex - b.rowIndex),
         conflicts: conflicts.map((conflict) => {
           const expenseRecord = conflict.existingExpenseId

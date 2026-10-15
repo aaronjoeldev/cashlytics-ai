@@ -204,7 +204,7 @@
   },
   "expenses": {
     "title": "Ausgaben",
-    "description": "Verwalte deine periodischen und täglichen Ausgaben",
+    "description": "Beschreibung",
     "allExpenses": "Alle Ausgaben",
     "noExpenses": "Noch keine Ausgaben vorhanden. Füge deine erste Ausgabe hinzu!",
     "addExpense": "Ausgabe hinzufügen",
@@ -214,7 +214,6 @@
     "daily": "Täglich",
     "name": "Name",
     "namePlaceholder": "z.B. Miete",
-    "description": "Beschreibung",
     "descriptionPlaceholder": "z.B. Mittagessen",
     "amount": "Betrag (€)",
     "recurrence": "Wiederholung",
@@ -656,7 +655,8 @@
       "title": "Import bestaetigen",
       "subtitle": "Uebertrage bestaetigte Zeilen in deine Transaktionen.",
       "irreversibleWarning": "Diese Aktion kann nicht rueckgaengig gemacht werden.",
-      "confirmButton": "Bestaetigen und importieren"
+      "confirmButton": "Bestaetigen und importieren",
+      "reconciliationMissing": "Der Abgleich mit deinen bestehenden Einträgen ist nicht gelaufen. Führe ihn aus, bevor du den Import bestätigst."
     },
     "toasts": {
       "stagedSuccess": "CSV-Datei wurde erfolgreich vorgemerkt.",
@@ -664,7 +664,9 @@
       "decisionsSaved": "Konfliktentscheidungen wurden gespeichert.",
       "rowUpdated": "Vorgemerkte Zeile wurde aktualisiert.",
       "rowRemoved": "Vorgemerkte Zeile wurde entfernt.",
-      "importConfirmed": "Import wurde erfolgreich abgeschlossen."
+      "importConfirmed": "Import wurde erfolgreich abgeschlossen.",
+      "alreadyImported": "Diese Datei wurde am {date} schon in dieses Konto importiert. Bereits vorhandene Buchungen erscheinen unten als Konflikte.",
+      "reconciliationPartial": "Der KI-Abgleich konnte {count} Zeilen nicht prüfen. Für diese Zeilen wurde nur nach exakten Duplikaten gesucht."
     },
     "errors": {
       "aiDisabled": "CSV-Import ist nicht verfuegbar, weil KI nicht konfiguriert ist.",

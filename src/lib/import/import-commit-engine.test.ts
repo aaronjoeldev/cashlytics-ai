@@ -12,6 +12,7 @@ type MemorySession = {
   accountId: string;
   accountCurrency: string;
   status: "draft" | "review" | "confirmed" | "cancelled";
+  reconciledAt: Date | null;
 };
 
 type MemoryRow = {
@@ -72,7 +73,7 @@ type MemoryState = {
   incomes: MemoryIncome[];
 };
 
-function createMemoryDeps(state: MemoryState): ImportCommitEngineDeps {
+function createMemoryDeps(state: MemoryState, insertCalls: number[] = []): ImportCommitEngineDeps {
   return {
     async inTransaction(callback) {
       const draft = structuredClone(state) as MemoryState;
@@ -133,32 +134,36 @@ function createMemoryDeps(state: MemoryState): ImportCommitEngineDeps {
             .map((decision) => ({ conflictId: decision.conflictId, decision: decision.decision }));
         },
 
-        async insertIncome(params: {
-          userId: string;
-          accountId: string;
-          source: string;
-          amount: string;
-          startDate: Date;
-          info: string;
-        }) {
-          draft.incomes.push({
-            id: `inc-${draft.incomes.length + 1}`,
-            ...params,
-          });
+        async insertIncomes(
+          rows: Array<{
+            userId: string;
+            accountId: string;
+            source: string;
+            amount: string;
+            startDate: Date;
+            info: string;
+          }>
+        ) {
+          insertCalls.push(rows.length);
+          for (const params of rows) {
+            draft.incomes.push({ id: `inc-${draft.incomes.length + 1}`, ...params });
+          }
         },
 
-        async insertExpense(params: {
-          userId: string;
-          accountId: string;
-          description: string;
-          amount: string;
-          date: Date;
-          info: string;
-        }) {
-          draft.expenses.push({
-            id: `exp-${draft.expenses.length + 1}`,
-            ...params,
-          });
+        async insertExpenses(
+          rows: Array<{
+            userId: string;
+            accountId: string;
+            description: string;
+            amount: string;
+            date: Date;
+            info: string;
+          }>
+        ) {
+          insertCalls.push(rows.length);
+          for (const params of rows) {
+            draft.expenses.push({ id: `exp-${draft.expenses.length + 1}`, ...params });
+          }
         },
 
         async updateIncome(
@@ -229,7 +234,16 @@ function createMemoryDeps(state: MemoryState): ImportCommitEngineDeps {
 test("commitApprovedRows persists approved rows and conflict outcomes", async () => {
   const state: MemoryState = {
     accountOwnership: { "user-1": ["acc-1"] },
-    sessions: [{ id: "session-1", userId: "user-1", accountId: "acc-1", accountCurrency: "EUR", status: "review" }],
+    sessions: [
+      {
+        id: "session-1",
+        userId: "user-1",
+        accountId: "acc-1",
+        accountCurrency: "EUR",
+        status: "review",
+        reconciledAt: new Date(),
+      },
+    ],
     rows: [
       {
         id: "row-1",
@@ -334,7 +348,16 @@ test("commitApprovedRows persists approved rows and conflict outcomes", async ()
 test("commitApprovedRows rolls back all writes when one write fails", async () => {
   const state: MemoryState = {
     accountOwnership: { "user-1": ["acc-1"] },
-    sessions: [{ id: "session-rollback", userId: "user-1", accountId: "acc-1", accountCurrency: "EUR", status: "review" }],
+    sessions: [
+      {
+        id: "session-rollback",
+        userId: "user-1",
+        accountId: "acc-1",
+        accountCurrency: "EUR",
+        status: "review",
+        reconciledAt: new Date(),
+      },
+    ],
     rows: [
       {
         id: "row-rollback",
@@ -379,4 +402,105 @@ test("commitApprovedRows rolls back all writes when one write fails", async () =
   assert.equal(state.decisions.length, 0);
   assert.equal(state.expenses.length, 0);
   assert.equal(state.incomes.length, 0);
+});
+
+function singleRowState(overrides: Partial<MemorySession> = {}): MemoryState {
+  return {
+    accountOwnership: { "user-1": ["acc-1"] },
+    sessions: [
+      {
+        id: "session-x",
+        userId: "user-1",
+        accountId: "acc-1",
+        accountCurrency: "EUR",
+        status: "review",
+        reconciledAt: new Date(),
+        ...overrides,
+      },
+    ],
+    rows: [],
+    conflicts: [],
+    decisions: [],
+    expenses: [],
+    incomes: [],
+  };
+}
+
+function expenseRow(index: number): MemoryRow {
+  return {
+    id: `row-${index}`,
+    sessionId: "session-x",
+    userId: "user-1",
+    rowIndex: index,
+    bookingDate: new Date("2026-03-01T00:00:00.000Z"),
+    amount: "-1.00",
+    currency: "EUR",
+    description: `Row ${index}`,
+    excludedByUser: false,
+  };
+}
+
+test("commitApprovedRows refuses a session whose duplicate check did not run", async () => {
+  const state = singleRowState({ reconciledAt: null });
+  state.rows = [expenseRow(1)];
+  const engine = createImportCommitEngine(createMemoryDeps(state));
+
+  await assert.rejects(
+    () => engine.commitApprovedRows({ userId: "user-1", sessionId: "session-x" }),
+    /Duplicate check has not run/
+  );
+  assert.equal(state.expenses.length, 0);
+  assert.equal(state.sessions[0]?.status, "review");
+});
+
+test("commitApprovedRows inserts rows in chunks", async () => {
+  const state = singleRowState();
+  state.rows = Array.from({ length: 1201 }, (_, index) => expenseRow(index + 1));
+  const insertCalls: number[] = [];
+  const engine = createImportCommitEngine(createMemoryDeps(state, insertCalls));
+
+  const result = await engine.commitApprovedRows({ userId: "user-1", sessionId: "session-x" });
+
+  assert.equal(result.insertedExpenseCount, 1201);
+  assert.equal(state.expenses.length, 1201);
+  assert.deepEqual(insertCalls, [500, 500, 201]);
+});
+
+test("commitApprovedRows refuses two rows replacing the same entry", async () => {
+  const state = singleRowState();
+  state.rows = [expenseRow(1), expenseRow(2)];
+  state.expenses = [
+    {
+      id: "exp-1",
+      userId: "user-1",
+      accountId: "acc-1",
+      description: "Old",
+      amount: "1.00",
+      date: new Date("2026-03-01T00:00:00.000Z"),
+      info: "existing",
+    },
+  ];
+  state.conflicts = [1, 2].map((index) => ({
+    id: `conflict-${index}`,
+    sessionId: "session-x",
+    userId: "user-1",
+    importRowId: `row-${index}`,
+    existingExpenseId: "exp-1",
+    existingIncomeId: null,
+  }));
+  const engine = createImportCommitEngine(createMemoryDeps(state));
+
+  await assert.rejects(
+    () =>
+      engine.commitApprovedRows({
+        userId: "user-1",
+        sessionId: "session-x",
+        decisions: [
+          { conflictId: "conflict-1", decision: "replace_existing" },
+          { conflictId: "conflict-2", decision: "replace_existing" },
+        ],
+      }),
+    /replaced by more than one import row/
+  );
+  assert.equal(state.expenses[0]?.description, "Old");
 });

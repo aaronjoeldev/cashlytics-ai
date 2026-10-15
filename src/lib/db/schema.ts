@@ -330,6 +330,8 @@ export const importSessions = pgTable(
     totalRows: integer("total_rows").notNull().default(0),
     stagedRows: integer("staged_rows").notNull().default(0),
     conflictRows: integer("conflict_rows").notNull().default(0),
+    // Set when duplicate detection ran on the current rows; a session cannot be confirmed before
+    reconciledAt: timestamp("reconciled_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
