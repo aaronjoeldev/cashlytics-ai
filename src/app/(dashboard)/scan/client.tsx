@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { createDailyExpense } from "@/actions/expense-actions";
 import { uploadDocument } from "@/actions/document-actions";
-import { currencies, type Currency, currencySymbols, convertCurrency } from "@/lib/currency";
+import { currencies, type Currency, currencySymbols } from "@/lib/currency";
 import { useSettings } from "@/lib/settings-context";
 import type { Account, Category } from "@/types/database";
 import type { ReceiptScanResult } from "@/types/receipt";
@@ -35,7 +35,7 @@ interface ScanClientProps {
 export function ScanClient({ accounts, categories }: ScanClientProps) {
   const router = useRouter();
   const t = useTranslations("receiptScan");
-  const { formatAmount } = useSettings();
+  const { formatAmount, convert } = useSettings();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<ScanStep>("idle");
@@ -144,7 +144,7 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
         currency: selectedCurrency,
         originalAmount: isForeignCurrency ? String(parsedAmount) : undefined,
         exchangeRate: isForeignCurrency
-          ? String(convertCurrency(1, selectedCurrency, accountCurrency))
+          ? String(convert(1, selectedCurrency, accountCurrency))
           : undefined,
       });
     } catch {
@@ -345,11 +345,7 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
                     const accountCurrency = (account?.currency as Currency) ?? "EUR";
                     const parsedAmt = parseFloat(amount || "0");
                     if (selectedCurrency !== accountCurrency && parsedAmt > 0) {
-                      const converted = convertCurrency(
-                        parsedAmt,
-                        selectedCurrency,
-                        accountCurrency
-                      );
+                      const converted = convert(parsedAmt, selectedCurrency, accountCurrency);
                       return (
                         <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                           <Info className="h-3 w-3 shrink-0" />

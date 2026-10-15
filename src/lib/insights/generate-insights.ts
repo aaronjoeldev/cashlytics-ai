@@ -3,6 +3,7 @@ import { insights, dailyExpenses, categories, userSettings } from "@/lib/db/sche
 import { eq, and, gte, lt, like, min, notInArray, sql } from "drizzle-orm";
 import { currencies, defaultCurrency, type Currency } from "@/lib/currency";
 import { computeInsights, HISTORY_MONTHS, monthKey } from "@/lib/insights/compute-insights";
+import { getAllRates } from "@/lib/exchange-rates";
 
 /**
  * Generates insights by analyzing user's financial data.
@@ -59,6 +60,7 @@ export async function generateInsights(
   const computed = computeInsights({
     now,
     baseCurrency,
+    rates: await getAllRates(),
     firstExpenseDate: first?.date ?? null,
     rows,
   });

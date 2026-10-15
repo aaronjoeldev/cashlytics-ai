@@ -7,6 +7,9 @@ import {
   defaultCurrency,
   currencies,
   formatCurrency as formatCurrencyUtil,
+  convertCurrency,
+  exchangeRates as fallbackRates,
+  type ExchangeRateTable,
 } from "@/lib/currency";
 import { updateBaseCurrency, updateLocale } from "@/actions/settings-actions";
 import { toast } from "sonner";
@@ -19,6 +22,10 @@ export interface SettingsContextType {
   setCurrency: (currency: Currency) => void;
   /** Formats an amount that is already in the base currency. */
   formatCurrency: (amount: number) => string;
+  /** Exchange rates (base EUR) the server computed this page with. */
+  rates: ExchangeRateTable;
+  /** Converts between currencies with the same rates the server uses. */
+  convert: (amount: number, from: Currency, to: Currency) => number;
   /**
    * Formats an amount in its own currency, without conversion. Unknown or missing currencies
    * fall back to the base currency.
@@ -41,6 +48,7 @@ interface SettingsProviderProps {
   children: ReactNode;
   initialLocale?: Locale;
   initialCurrency?: Currency;
+  rates?: ExchangeRateTable;
 }
 
 /**
@@ -51,6 +59,7 @@ export function SettingsProvider({
   children,
   initialLocale,
   initialCurrency,
+  rates = fallbackRates,
 }: SettingsProviderProps) {
   const locale = initialLocale ?? defaultLocale;
   const currency = initialCurrency ?? defaultCurrency;
@@ -92,6 +101,11 @@ export function SettingsProvider({
     [saveAndReload]
   );
 
+  const convert = useCallback(
+    (amount: number, from: Currency, to: Currency) => convertCurrency(amount, from, to, rates),
+    [rates]
+  );
+
   const formatCurrency = useCallback(
     (amount: number) => {
       const localeMap: Record<Locale, string> = {
@@ -131,6 +145,8 @@ export function SettingsProvider({
         setCurrency,
         formatCurrency,
         formatAmount,
+        rates,
+        convert,
       }}
     >
       {children}

@@ -14,19 +14,8 @@ import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { getBaseCurrency } from "@/lib/user-preferences";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
-
-function toBase(
-  amount: number,
-  fromCurrency: string | null | undefined,
-  baseCurrency: Currency
-): number {
-  const from =
-    fromCurrency && currencies.includes(fromCurrency as Currency)
-      ? (fromCurrency as Currency)
-      : baseCurrency;
-  return convertCurrency(amount, from, baseCurrency);
-}
+import { toBaseCurrency as toBase } from "@/lib/currency";
+import { getRates } from "@/lib/exchange-rates";
 
 function getMonthDateRange(month: number, year: number): { startDate: Date; endDate: Date } {
   const startDate = new Date(year, month - 1, 1, 0, 0, 0, 0);
@@ -131,20 +120,21 @@ export async function getAccountTransactions(
       account: r.account,
     }));
 
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
 
     const totalIncome = incomesWithAccount.reduce(
-      (sum, income) => sum + toBase(safeParseFloat(income.amount), income.currency, baseCurrency),
+      (sum, income) =>
+        sum + toBase(safeParseFloat(income.amount), income.currency, baseCurrency, rates),
       0
     );
     const totalExpenses = expensesWithDetails.reduce(
       (sum, expense) =>
-        sum + toBase(safeParseFloat(expense.amount), expense.currency, baseCurrency),
+        sum + toBase(safeParseFloat(expense.amount), expense.currency, baseCurrency, rates),
       0
     );
     const totalDailyExpenses = dailyExpensesWithDetails.reduce(
       (sum, expense) =>
-        sum + toBase(safeParseFloat(expense.amount), expense.currency, baseCurrency),
+        sum + toBase(safeParseFloat(expense.amount), expense.currency, baseCurrency, rates),
       0
     );
     const balance = totalIncome - totalExpenses - totalDailyExpenses;

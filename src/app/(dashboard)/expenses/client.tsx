@@ -18,7 +18,7 @@ import { deleteExpense, deleteDailyExpense } from "@/actions/expense-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
 import { formatCalendarDate } from "@/lib/format-date";
-import { currencySymbols, convertCurrency, type Currency } from "@/lib/currency";
+import { currencySymbols, type Currency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type {
   Account,
@@ -66,7 +66,7 @@ export function ExpensesClient({
   initialDailyExpenses,
 }: ExpensesClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt, currency: baseCurrency, locale } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency, locale, convert } = useSettings();
   const formatDate = (date: Date | string) => formatCalendarDate(date, locale);
   const t = useTranslations("expenses");
   const tCommon = useTranslations("common");
@@ -112,7 +112,7 @@ export function ExpensesClient({
 
   const toBase = (amount: number, entryCurrency?: string | null) =>
     entryCurrency && entryCurrency !== baseCurrency
-      ? convertCurrency(amount, entryCurrency as Currency, baseCurrency)
+      ? convert(amount, entryCurrency as Currency, baseCurrency)
       : amount;
 
   const totalMonthlyFixed = monthlyFixed.reduce(

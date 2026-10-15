@@ -97,8 +97,14 @@ export const currencyLocales: Record<Currency, string> = {
   DKK: "da-DK",
 };
 
-// TODO: Phase 7 — vollständig durch exchange-rates.ts ersetzen
-export const exchangeRates: Record<Currency, number> = {
+/** Units of each currency per 1 EUR. */
+export type ExchangeRateTable = Record<Currency, number>;
+
+/**
+ * Fallback rates (base EUR), used only when neither the Frankfurter API nor the database cache
+ * has rates. Live rates come from `src/lib/exchange-rates.ts`.
+ */
+export const exchangeRates: ExchangeRateTable = {
   EUR: 1,
   USD: 1.08,
   JPY: 163.5,
@@ -125,11 +131,29 @@ export const exchangeRates: Record<Currency, number> = {
 export function convertCurrency(
   amount: number,
   fromCurrency: Currency,
-  toCurrency: Currency
+  toCurrency: Currency,
+  rates: ExchangeRateTable = exchangeRates
 ): number {
   if (fromCurrency === toCurrency) return amount;
-  const amountInEUR = amount / exchangeRates[fromCurrency];
-  return amountInEUR * exchangeRates[toCurrency];
+  const amountInEUR = amount / rates[fromCurrency];
+  return amountInEUR * rates[toCurrency];
+}
+
+/**
+ * Converts an entry amount into the base currency. Unknown or missing entry currencies count as
+ * the base currency.
+ */
+export function toBaseCurrency(
+  amount: number,
+  fromCurrency: string | null | undefined,
+  baseCurrency: Currency,
+  rates: ExchangeRateTable
+): number {
+  const from =
+    fromCurrency && currencies.includes(fromCurrency as Currency)
+      ? (fromCurrency as Currency)
+      : baseCurrency;
+  return convertCurrency(amount, from, baseCurrency, rates);
 }
 
 export function formatCurrency(

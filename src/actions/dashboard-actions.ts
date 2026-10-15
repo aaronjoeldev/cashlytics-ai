@@ -8,25 +8,14 @@ import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { getBaseCurrency } from "@/lib/user-preferences";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
+import { toBaseCurrency as toBase } from "@/lib/currency";
+import { getRates } from "@/lib/exchange-rates";
 import {
   getBudgetedAmountForMonth,
   getDueAmountForMonth,
   getNextOccurrence,
   type RecurringItem,
 } from "@/lib/recurrence";
-
-function toBase(
-  amount: number,
-  fromCurrency: string | null | undefined,
-  baseCurrency: Currency
-): number {
-  const from =
-    fromCurrency && currencies.includes(fromCurrency as Currency)
-      ? (fromCurrency as Currency)
-      : baseCurrency;
-  return convertCurrency(amount, from, baseCurrency);
-}
 
 interface DashboardStats {
   totalAssets: number;
@@ -69,7 +58,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
   const { userId } = auth;
 
   try {
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
 
     // Gesamtvermögen: fetch per account and convert each balance to baseCurrency
     const accountsResult = await db
@@ -81,7 +70,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
       .where(eq(accounts.userId, userId));
 
     const totalAssets = accountsResult.reduce((sum, acc) => {
-      return sum + toBase(safeParseFloat(acc.balance), acc.currency, baseCurrency);
+      return sum + toBase(safeParseFloat(acc.balance), acc.currency, baseCurrency, rates);
     }, 0);
 
     // Check whether accounts have mixed currencies (used in client for ≈ indicator)
@@ -148,11 +137,11 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
 
     // Convert each daily expense row to baseCurrency before summing
     const currentDailyExpensesTotal = currentMonthDailyRows.reduce(
-      (sum, e) => sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency),
+      (sum, e) => sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency, rates),
       0
     );
     const lastDailyExpensesTotal = lastMonthDailyRows.reduce(
-      (sum, e) => sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency),
+      (sum, e) => sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency, rates),
       0
     );
 
@@ -168,7 +157,7 @@ export async function getDashboardStats(): Promise<ApiResponse<DashboardStats>> 
           reference.getFullYear(),
           reference.getMonth() + 1
         );
-        return sum + toBase(amount, item.entryCurrency, baseCurrency);
+        return sum + toBase(amount, item.entryCurrency, baseCurrency, rates);
       }, 0);
 
     // Reserve view: smoothed monthly averages. Cashflow view: what is actually due in the month.
@@ -249,7 +238,7 @@ export async function getCategoryBreakdown(
 
   try {
     const nextMonthStart = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
     const categoryMap = new Map<
       string,
       {
@@ -282,7 +271,7 @@ export async function getCategoryBreakdown(
 
     for (const row of dailyExpensesResult) {
       const categoryId = row.categoryId || "uncategorized";
-      const amount = toBase(safeParseFloat(row.amount), row.entryCurrency, baseCurrency);
+      const amount = toBase(safeParseFloat(row.amount), row.entryCurrency, baseCurrency, rates);
       if (categoryMap.has(categoryId)) {
         categoryMap.get(categoryId)!.total += amount;
       } else {
@@ -327,7 +316,7 @@ export async function getCategoryBreakdown(
       if (rawMonthly === 0) continue;
 
       const categoryId = row.categoryId || "uncategorized";
-      const monthlyAmount = toBase(rawMonthly, row.entryCurrency, baseCurrency);
+      const monthlyAmount = toBase(rawMonthly, row.entryCurrency, baseCurrency, rates);
 
       if (categoryMap.has(categoryId)) {
         categoryMap.get(categoryId)!.total += monthlyAmount;
@@ -434,7 +423,7 @@ export async function getUpcomingPayments(
     const now = new Date();
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const endDate = new Date(today.getTime() + days * 24 * 60 * 60 * 1000);
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
 
     const payments: UpcomingPayment[] = [];
 
@@ -461,7 +450,12 @@ export async function getUpcomingPayments(
         payments.push({
           id: item.expense.id,
           name: item.expense.name,
-          amount: toBase(safeParseFloat(item.expense.amount), item.expense.currency, baseCurrency),
+          amount: toBase(
+            safeParseFloat(item.expense.amount),
+            item.expense.currency,
+            baseCurrency,
+            rates
+          ),
           date: nextDate,
           type: "expense",
           category: item.category
@@ -498,7 +492,8 @@ export async function getUpcomingPayments(
         amount: toBase(
           safeParseFloat(item.dailyExpense.amount),
           item.dailyExpense.currency,
-          baseCurrency
+          baseCurrency,
+          rates
         ),
         date: new Date(item.dailyExpense.date),
         type: "daily_expense",
