@@ -66,11 +66,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
-          // Accounts created before e-mails were normalised may be stored in mixed case
+          // Accounts created before e-mails were normalised may be stored in mixed case. If two
+          // accounts differ only in case (see migration 0020), the oldest one is used.
           const [user] = await db
             .select()
             .from(users)
             .where(sql`lower(${users.email}) = ${email}`)
+            .orderBy(users.createdAt)
             .limit(1);
 
           if (!user?.password) {

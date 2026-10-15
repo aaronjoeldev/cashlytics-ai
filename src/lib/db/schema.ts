@@ -12,6 +12,7 @@ import {
   primaryKey,
   unique,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 
@@ -69,7 +70,8 @@ export const users = pgTable(
     image: text("image"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [index("users_email_lower_idx").on(sql`lower(${t.email})`)]
+  // Addresses are stored in lower case; the index also rejects case variants written by other paths
+  (t) => [uniqueIndex("users_email_lower_unique").on(sql`lower(${t.email})`)]
 );
 
 // Auth.js accounts table (OAuth provider linking)
