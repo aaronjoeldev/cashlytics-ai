@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
+import { chatTransport } from "@/lib/ai/chat-transport";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import {
@@ -119,7 +120,7 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { messages, sendMessage, status } = useChat();
+  const { messages, sendMessage, status } = useChat({ transport: chatTransport });
   const chatLoading = status === "streaming" || status === "submitted";
 
   // Form state

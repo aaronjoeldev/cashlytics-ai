@@ -65,12 +65,14 @@ services:
       # Cron-Zeitplan für Zahlungserinnerungen (Standard: 08:00 UTC = 09:00 MEZ / 10:00 MESZ)
       # Format: "Minute Stunde * * *" — z.B. "0 7 * * *" für 07:00 UTC
       NOTIFICATION_SCHEDULE: ${NOTIFICATION_SCHEDULE:-0 8 * * *}
+      # Insights for the AI assistant (default 06:00 UTC daily)
+      INSIGHTS_SCHEDULE: ${INSIGHTS_SCHEDULE:-0 6 * * *}
     depends_on:
       cashlytics:
         condition: service_healthy
     command: >
       sh -c "apk add --no-cache curl --quiet &&
-             echo \"$$NOTIFICATION_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/upcoming-payments >> /var/log/cron.log 2>&1\" | crontab - &&
+             printf '%s\\n' \"$$NOTIFICATION_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/upcoming-payments >> /var/log/cron.log 2>&1\" \"$$INSIGHTS_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/insights >> /var/log/cron.log 2>&1\" | crontab - &&
              crond -f -l 2"
 
   postgres:

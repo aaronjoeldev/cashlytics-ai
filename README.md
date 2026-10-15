@@ -93,6 +93,7 @@ OPENAI_API_KEY=sk-your-openai-key
 # VAPID_SUBJECT=mailto:you@example.com
 # CRON_SECRET=
 # NOTIFICATION_SCHEDULE=0 8 * * *
+# INSIGHTS_SCHEDULE=0 6 * * *
 ```
 
 ### 3. Start Cashlytics
@@ -157,12 +158,14 @@ services:
       CRON_SECRET: ${CRON_SECRET}
       APP_URL: http://cashlytics:3000
       NOTIFICATION_SCHEDULE: ${NOTIFICATION_SCHEDULE:-0 8 * * *}
+      # Insights for the AI assistant (default 06:00 UTC daily)
+      INSIGHTS_SCHEDULE: ${INSIGHTS_SCHEDULE:-0 6 * * *}
     depends_on:
       cashlytics:
         condition: service_healthy
     command: >
       sh -c "apk add --no-cache curl --quiet &&
-             echo \"$$NOTIFICATION_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/upcoming-payments >> /var/log/cron.log 2>&1\" | crontab - &&
+             printf '%s\\n' \"$$NOTIFICATION_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/upcoming-payments >> /var/log/cron.log 2>&1\" \"$$INSIGHTS_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/insights >> /var/log/cron.log 2>&1\" | crontab - &&
              crond -f -l 2"
 
   postgres:
@@ -239,8 +242,9 @@ npm start
 | `VAPID_PUBLIC_KEY`             | ❌ No    | —                       | Public VAPID key for browser push subscriptions                        |
 | `VAPID_PRIVATE_KEY`            | ❌ No    | —                       | Private VAPID key used to sign push messages                           |
 | `VAPID_SUBJECT`                | ❌ No    | —                       | Contact URI for VAPID (`mailto:...` or `https://...`)                  |
-| `CRON_SECRET`                  | ❌ No    | —                       | Bearer token used by scheduled reminder endpoint                       |
+| `CRON_SECRET`                  | ❌ No    | —                       | Bearer token for the scheduled reminder and insights endpoints         |
 | `NOTIFICATION_SCHEDULE`        | ❌ No    | `0 8 * * *`             | Cron schedule for upcoming-payment checks                              |
+| `INSIGHTS_SCHEDULE`            | ❌ No    | `0 6 * * *`             | Cron schedule for the AI assistant's spending insights                 |
 
 ### Database Configuration
 
@@ -352,7 +356,8 @@ Cashlytics is now available as a Progressive Web App (PWA) and supports browser 
    NOTIFICATION_SCHEDULE=0 8 * * *
    ```
 
-3. Keep the `cashlytics-cron` service enabled in `docker-compose.selfhost.yml`.
+3. Keep the `cashlytics-cron` service enabled in `docker-compose.selfhost.yml`. It also generates
+   the spending insights for the AI assistant once a day (`INSIGHTS_SCHEDULE`, default 06:00 UTC).
 
 4. In the app, open Settings and enable notification permissions in your browser.
 

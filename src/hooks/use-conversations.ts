@@ -1,9 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useChat } from '@ai-sdk/react';
-import { lastAssistantMessageIsCompleteWithApprovalResponses } from 'ai';
-import { toast } from 'sonner';
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useChat } from "@ai-sdk/react";
+import { chatTransport } from "@/lib/ai/chat-transport";
+import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
+import { toast } from "sonner";
 import {
   getConversations,
   createConversation,
@@ -11,8 +12,8 @@ import {
   getConversationById,
   updateConversationTitleFromFirstMessage,
   saveMessage,
-} from '@/actions/conversation-actions';
-import type { Conversation, Message, ApiResponse } from '@/types/database';
+} from "@/actions/conversation-actions";
+import type { Conversation, Message, ApiResponse } from "@/types/database";
 
 interface UseConversationsReturn {
   conversations: Conversation[];
@@ -22,12 +23,12 @@ interface UseConversationsReturn {
   selectConversation: (id: string) => Promise<void>;
   startNewChat: () => Promise<void>;
   deleteConversationWithSwitch: (id: string) => Promise<void>;
-  messages: ReturnType<typeof useChat>['messages'];
-  sendMessage: ReturnType<typeof useChat>['sendMessage'];
-  status: ReturnType<typeof useChat>['status'];
-  error: ReturnType<typeof useChat>['error'];
-  setMessages: ReturnType<typeof useChat>['setMessages'];
-  addToolApprovalResponse: ReturnType<typeof useChat>['addToolApprovalResponse'];
+  messages: ReturnType<typeof useChat>["messages"];
+  sendMessage: ReturnType<typeof useChat>["sendMessage"];
+  status: ReturnType<typeof useChat>["status"];
+  error: ReturnType<typeof useChat>["error"];
+  setMessages: ReturnType<typeof useChat>["setMessages"];
+  addToolApprovalResponse: ReturnType<typeof useChat>["addToolApprovalResponse"];
 }
 
 export function useConversations(): UseConversationsReturn {
@@ -38,6 +39,7 @@ export function useConversations(): UseConversationsReturn {
   const initializedRef = useRef(false);
 
   const chat = useChat({
+    transport: chatTransport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onFinish: async ({ message }) => {
       if (!activeConversationId) return;
@@ -45,38 +47,40 @@ export function useConversations(): UseConversationsReturn {
       // Skip saving when the message only contains pending tool approvals (no text,
       // no completed results). This avoids triggering revalidatePath while the
       // confirmation card is waiting for user input.
-      const hasText = message.parts.some((p) => p.type === 'text');
+      const hasText = message.parts.some((p) => p.type === "text");
       const hasPendingApproval = message.parts.some(
-        (p) => p.type.startsWith('tool-') && (p as { state?: string }).state === 'approval-requested'
+        (p) =>
+          p.type.startsWith("tool-") && (p as { state?: string }).state === "approval-requested"
       );
       if (!hasText && hasPendingApproval) return;
 
       const messagesLength = chat.messages.length;
-      const userMsg = messagesLength >= 2
-        ? chat.messages[messagesLength - 2]
-        : chat.messages.find((m) => m.role === 'user');
+      const userMsg =
+        messagesLength >= 2
+          ? chat.messages[messagesLength - 2]
+          : chat.messages.find((m) => m.role === "user");
 
-      if (userMsg?.role === 'user') {
+      if (userMsg?.role === "user") {
         const userContent = userMsg.parts
-          .filter((p) => p.type === 'text')
-          .map((p) => (p as { type: 'text'; text: string }).text)
-          .join('');
-        await saveMessage(activeConversationId, 'user', userContent);
+          .filter((p) => p.type === "text")
+          .map((p) => (p as { type: "text"; text: string }).text)
+          .join("");
+        await saveMessage(activeConversationId, "user", userContent);
       }
 
       const assistantContent = message.parts
-        .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+        .filter((p): p is { type: "text"; text: string } => p.type === "text")
         .map((p) => p.text)
-        .join('');
-      await saveMessage(activeConversationId, 'assistant', assistantContent);
+        .join("");
+      await saveMessage(activeConversationId, "assistant", assistantContent);
 
       if (!hasSetTitle) {
-        const firstUserMessage = chat.messages.find((m) => m.role === 'user');
+        const firstUserMessage = chat.messages.find((m) => m.role === "user");
         if (firstUserMessage) {
           const content = firstUserMessage.parts
-            .filter((p) => p.type === 'text')
-            .map((p) => (p as { type: 'text'; text: string }).text)
-            .join('');
+            .filter((p) => p.type === "text")
+            .map((p) => (p as { type: "text"; text: string }).text)
+            .join("");
           await updateConversationTitleFromFirstMessage(activeConversationId, content);
           setHasSetTitle(true);
         }
@@ -91,27 +95,30 @@ export function useConversations(): UseConversationsReturn {
     if (result.success) {
       setConversations(result.data);
     } else {
-      toast.error('Fehler beim Laden der Chats');
+      toast.error("Fehler beim Laden der Chats");
     }
     setIsLoadingConversations(false);
     return result;
   }, []);
 
-  const selectConversation = useCallback(async (id: string) => {
-    setActiveConversationId(id);
-    setHasSetTitle(true);
-    const result = await getConversationById(id);
-    if (result.success) {
-      const uiMessages = result.data.messages.map((msg: Message) => ({
-        id: msg.id,
-        role: msg.role as 'user' | 'assistant',
-        parts: [{ type: 'text' as const, text: msg.content }],
-      }));
-      chat.setMessages(uiMessages);
-    } else {
-      toast.error('Fehler beim Laden des Chats');
-    }
-  }, [chat]);
+  const selectConversation = useCallback(
+    async (id: string) => {
+      setActiveConversationId(id);
+      setHasSetTitle(true);
+      const result = await getConversationById(id);
+      if (result.success) {
+        const uiMessages = result.data.messages.map((msg: Message) => ({
+          id: msg.id,
+          role: msg.role as "user" | "assistant",
+          parts: [{ type: "text" as const, text: msg.content }],
+        }));
+        chat.setMessages(uiMessages);
+      } else {
+        toast.error("Fehler beim Laden des Chats");
+      }
+    },
+    [chat]
+  );
 
   const startNewChat = useCallback(async () => {
     const result = await createConversation();
@@ -121,7 +128,7 @@ export function useConversations(): UseConversationsReturn {
       chat.setMessages([]);
       setConversations((prev) => [result.data, ...prev]);
     } else {
-      toast.error('Fehler beim Erstellen des Chats');
+      toast.error("Fehler beim Erstellen des Chats");
     }
   }, [chat]);
 
@@ -139,9 +146,9 @@ export function useConversations(): UseConversationsReturn {
             await startNewChat();
           }
         }
-        toast.success('Chat gelöscht');
+        toast.success("Chat gelöscht");
       } else {
-        toast.error('Fehler beim Löschen des Chats');
+        toast.error("Fehler beim Löschen des Chats");
       }
     },
     [conversations, activeConversationId, selectConversation, startNewChat]

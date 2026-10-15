@@ -47,12 +47,14 @@ services:
       CRON_SECRET: ${CRON_SECRET}
       APP_URL: http://app:3000
       NOTIFICATION_SCHEDULE: ${NOTIFICATION_SCHEDULE:-0 8 * * *}
+      # Insights for the AI assistant (default 06:00 UTC daily)
+      INSIGHTS_SCHEDULE: ${INSIGHTS_SCHEDULE:-0 6 * * *}
     depends_on:
       app:
         condition: service_healthy
     command: >
       sh -c "apk add --no-cache curl --quiet &&
-             echo \"$$NOTIFICATION_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/upcoming-payments >> /var/log/cron.log 2>&1\" | crontab - &&
+             printf '%s\\n' \"$$NOTIFICATION_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/upcoming-payments >> /var/log/cron.log 2>&1\" \"$$INSIGHTS_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/insights >> /var/log/cron.log 2>&1\" | crontab - &&
              crond -f -l 2"
 
   postgres:
