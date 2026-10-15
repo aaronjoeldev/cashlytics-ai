@@ -291,12 +291,16 @@ export const tools = {
         .number()
         .positive()
         .optional()
-        .describe('Mindestbetrag als Zahl, z.B. 50 für "Ausgaben über 50€"'),
+        .describe(
+          'Mindestbetrag als Zahl in der Währung der Ausgabe, z.B. 50 für "Ausgaben über 50€"'
+        ),
       maxAmount: z
         .number()
         .positive()
         .optional()
-        .describe('Höchstbetrag als Zahl, z.B. 100 für "Ausgaben unter 100€"'),
+        .describe(
+          'Höchstbetrag als Zahl in der Währung der Ausgabe, z.B. 100 für "Ausgaben unter 100€"'
+        ),
     }),
     execute: async ({
       accountId,
@@ -321,8 +325,8 @@ export const tools = {
       if (description) filters.description = description;
       if (startDate) filters.startDate = new Date(startDate);
       if (endDate) filters.endDate = new Date(endDate);
-      if (minAmount) filters.minAmount = minAmount;
-      if (maxAmount) filters.maxAmount = maxAmount;
+      if (minAmount !== undefined) filters.minAmount = minAmount;
+      if (maxAmount !== undefined) filters.maxAmount = maxAmount;
       const result = await getDailyExpenses(filters);
       if (!result.success) return result;
       // Explicit allowlist: only return fields the AI needs.

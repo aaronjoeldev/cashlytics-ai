@@ -7,6 +7,7 @@ import { getExpenses, getDailyExpenses } from "@/actions/expense-actions";
 import { getIncomes } from "@/actions/income-actions";
 import { getDashboardStats } from "@/actions/dashboard-actions";
 import { getActiveInsights } from "@/actions/insights-actions";
+import { getMerchantCategoryHints } from "@/actions/merchant-category-actions";
 import { currencies } from "@/lib/currency";
 import { rateLimit } from "@/lib/rate-limiter";
 import { isAiEnabled } from "@/lib/import/feature-gating";
@@ -67,6 +68,8 @@ Vorgehensweise wenn der Benutzer keine Kategorie nennt:
 2. Frage den Benutzer ZUERST per Text: "Soll ich das unter der Kategorie **[Kategoriename]** einordnen?" – BEVOR du das Tool aufrufst
 3. Erst wenn der Benutzer zustimmt oder eine andere Kategorie wählt, rufe das Tool mit der bestätigten categoryId auf
 4. Falls keine passende Kategorie im Kontext vorhanden ist: Frage ob du eine neue Kategorie anlegen soll, und rufe zuerst createCategory auf
+
+Wenn die Beschreibung zu einem Eintrag unter "Gelernte Kategorien" im Kontext passt, schlage genau diese Kategorie vor – der Benutzer hat sie für diesen Händler schon einmal gewählt.
 
 Bevor du den Benutzer nach einer Kategorie fragst, versuche basierend auf der Beschreibung eine bekannte Kategorie aus dem Kontext zuzuordnen. Wenn der Benutzer z.B. "REWE" sagt und eine Kategorie "Lebensmittel" existiert, schlage diese direkt vor.
 
@@ -152,6 +155,7 @@ async function buildSystemPrompt(timeZone: string | undefined): Promise<string> 
     recentDailyResult,
     incomesResult,
     insightsResult,
+    merchantHintsResult,
   ] = await Promise.all([
     getAccounts(),
     getCategories(),
@@ -160,6 +164,7 @@ async function buildSystemPrompt(timeZone: string | undefined): Promise<string> 
     getDailyExpenses({ startDate: monthStart }),
     getIncomes(),
     getActiveInsights(),
+    getMerchantCategoryHints(),
   ]);
 
   const accountsContext =
@@ -238,6 +243,17 @@ ${insightsResult.data
   .join("\n")}`
       : "";
 
+  const merchantHintsContext =
+    merchantHintsResult.success && merchantHintsResult.data.length > 0
+      ? `### Gelernte Kategorien (Händler → Kategorie, früher vom Benutzer bestätigt):
+${merchantHintsResult.data
+  .map(
+    (h) =>
+      `  - "${sanitizeForPrompt(h.merchantPattern)}" → "${sanitizeForPrompt(h.categoryName)}" | ID: ${h.categoryId}`
+  )
+  .join("\n")}`
+      : "";
+
   return `${BASE_SYSTEM_PROMPT}
 
 ## AKTUELLER KONTEXT
@@ -250,6 +266,8 @@ ${accountsContext}
 
 ### Verfügbare Kategorien:
 ${categoriesContext}
+
+${merchantHintsContext}
 
 ### Bestehende periodische Ausgaben (für Updates/Löschungen direkt ID verwenden, kein getExpenses nötig):
 ${expensesContext}

@@ -1,9 +1,13 @@
-'use client';
+"use client";
 
-import { Check, X, AlertTriangle, Plus, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { useEffect, useState } from "react";
+import { Check, X, AlertTriangle, Plus, Pencil, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { useSettings } from "@/lib/settings-context";
+import { MUTATING_TOOL_TITLES } from "@/lib/ai/tool-labels";
+import { getToolPreview, type ToolPreview } from "@/actions/tool-preview-actions";
 
 interface ToolConfirmationCardProps {
   toolName: string;
@@ -13,181 +17,325 @@ interface ToolConfirmationCardProps {
   onDeny?: (approvalId: string) => void;
 }
 
-type OperationKind = 'create' | 'update' | 'delete';
+type OperationKind = "create" | "update" | "delete";
 
 interface OperationInfo {
   title: string;
+  /** Shown in the red box on delete cards */
+  warning?: string;
   details: { label: string; value: string }[];
   kind: OperationKind;
 }
 
+type FormatAmount = (amount: number | string, currency?: string | null) => string;
+
 const RECURRENCE_LABELS: Record<string, string> = {
-  once: 'Einmalig',
-  daily: 'Täglich',
-  weekly: 'Wöchentlich',
-  monthly: 'Monatlich',
-  quarterly: 'Quartalsweise',
-  yearly: 'Jährlich',
-  custom: 'Benutzerdefiniert',
+  once: "Einmalig",
+  daily: "Täglich",
+  weekly: "Wöchentlich",
+  monthly: "Monatlich",
+  quarterly: "Quartalsweise",
+  semiannual: "Halbjährlich",
+  yearly: "Jährlich",
+  custom: "Benutzerdefiniert",
 };
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  checking: 'Girokonto',
-  savings: 'Sparkonto',
-  etf: 'ETF-Portfolio',
+  checking: "Girokonto",
+  savings: "Sparkonto",
+  etf: "ETF-Portfolio",
 };
 
-function formatAmount(amount: unknown): string {
-  if (amount == null) return '–';
-  const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
-  return isNaN(num) ? String(amount) : `${num.toFixed(2)} €`;
+const EMPTY_PREVIEW: ToolPreview = { accounts: {}, categories: {} };
+
+function formatDate(value: unknown): string {
+  if (!value || typeof value !== "string") return "–";
+  const date = new Date(value);
+  // Dates are calendar days; format in UTC so the day does not shift
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("de-DE", { timeZone: "UTC" });
 }
 
-function formatDate(dateStr: unknown): string {
-  if (!dateStr || typeof dateStr !== 'string') return '–';
-  try {
-    return new Date(dateStr).toLocaleDateString('de-DE');
-  } catch {
-    return dateStr;
-  }
+function label(map: Record<string, string>, value: unknown): string {
+  return value == null ? "–" : (map[String(value)] ?? String(value));
 }
 
-function getOperationInfo(toolName: string, args: Record<string, unknown>): OperationInfo {
+function text(value: unknown): string {
+  return value == null || value === "" ? "–" : String(value);
+}
+
+function getOperationInfo(
+  toolName: string,
+  args: Record<string, unknown>,
+  preview: ToolPreview,
+  formatAmount: FormatAmount
+): OperationInfo {
+  const title = MUTATING_TOOL_TITLES[toolName] ?? toolName;
+  const record = preview.record;
+  const accountOf = (key: string) =>
+    typeof args[key] === "string" ? preview.accounts[args[key] as string] : undefined;
+  const accountName = (key: string) => accountOf(key)?.name ?? "–";
+  const categoryName = (value: unknown) =>
+    value == null ? "Keine" : (preview.categories[String(value)] ?? "–");
+  // Amounts of new entries are in the given currency, otherwise in the account's currency
+  const newAmount = (amount: unknown, accountKey = "accountId") =>
+    amount == null
+      ? "–"
+      : formatAmount(
+          amount as number | string,
+          (args.currency as string | undefined) ?? accountOf(accountKey)?.currency
+        );
+  const recordAmount = (amount: unknown) =>
+    amount == null ? "–" : formatAmount(amount as number | string, record?.currency);
+
+  // "old → new" for the fields an update sets
+  const change = (fieldLabel: string, before: string, after: string) => ({
+    label: fieldLabel,
+    value: record ? `${before} → ${after}` : after,
+  });
+  const target = record
+    ? [{ label: "Eintrag", value: record.name }]
+    : record === null
+      ? [{ label: "Eintrag", value: "Nicht gefunden" }]
+      : [];
+  const deleteDetails = (warning: string): OperationInfo => ({
+    title,
+    kind: "delete",
+    warning,
+    details: [
+      ...target,
+      ...(record?.amount != null ? [{ label: "Betrag", value: recordAmount(record.amount) }] : []),
+      ...(record?.date ? [{ label: "Datum", value: formatDate(record.date) }] : []),
+      ...(record?.recurrenceType
+        ? [{ label: "Turnus", value: label(RECURRENCE_LABELS, record.recurrenceType) }]
+        : []),
+    ],
+  });
+
   switch (toolName) {
-    case 'createAccount':
+    case "createAccount":
       return {
-        title: 'Neues Konto erstellen',
-        kind: 'create',
+        title,
+        kind: "create",
         details: [
-          { label: 'Name', value: String(args.name ?? '–') },
-          { label: 'Typ', value: ACCOUNT_TYPE_LABELS[String(args.type)] ?? String(args.type ?? '–') },
-          { label: 'Startguthaben', value: formatAmount(args.balance ?? 0) },
-          { label: 'Währung', value: String(args.currency ?? 'EUR') },
+          { label: "Name", value: text(args.name) },
+          { label: "Typ", value: label(ACCOUNT_TYPE_LABELS, args.type) },
+          {
+            label: "Kontostand",
+            value: formatAmount((args.balance as string) ?? 0, (args.currency as string) ?? null),
+          },
+          { label: "Währung", value: text(args.currency ?? "Standard") },
         ],
       };
 
-    case 'updateAccount':
+    case "updateAccount":
       return {
-        title: 'Konto aktualisieren',
-        kind: 'update',
+        title,
+        kind: "update",
         details: [
-          ...(args.name != null ? [{ label: 'Neuer Name', value: String(args.name) }] : []),
-          ...(args.type != null ? [{ label: 'Neuer Typ', value: ACCOUNT_TYPE_LABELS[String(args.type)] ?? String(args.type) }] : []),
-          ...(args.balance != null ? [{ label: 'Neuer Kontostand', value: formatAmount(args.balance) }] : []),
+          ...target,
+          ...(args.name != null ? [change("Name", text(record?.name), text(args.name))] : []),
+          ...(args.type != null
+            ? [
+                change(
+                  "Typ",
+                  label(ACCOUNT_TYPE_LABELS, record?.type),
+                  label(ACCOUNT_TYPE_LABELS, args.type)
+                ),
+              ]
+            : []),
+          ...(args.balance != null
+            ? [
+                change(
+                  "Kontostand",
+                  recordAmount(record?.amount),
+                  formatAmount(args.balance as string, record?.currency)
+                ),
+              ]
+            : []),
         ],
       };
 
-    case 'deleteAccount':
+    case "deleteAccount":
+      return deleteDetails("Alle Buchungen dieses Kontos werden ebenfalls gelöscht.");
+
+    case "createExpense":
       return {
-        title: 'Konto löschen',
-        kind: 'delete',
+        title,
+        kind: "create",
         details: [
-          { label: 'Achtung', value: 'Alle zugehörigen Transaktionen werden ebenfalls gelöscht.' },
+          { label: "Name", value: text(args.name) },
+          { label: "Betrag", value: newAmount(args.amount) },
+          { label: "Turnus", value: label(RECURRENCE_LABELS, args.recurrenceType) },
+          { label: "Konto", value: accountName("accountId") },
+          { label: "Kategorie", value: categoryName(args.categoryId) },
+          { label: "Ab", value: formatDate(args.startDate) },
+          ...(args.endDate ? [{ label: "Bis", value: formatDate(args.endDate) }] : []),
         ],
       };
 
-    case 'createExpense':
+    case "updateExpense":
       return {
-        title: 'Wiederkehrende Ausgabe erstellen',
-        kind: 'create',
+        title,
+        kind: "update",
         details: [
-          { label: 'Name', value: String(args.name ?? '–') },
-          { label: 'Betrag', value: formatAmount(args.amount) },
-          { label: 'Turnus', value: RECURRENCE_LABELS[String(args.recurrenceType)] ?? String(args.recurrenceType ?? '–') },
-          { label: 'Ab', value: formatDate(args.startDate) },
-          ...(args.endDate ? [{ label: 'Bis', value: formatDate(args.endDate) }] : []),
+          ...target,
+          ...(args.name != null ? [change("Name", text(record?.name), text(args.name))] : []),
+          ...(args.amount != null
+            ? [
+                change(
+                  "Betrag",
+                  recordAmount(record?.amount),
+                  formatAmount(args.amount as number, record?.currency)
+                ),
+              ]
+            : []),
+          ...(args.recurrenceType != null
+            ? [
+                change(
+                  "Turnus",
+                  label(RECURRENCE_LABELS, record?.recurrenceType),
+                  label(RECURRENCE_LABELS, args.recurrenceType)
+                ),
+              ]
+            : []),
+          ...(args.endDate !== undefined
+            ? [
+                change(
+                  "Enddatum",
+                  record?.endDate ? formatDate(record.endDate) : "Keins",
+                  args.endDate ? formatDate(args.endDate) : "Keins"
+                ),
+              ]
+            : []),
         ],
       };
 
-    case 'updateExpense':
+    case "deleteExpense":
+      return deleteDetails("Diese wiederkehrende Ausgabe wird dauerhaft entfernt.");
+
+    case "createDailyExpense":
       return {
-        title: 'Ausgabe aktualisieren',
-        kind: 'update',
+        title,
+        kind: "create",
         details: [
-          ...(args.name != null ? [{ label: 'Neuer Name', value: String(args.name) }] : []),
-          ...(args.amount != null ? [{ label: 'Neuer Betrag', value: formatAmount(args.amount) }] : []),
-          ...(args.recurrenceType != null ? [{ label: 'Neuer Turnus', value: RECURRENCE_LABELS[String(args.recurrenceType)] ?? String(args.recurrenceType) }] : []),
-          ...(args.endDate != null ? [{ label: 'Neues Enddatum', value: formatDate(args.endDate) }] : []),
+          { label: "Beschreibung", value: text(args.description) },
+          { label: "Betrag", value: newAmount(args.amount) },
+          { label: "Datum", value: formatDate(args.date) },
+          { label: "Konto", value: accountName("accountId") },
+          { label: "Kategorie", value: categoryName(args.categoryId) },
         ],
       };
 
-    case 'deleteExpense':
+    case "updateDailyExpense":
       return {
-        title: 'Wiederkehrende Ausgabe löschen',
-        kind: 'delete',
+        title,
+        kind: "update",
         details: [
-          { label: 'Achtung', value: 'Diese Ausgabe wird dauerhaft entfernt.' },
+          ...target,
+          ...(args.description != null
+            ? [change("Beschreibung", text(record?.name), text(args.description))]
+            : []),
+          ...(args.amount != null
+            ? [
+                change(
+                  "Betrag",
+                  recordAmount(record?.amount),
+                  formatAmount(args.amount as number, record?.currency)
+                ),
+              ]
+            : []),
+          ...(args.date != null
+            ? [change("Datum", formatDate(record?.date), formatDate(args.date))]
+            : []),
+          ...(args.categoryId !== undefined
+            ? [change("Kategorie", record?.categoryName ?? "Keine", categoryName(args.categoryId))]
+            : []),
         ],
       };
 
-    case 'createDailyExpense':
+    case "deleteDailyExpense":
+      return deleteDetails("Diese Ausgabe wird dauerhaft gelöscht.");
+
+    case "createIncome":
       return {
-        title: 'Ausgabe erfassen',
-        kind: 'create',
+        title,
+        kind: "create",
         details: [
-          { label: 'Beschreibung', value: String(args.description ?? '–') },
-          { label: 'Betrag', value: formatAmount(args.amount) },
-          { label: 'Datum', value: formatDate(args.date) },
+          { label: "Quelle", value: text(args.source) },
+          { label: "Betrag", value: newAmount(args.amount) },
+          { label: "Turnus", value: label(RECURRENCE_LABELS, args.recurrenceType) },
+          { label: "Konto", value: accountName("accountId") },
+          { label: "Ab", value: formatDate(args.startDate) },
         ],
       };
 
-    case 'deleteDailyExpense':
+    case "updateIncome":
       return {
-        title: 'Ausgabe löschen',
-        kind: 'delete',
+        title,
+        kind: "update",
         details: [
-          { label: 'Achtung', value: 'Diese Ausgabe wird dauerhaft gelöscht.' },
+          ...target,
+          ...(args.source != null ? [change("Quelle", text(record?.name), text(args.source))] : []),
+          ...(args.amount != null
+            ? [
+                change(
+                  "Betrag",
+                  recordAmount(record?.amount),
+                  formatAmount(args.amount as number, record?.currency)
+                ),
+              ]
+            : []),
+          ...(args.recurrenceType != null
+            ? [
+                change(
+                  "Turnus",
+                  label(RECURRENCE_LABELS, record?.recurrenceType),
+                  label(RECURRENCE_LABELS, args.recurrenceType)
+                ),
+              ]
+            : []),
         ],
       };
 
-    case 'createIncome':
+    case "deleteIncome":
+      return deleteDetails("Diese Einnahme wird dauerhaft entfernt.");
+
+    case "createCategory":
       return {
-        title: 'Einnahme erfassen',
-        kind: 'create',
+        title,
+        kind: "create",
         details: [
-          { label: 'Quelle', value: String(args.source ?? '–') },
-          { label: 'Betrag', value: formatAmount(args.amount) },
-          { label: 'Turnus', value: RECURRENCE_LABELS[String(args.recurrenceType)] ?? String(args.recurrenceType ?? '–') },
-          { label: 'Ab', value: formatDate(args.startDate) },
+          { label: "Name", value: text(args.name) },
+          ...(args.icon ? [{ label: "Icon", value: String(args.icon) }] : []),
+          ...(args.color ? [{ label: "Farbe", value: String(args.color) }] : []),
         ],
       };
 
-    case 'updateIncome':
+    case "createTransfer":
       return {
-        title: 'Einnahme aktualisieren',
-        kind: 'update',
+        title,
+        kind: "create",
         details: [
-          ...(args.source != null ? [{ label: 'Neue Quelle', value: String(args.source) }] : []),
-          ...(args.amount != null ? [{ label: 'Neuer Betrag', value: formatAmount(args.amount) }] : []),
-          ...(args.recurrenceType != null ? [{ label: 'Neuer Turnus', value: RECURRENCE_LABELS[String(args.recurrenceType)] ?? String(args.recurrenceType) }] : []),
+          { label: "Von", value: accountName("sourceAccountId") },
+          { label: "An", value: accountName("targetAccountId") },
+          { label: "Betrag", value: newAmount(args.amount, "sourceAccountId") },
+          { label: "Turnus", value: label(RECURRENCE_LABELS, args.recurrenceType) },
+          { label: "Ab", value: formatDate(args.startDate) },
+          ...(args.endDate ? [{ label: "Bis", value: formatDate(args.endDate) }] : []),
+          ...(args.description ? [{ label: "Beschreibung", value: String(args.description) }] : []),
         ],
       };
 
-    case 'deleteIncome':
-      return {
-        title: 'Einnahme löschen',
-        kind: 'delete',
-        details: [
-          { label: 'Achtung', value: 'Diese Einnahme wird dauerhaft entfernt.' },
-        ],
-      };
-
-    case 'createCategory':
-      return {
-        title: 'Kategorie erstellen',
-        kind: 'create',
-        details: [
-          { label: 'Name', value: String(args.name ?? '–') },
-          ...(args.icon ? [{ label: 'Icon', value: String(args.icon) }] : []),
-          ...(args.color ? [{ label: 'Farbe', value: String(args.color) }] : []),
-        ],
-      };
+    case "markInsightRead":
+      return { title, kind: "update", details: [...target] };
 
     default:
       return {
-        title: toolName,
-        kind: 'create',
-        details: Object.entries(args).map(([k, v]) => ({ label: k, value: String(v ?? '–') })),
+        title,
+        kind: "create",
+        details: Object.entries(args).map(([key, value]) => ({ label: key, value: text(value) })),
       };
   }
 }
@@ -199,9 +347,9 @@ const KIND_ICON = {
 };
 
 const KIND_ICON_STYLE = {
-  create: 'bg-emerald-500/10 text-emerald-500',
-  update: 'bg-amber-500/10 text-amber-500',
-  delete: 'bg-red-500/10 text-red-500',
+  create: "bg-emerald-500/10 text-emerald-500",
+  update: "bg-amber-500/10 text-amber-500",
+  delete: "bg-red-500/10 text-red-500",
 };
 
 export function ToolConfirmationCard({
@@ -211,34 +359,58 @@ export function ToolConfirmationCard({
   onApprove,
   onDeny,
 }: ToolConfirmationCardProps) {
-  const { title, details, kind } = getOperationInfo(toolName, args);
+  const { formatAmount } = useSettings();
+  const [preview, setPreview] = useState<ToolPreview>(EMPTY_PREVIEW);
+  const argsKey = JSON.stringify(args);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Without the preview the card still shows the values from the tool input
+    getToolPreview(toolName, JSON.parse(argsKey) as Record<string, unknown>)
+      .then((result) => {
+        if (!cancelled && result.success) setPreview(result.data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [toolName, argsKey]);
+
+  const { title, warning, details, kind } = getOperationInfo(toolName, args, preview, formatAmount);
   const Icon = KIND_ICON[kind];
-  const isDelete = kind === 'delete';
+  const isDelete = kind === "delete";
 
   return (
-    <Card className="border border-border/60 shadow-md overflow-hidden">
-      <CardHeader className="pb-3 pt-4 px-4">
+    <Card className="border-border/60 overflow-hidden border shadow-md">
+      <CardHeader className="px-4 pt-4 pb-3">
         <div className="flex items-center gap-3">
-          <div className={cn('flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg', KIND_ICON_STYLE[kind])}>
+          <div
+            className={cn(
+              "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg",
+              KIND_ICON_STYLE[kind]
+            )}
+          >
             <Icon className="h-4 w-4" />
           </div>
           <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         </div>
       </CardHeader>
 
-      {details.length > 0 && (
+      {(warning || details.length > 0) && (
         <CardContent className="px-4 pb-3">
-          {isDelete && (
-            <div className="mb-3 flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+          {warning && (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
-              <p className="text-xs text-red-600 dark:text-red-400">{details[0]?.value}</p>
+              <p className="text-xs text-red-600 dark:text-red-400">{warning}</p>
             </div>
           )}
-          {(!isDelete || details.length > 1) && (
+          {details.length > 0 && (
             <dl className="space-y-1.5">
-              {(isDelete ? details.slice(1) : details).map(({ label, value }) => (
-                <div key={label} className="flex items-baseline gap-2">
-                  <dt className="min-w-[90px] flex-shrink-0 text-xs text-muted-foreground">{label}</dt>
+              {details.map(({ label: detailLabel, value }) => (
+                <div key={detailLabel} className="flex items-baseline gap-2">
+                  <dt className="text-muted-foreground min-w-[90px] flex-shrink-0 text-xs">
+                    {detailLabel}
+                  </dt>
                   <dd className="text-xs font-medium">{value}</dd>
                 </div>
               ))}
@@ -247,18 +419,13 @@ export function ToolConfirmationCard({
         </CardContent>
       )}
 
-      <CardFooter className="flex justify-end gap-2 border-t border-border/40 px-4 py-3">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!onDeny}
-          onClick={() => onDeny?.(approvalId)}
-        >
+      <CardFooter className="border-border/40 flex justify-end gap-2 border-t px-4 py-3">
+        <Button variant="outline" size="sm" disabled={!onDeny} onClick={() => onDeny?.(approvalId)}>
           <X className="h-3.5 w-3.5" />
           Ablehnen
         </Button>
         <Button
-          variant={isDelete ? 'destructive' : 'default'}
+          variant={isDelete ? "destructive" : "default"}
           size="sm"
           disabled={!onApprove}
           onClick={() => onApprove?.(approvalId)}

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
 import { chatTransport } from "@/lib/ai/chat-transport";
+import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import {
@@ -120,8 +121,17 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { messages, sendMessage, status } = useChat({ transport: chatTransport });
+  const { messages, sendMessage, status, addToolApprovalResponse } = useChat({
+    transport: chatTransport,
+    // After the user answers an approval card, send the answer back so the tool runs
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+  });
   const chatLoading = status === "streaming" || status === "submitted";
+  const lastAssistantIndex = messages.findLastIndex((message) => message.role === "assistant");
+  const approveTool = (approvalId: string) =>
+    addToolApprovalResponse({ id: approvalId, approved: true });
+  const denyTool = (approvalId: string) =>
+    addToolApprovalResponse({ id: approvalId, approved: false });
 
   // Form state
   const [activeForm, setActiveForm] = useState<FormType>(null);
@@ -241,8 +251,14 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
             </div>
           )}
           <div className="py-2">
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+            {messages.map((message, index) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                // Only the latest answer can still be approved
+                onApprove={index === lastAssistantIndex && !chatLoading ? approveTool : undefined}
+                onDeny={index === lastAssistantIndex && !chatLoading ? denyTool : undefined}
+              />
             ))}
             {chatLoading && <ChatMessageLoading />}
             <div ref={messagesEndRef} />

@@ -213,6 +213,9 @@ export async function getDailyExpenses(filters?: {
   description?: string;
   startDate?: Date;
   endDate?: Date;
+  /** Amounts in the entry's own currency */
+  minAmount?: number;
+  maxAmount?: number;
 }): Promise<ApiResponse<DailyExpenseWithDetails[]>> {
   try {
     const authResult = await requireAuth();
@@ -236,6 +239,12 @@ export async function getDailyExpenses(filters?: {
     }
     if (filters?.endDate) {
       conditions.push(lte(dailyExpenses.date, filters.endDate));
+    }
+    if (filters?.minAmount !== undefined && Number.isFinite(filters.minAmount)) {
+      conditions.push(gte(dailyExpenses.amount, filters.minAmount.toFixed(2)));
+    }
+    if (filters?.maxAmount !== undefined && Number.isFinite(filters.maxAmount)) {
+      conditions.push(lte(dailyExpenses.amount, filters.maxAmount.toFixed(2)));
     }
 
     const result = await db.query.dailyExpenses.findMany({

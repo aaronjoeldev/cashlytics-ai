@@ -129,18 +129,19 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 
 ## 4. AI assistant and insights
 
-- [ ] **Approval card does not show what is changed or deleted**
+- [x] **Approval card does not show what is changed or deleted**
       (`src/components/molecules/tool-confirmation-card.tsx`): delete cards show no name, update
       cards only the new values, amounts always with `€`. `updateDailyExpense`, `createTransfer`
       and `markInsightRead` have no card layout.
-- [ ] **Approval buttons are disabled in the floating mini-chat** (`floating-actions.tsx` passes no
+- [x] **Approval buttons are disabled in the floating mini-chat** (`floating-actions.tsx` passes no
       approve / deny handlers).
 - [x] **Conversations stop working after 100 messages** (`api/chat/route.ts` rejects instead of
       truncating).
-- [ ] **Messages are saved twice or empty** (`src/hooks/use-conversations.ts`): on tool approval, on
+- [x] **Messages are saved twice or empty** (`src/hooks/use-conversations.ts`): on tool approval, on
       errors and aborts, and on retry. Switching conversation mid-stream saves the answer into the
-      wrong conversation. Tool calls are not persisted.
-- [ ] **`getDailyExpenses` tool advertises `minAmount` / `maxAmount`** that the action ignores.
+      wrong conversation. Tool calls are not persisted. (Data-changing tool calls are now stored as
+      a text line per call; the history is still plain text.)
+- [x] **`getDailyExpenses` tool advertises `minAmount` / `maxAmount`** that the action ignores.
 - [x] **Missing `OPENAI_API_KEY` is not checked in the chat route**; the stream fails with a generic
       error and a retry button that cannot succeed.
 - [x] **"Today" in the system prompt is the UTC date**; around midnight entries are booked a day
@@ -152,7 +153,7 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       uncategorised spend is titled "null: …", the average divides by three even with one month of
       history, and the budget warning fires on day one of a month.
 - [x] **One failing user aborts the whole insights run.**
-- [ ] Smaller: merchant-category learning is written but never read.
+- [x] Smaller: merchant-category learning is written but never read.
 
 ## 5. Deployment and database
 
