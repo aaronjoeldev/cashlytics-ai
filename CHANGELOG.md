@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.10](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.9...v0.8.10) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **assistant:** show what an approval changes, store each turn once ([96b8f73](https://github.com/aaronjoeldev/cashlytics-ai/commit/96b8f736c5b2698d9e284ab65523b5fbcd7664a4))
+
 ## [0.8.9](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.8...v0.8.9) (2026-10-15)
 
 ### 🐛 Bug Fixes
