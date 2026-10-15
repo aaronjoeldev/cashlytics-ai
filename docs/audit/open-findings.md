@@ -102,6 +102,10 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [x] **End date is not checked against the stored start date** when an update sets only one of
       the two (for example the AI `updateExpense` tool setting only `endDate`).
 
+- [x] **Amounts were rounded in binary**: server validation stored `5.555` as `5.55`
+      (`toFixed`); `roundDecimal` now rounds half away from zero like Postgres. _(found in the Docker
+      e2e run)_
+
 ## 3. CSV import
 
 - [x] **Amount parser flips sign or magnitude** (`src/lib/import/csv-import-staging.ts`): `50,00-`,
@@ -186,6 +190,11 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       missing in `drizzle/meta`, `package.json` version is never bumped, `scripts/migrate-add-userId.ts`
       creates a user with password `changeme` when `INITIAL_PASSWORD` is unset.
 
+- [x] **Compose healthchecks never passed**: `wget http://localhost:3000` resolves to `::1` in
+      Alpine while the server listens on IPv4 only, so the app stayed unhealthy and the cron
+      container (and the demo seeder) never started. The checks use `127.0.0.1`. _(found in the
+      Docker e2e run)_
+
 ## 6. User interface
 
 - [x] **Currency and locale jumped after login**: the provider wrote default cookies on the login
@@ -216,6 +225,13 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [x] Smaller: "custom" recurrence has an interval input; the header bell lists unread insights and
       shows its dot only when there are some; the forgot-password form shows its confirmation
       instead of redirecting; manifest icons are listed for `any` and `maskable`.
+
+- [x] **Dashboard dates followed the runtime time zone**: header date and "In X Tagen" caused a
+      hydration mismatch when server (UTC) and browser were on different days; recent transaction
+      dates were German-only and shifted a day west of UTC. _(found in the Docker e2e run)_
+- [ ] Found in the Docker e2e run, not fixed yet: - month labels on the analytics page (server-rendered) and in the account detail month
+      picker are hard-coded `de-DE` - icon-only edit/delete buttons in the lists have no `aria-label` or `title` - `deleteCategory` returns the English "Category not found", the other actions German - every prefetch of a sidebar link is stored in the user's offline cache under a new
+      `?_rsc=` key; these entries are never used offline and only expire after 7 days
 
 ## 7. Cleanup
 

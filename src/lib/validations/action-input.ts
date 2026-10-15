@@ -19,6 +19,15 @@ const MAX_RECURRENCE_INTERVAL = 120;
 const toNumber = (value: string | number) =>
   typeof value === "number" ? value : value.trim() === "" ? Number.NaN : Number(value);
 
+/**
+ * Rounds half away from zero on the decimal digits, like Postgres `numeric`. Scaling through the
+ * exponent notation avoids binary float errors: `(5.555).toFixed(2)` is "5.55", this gives "5.56".
+ */
+export function roundDecimal(n: number, scale: number): string {
+  const rounded = Math.sign(n) * Math.round(Number(`${Math.abs(n)}e${scale}`));
+  return Number(`${rounded}e-${scale}`).toFixed(scale);
+}
+
 /** Accepts "12.5", " 12.50 " or 12.5 and stores "12.50". */
 function decimal(options: { min: number; max: number; scale: number; label: string }) {
   return z
@@ -29,7 +38,7 @@ function decimal(options: { min: number; max: number; scale: number; label: stri
       (n) => n >= options.min && n <= options.max,
       `${options.label} liegt außerhalb des erlaubten Bereichs`
     )
-    .transform((n) => n.toFixed(options.scale));
+    .transform((n) => roundDecimal(n, options.scale));
 }
 
 const positiveAmount = decimal({ min: 0.01, max: MAX_AMOUNT, scale: 2, label: "Betrag" });

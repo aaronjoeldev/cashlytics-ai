@@ -50,7 +50,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      # 127.0.0.1, not localhost: in Alpine localhost resolves to ::1 first, and the server
+      # listens on IPv4 only, so the check never passed and dependent services never started
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
