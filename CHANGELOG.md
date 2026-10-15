@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.11](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.10...v0.8.11) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **ui:** settings from the server, visible errors, translations, effects ([1474359](https://github.com/aaronjoeldev/cashlytics-ai/commit/147435905fb5478816de747c6b1eabf567820bf5))
+
 ## [0.8.10](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.9...v0.8.10) (2026-10-15)
 
 ### 🐛 Bug Fixes
