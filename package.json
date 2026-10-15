@@ -1,7 +1,7 @@
 {
-  "name": "cashlytics-app",
-  "version": "0.1.0",
-  "private": false,
+  "name": "cashlytics",
+  "version": "0.8.13",
+  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,8 +14,6 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:migrate-userId": "tsx scripts/migrate-add-userId.ts",
-    "check-context-deps": "node scripts/check-context-deps.mjs",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
@@ -43,7 +41,6 @@
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.4",
     "lucide-react": "^1.56.0",
     "next": "16.4.0",

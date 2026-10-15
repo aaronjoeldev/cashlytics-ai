@@ -26,6 +26,28 @@ export async function getAccounts(): Promise<ApiResponse<Account[]>> {
   }
 }
 
+export async function getAccountById(id: string): Promise<ApiResponse<Account>> {
+  try {
+    const authResult = await requireAuth();
+    if (authResult.error) return { success: false, error: "Unauthorized" };
+
+    const [account] = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.id, id), eq(accounts.userId, authResult.userId)))
+      .limit(1);
+
+    if (!account) {
+      return { success: false, error: "Konto nicht gefunden." };
+    }
+
+    return { success: true, data: account };
+  } catch (error) {
+    logger.error("Failed to fetch account", "getAccountById", error);
+    return { success: false, error: "Konto konnte nicht geladen werden." };
+  }
+}
+
 export async function createAccount(
   data: Omit<NewAccount, "userId">
 ): Promise<ApiResponse<Account>> {

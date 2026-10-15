@@ -56,7 +56,7 @@ const text = (max: number, label: string) =>
   z.string().trim().min(1, `${label} ist erforderlich`).max(max, `${label} ist zu lang`);
 const info = z.string().trim().max(1000, "Notiz ist zu lang").nullable().optional();
 
-export const expenseRecurrenceTypes = [
+const expenseRecurrenceTypes = [
   "once",
   "daily",
   "weekly",
@@ -66,9 +66,9 @@ export const expenseRecurrenceTypes = [
   "yearly",
   "custom",
 ] as const;
-export const incomeRecurrenceTypes = ["once", "monthly", "yearly"] as const;
-export const transferRecurrenceTypes = ["once", "monthly", "quarterly", "yearly"] as const;
-export const accountTypes = ["checking", "savings", "etf"] as const;
+const incomeRecurrenceTypes = ["once", "monthly", "yearly"] as const;
+const transferRecurrenceTypes = ["once", "monthly", "quarterly", "yearly"] as const;
+const accountTypes = ["checking", "savings", "etf"] as const;
 
 type DateRange = { startDate?: Date; endDate?: Date | null };
 const endNotBeforeStart = (data: DateRange) =>
@@ -205,7 +205,6 @@ export const createTransferInput = transferFields
     message: "Quell- und Zielkonto müssen unterschiedlich sein",
     path: ["targetAccountId"],
   });
-export const updateTransferInput = transferFields.partial().refine(endNotBeforeStart, endDateIssue);
 
 // --- Helper -------------------------------------------------------------------
 

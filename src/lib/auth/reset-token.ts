@@ -6,7 +6,7 @@ import { passwordResetTokens } from "@/lib/db/schema";
 /**
  * Token expiry time in milliseconds (1 hour)
  */
-export const TOKEN_EXPIRY_MS = 60 * 60 * 1000;
+const TOKEN_EXPIRY_MS = 60 * 60 * 1000;
 
 /**
  * Generates a cryptographically secure password reset token.
@@ -15,7 +15,7 @@ export const TOKEN_EXPIRY_MS = 60 * 60 * 1000;
  *   - raw: The 64-character hex token (sent via email, never stored)
  *   - hash: The SHA-256 hash of the token (stored in database)
  */
-export function generateResetToken(): { raw: string; hash: string } {
+function generateResetToken(): { raw: string; hash: string } {
   // Generate 256-bit (32 bytes) cryptographically random token
   const rawBytes = randomBytes(32);
   const raw = rawBytes.toString("hex"); // 64-character hex string
@@ -33,7 +33,7 @@ export function generateResetToken(): { raw: string; hash: string } {
  * @param raw - The raw token string to hash
  * @returns The SHA-256 hash as a 64-character hex string
  */
-export function hashToken(raw: string): string {
+function hashToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 

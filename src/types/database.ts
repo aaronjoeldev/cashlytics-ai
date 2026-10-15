@@ -108,18 +108,3 @@ export type Forecast = {
     balance: number;
   }>;
 };
-
-export type AccountDetailSummary = {
-  totalIncome: number;
-  totalExpenses: number;
-  totalDailyExpenses: number;
-  balance: number;
-};
-
-export type AccountDetail = {
-  account: Account;
-  incomes: IncomeWithAccount[];
-  expenses: ExpenseWithDetails[];
-  dailyExpenses: DailyExpenseWithDetails[];
-  summary: AccountDetailSummary;
-};

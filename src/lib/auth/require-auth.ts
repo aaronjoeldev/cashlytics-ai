@@ -7,7 +7,7 @@ export type AuthResult = AuthSuccess | AuthFailure;
 /**
  * Call at the top of every server action before any DB query.
  * Returns { userId } on success, { error: "Unauthorized" } if no session.
- * Does NOT fall back to SINGLE_USER_EMAIL — unauthenticated = unauthorized.
+ * Unauthenticated requests are always unauthorized.
  */
 export async function requireAuth(): Promise<AuthResult> {
   const session = await auth();

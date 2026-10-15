@@ -174,7 +174,7 @@ function splitCsvLine(line: string, delimiter: ";" | ","): string[] {
 }
 
 /** Splits CSV content into records; line breaks inside quoted fields stay part of the field. */
-export function splitCsvRecords(content: string): string[] {
+function splitCsvRecords(content: string): string[] {
   const records: string[] = [];
   let current = "";
   let insideQuotes = false;
@@ -571,5 +571,3 @@ export function createCsvImportStagingService(deps: CsvImportStagingServiceDeps)
     },
   };
 }
-
-export { MAX_CSV_UPLOAD_BYTES };

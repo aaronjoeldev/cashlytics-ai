@@ -27,7 +27,6 @@ services:
       # Registration mode: true = single user, false = open registration
       - SINGLE_USER_MODE=${SINGLE_USER_MODE:-true}
       # Email of the single user (used for data migration)
-      - SINGLE_USER_EMAIL=${SINGLE_USER_EMAIL}
       # OpenAI API Key for AI Assistant (optional)
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       # Push Notifications (generate keys: npx web-push generate-vapid-keys)

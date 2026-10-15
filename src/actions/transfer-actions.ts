@@ -6,24 +6,8 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Transfer, NewTransfer, TransferWithDetails } from "@/types/database";
 import { logger } from "@/lib/logger";
-import type { Currency } from "@/lib/currency";
 import { requireAuth } from "@/lib/auth/require-auth";
-import {
-  checkUpdatedRange,
-  createTransferInput,
-  parseInput,
-  updateTransferInput,
-} from "@/lib/validations/action-input";
-
-/** Currency of the account if it belongs to the user, otherwise null. Not exported: not an action. */
-async function getOwnedAccountCurrency(userId: string, accountId: string): Promise<string | null> {
-  const [account] = await db
-    .select({ currency: accounts.currency })
-    .from(accounts)
-    .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
-    .limit(1);
-  return account?.currency ?? null;
-}
+import { createTransferInput, parseInput } from "@/lib/validations/action-input";
 
 export async function getTransfers(filters?: {
   sourceAccountId?: string;
@@ -117,82 +101,6 @@ export async function createTransfer(
   } catch (error) {
     logger.error("Failed to create transfer", "createTransfer", error);
     return { success: false, error: "Transfer konnte nicht erstellt werden" };
-  }
-}
-
-export async function updateTransfer(
-  id: string,
-  data: Partial<NewTransfer>
-): Promise<ApiResponse<Transfer>> {
-  try {
-    const authResult = await requireAuth();
-    if (authResult.error) {
-      return { success: false, error: "Unauthorized" };
-    }
-    const { userId } = authResult;
-
-    const input = parseInput(updateTransferInput, data);
-    if (!input.success) return input;
-    const updates = input.data;
-    if (Object.keys(updates).length === 0) {
-      return { success: false, error: "Keine Änderungen übergeben." };
-    }
-
-    const [existing] = await db
-      .select({
-        sourceAccountId: transfers.sourceAccountId,
-        targetAccountId: transfers.targetAccountId,
-        startDate: transfers.startDate,
-        endDate: transfers.endDate,
-      })
-      .from(transfers)
-      .where(and(eq(transfers.id, id), eq(transfers.userId, userId)))
-      .limit(1);
-    if (!existing) {
-      return { success: false, error: "Transfer nicht gefunden." };
-    }
-
-    const rangeError = checkUpdatedRange(updates, existing);
-    if (rangeError) return { success: false, error: rangeError };
-
-    const sourceAccountId = updates.sourceAccountId ?? existing.sourceAccountId;
-    const targetAccountId = updates.targetAccountId ?? existing.targetAccountId;
-    if (sourceAccountId === targetAccountId) {
-      return { success: false, error: "Quell- und Zielkonto müssen unterschiedlich sein" };
-    }
-    // A new account brings its currency along unless the caller sets one explicitly
-    if (updates.sourceAccountId) {
-      const currency = await getOwnedAccountCurrency(userId, updates.sourceAccountId);
-      if (!currency) {
-        return { success: false, error: "Quellkonto nicht gefunden oder kein Zugriff." };
-      }
-      updates.sourceCurrency ??= currency as Currency;
-    }
-    if (updates.targetAccountId) {
-      const currency = await getOwnedAccountCurrency(userId, updates.targetAccountId);
-      if (!currency) {
-        return { success: false, error: "Zielkonto nicht gefunden oder kein Zugriff." };
-      }
-      updates.targetCurrency ??= currency as Currency;
-    }
-
-    const [transfer] = await db
-      .update(transfers)
-      .set(updates)
-      .where(and(eq(transfers.id, id), eq(transfers.userId, userId)))
-      .returning();
-
-    if (!transfer) {
-      return { success: false, error: "Transfer nicht gefunden." };
-    }
-
-    revalidatePath("/transfers");
-    revalidatePath("/dashboard");
-    revalidatePath("/accounts");
-    return { success: true, data: transfer };
-  } catch (error) {
-    logger.error("Failed to update transfer", "updateTransfer", error);
-    return { success: false, error: "Transfer konnte nicht aktualisiert werden" };
   }
 }
 

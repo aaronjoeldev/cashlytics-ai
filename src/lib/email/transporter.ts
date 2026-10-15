@@ -64,7 +64,7 @@ export function isEmailConfigured(): boolean {
   return isConfigured;
 }
 
-export function getTransporter(): Transporter | null {
+function getTransporter(): Transporter | null {
   if (transporter) {
     return transporter;
   }

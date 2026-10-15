@@ -1,7 +1,7 @@
 # Builds the image from this checkout and runs it with a local PostgreSQL.
 #
 #   docker compose up -d --build     app on http://localhost:3000
-#   docker compose up -d postgres    database only, for `npm run dev` (see start-services.sh)
+#   docker compose up -d postgres    database only, for `npm run dev` (see scripts/dev.sh)
 
 services:
   app:
@@ -18,7 +18,6 @@ services:
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - AUTH_SECRET=${AUTH_SECRET}
       - SINGLE_USER_MODE=${SINGLE_USER_MODE:-true}
-      - SINGLE_USER_EMAIL=${SINGLE_USER_EMAIL}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
