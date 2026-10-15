@@ -1,13 +1,20 @@
-'use client';
+"use client";
 
-import { useRef, useEffect, useState } from 'react';
-import { MessageSquare, RefreshCw, Sparkles, TrendingUp, CreditCard, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { ChatMessage, ChatMessageLoading } from '@/components/molecules/chat-message';
-import { ChatInput } from '@/components/molecules/chat-input';
-import { ChatHistorySidebar } from '@/components/organisms/chat-history-sidebar';
-import { useConversations } from '@/hooks/use-conversations';
+import { useRef, useEffect, useState } from "react";
+import {
+  MessageSquare,
+  RefreshCw,
+  Sparkles,
+  TrendingUp,
+  CreditCard,
+  AlertCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ChatMessage, ChatMessageLoading } from "@/components/molecules/chat-message";
+import { ChatInput } from "@/components/molecules/chat-input";
+import { ChatHistorySidebar } from "@/components/organisms/chat-history-sidebar";
+import { useConversations } from "@/hooks/use-conversations";
 
 const WELCOME_TEXT = `Hallo! Ich bin dein Cashlytics Assistent.
 
@@ -22,22 +29,22 @@ Ich kann dir bei deinen Finanzen helfen:
 Wie kann ich dir helfen?`;
 
 const WELCOME_MESSAGE = {
-  id: 'welcome',
-  role: 'assistant' as const,
-  parts: [{ type: 'text' as const, text: WELCOME_TEXT }],
+  id: "welcome",
+  role: "assistant" as const,
+  parts: [{ type: "text" as const, text: WELCOME_TEXT }],
 };
 
 const SUGGESTED_PROMPTS = [
-  { icon: Sparkles, text: 'Wie sieht es finanziell aus?' },
-  { icon: CreditCard, text: 'Welche Abos habe ich?' },
-  { icon: TrendingUp, text: 'Vergleiche diesen Monat mit dem letzten' },
-  { icon: AlertCircle, text: 'Gibt es etwas Auffälliges bei meinen Ausgaben?' },
-  { icon: MessageSquare, text: 'Ich habe 45€ bei REWE ausgegeben' },
+  { icon: Sparkles, text: "Wie sieht es finanziell aus?" },
+  { icon: CreditCard, text: "Welche Abos habe ich?" },
+  { icon: TrendingUp, text: "Vergleiche diesen Monat mit dem letzten" },
+  { icon: AlertCircle, text: "Gibt es etwas Auffälliges bei meinen Ausgaben?" },
+  { icon: MessageSquare, text: "Ich habe 45€ bei REWE ausgegeben" },
 ];
 
 export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
 
   const {
     conversations,
@@ -48,6 +55,7 @@ export function ChatInterface() {
     deleteConversationWithSwitch,
     messages,
     sendMessage,
+    regenerate,
     status,
     error,
     addToolApprovalResponse,
@@ -61,16 +69,16 @@ export function ChatInterface() {
     addToolApprovalResponse({ id: approvalId, approved: false });
   };
 
-  const isLoading = status === 'streaming' || status === 'submitted';
+  const isLoading = status === "streaming" || status === "submitted";
   const hasMessages = messages.length > 0;
 
   const lastAssistantIndex = messages.reduce(
-    (lastIdx, msg, idx) => (msg.role === 'assistant' ? idx : lastIdx),
+    (lastIdx, msg, idx) => (msg.role === "assistant" ? idx : lastIdx),
     -1
   );
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -80,7 +88,7 @@ export function ChatInterface() {
   const handleSend = () => {
     if (input.trim() && !isLoading) {
       sendMessage({ text: input.trim() });
-      setInput('');
+      setInput("");
     }
   };
 
@@ -90,15 +98,9 @@ export function ChatInterface() {
     }
   };
 
+  // Re-sends the last user message instead of adding a copy of it
   const handleRetry = () => {
-    const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
-    if (lastUserMessage) {
-      const content = lastUserMessage.parts
-        .filter((p) => p.type === 'text')
-        .map((p) => p.text)
-        .join('');
-      sendMessage({ text: content });
-    }
+    regenerate();
   };
 
   const sidebarProps = {
@@ -113,7 +115,7 @@ export function ChatInterface() {
   return (
     <div className="flex h-full flex-col">
       {/* Mobile header bar */}
-      <div className="flex sm:hidden items-center gap-2 border-b border-border/50 dark:border-white/[0.08] px-2 py-2 flex-shrink-0">
+      <div className="border-border/50 flex flex-shrink-0 items-center gap-2 border-b px-2 py-2 sm:hidden dark:border-white/[0.08]">
         <ChatHistorySidebar {...sidebarProps} />
         <span className="text-sm font-semibold">Assistent</span>
       </div>
@@ -146,12 +148,12 @@ export function ChatInterface() {
             {!hasMessages && !isLoading && (
               <div className="mx-auto max-w-3xl px-4 py-8">
                 <div className="flex flex-col items-center justify-center space-y-6">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-lg shadow-amber-500/10">
-                    <MessageSquare className="h-8 w-8 text-primary" />
+                  <div className="from-primary/20 to-primary/5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg shadow-amber-500/10">
+                    <MessageSquare className="text-primary h-8 w-8" />
                   </div>
                   <div className="text-center">
                     <h3 className="text-lg font-semibold">Starte eine Konversation</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="text-muted-foreground mt-1 text-sm">
                       Dein AI-Assistent hilft dir bei allen Finanzfragen
                     </p>
                   </div>
@@ -160,11 +162,11 @@ export function ChatInterface() {
                     {SUGGESTED_PROMPTS.map((prompt, index) => (
                       <Card
                         key={index}
-                        className="cursor-pointer p-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 dark:hover:bg-white/[0.08]"
+                        className="cursor-pointer p-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:hover:bg-white/[0.08]"
                         onClick={() => handleSuggestedPrompt(prompt.text)}
                       >
                         <div className="flex items-center gap-3">
-                          <prompt.icon className="h-4 w-4 flex-shrink-0 text-primary" />
+                          <prompt.icon className="text-primary h-4 w-4 flex-shrink-0" />
                           <span className="text-sm">{prompt.text}</span>
                         </div>
                       </Card>
@@ -176,10 +178,10 @@ export function ChatInterface() {
 
             {error && (
               <div className="mx-auto max-w-3xl px-4 py-4">
-                <Card className="border-destructive/50 bg-destructive/10 dark:bg-red-500/10 dark:border-red-500/20 p-4">
+                <Card className="border-destructive/50 bg-destructive/10 p-4 dark:border-red-500/20 dark:bg-red-500/10">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm text-destructive">
+                      <p className="text-destructive text-sm">
                         Ein Fehler ist aufgetreten. Bitte versuche es erneut.
                       </p>
                     </div>
@@ -199,7 +201,7 @@ export function ChatInterface() {
             )}
           </div>
 
-          <div className="border-t border-border/50 dark:border-white/[0.08] bg-background/95 dark:bg-background/50 p-2 sm:p-4 backdrop-blur-xl">
+          <div className="border-border/50 bg-background/95 dark:bg-background/50 border-t p-2 backdrop-blur-xl sm:p-4 dark:border-white/[0.08]">
             <ChatInput
               input={input}
               isLoading={isLoading}

@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { chatTransport } from "@/lib/ai/chat-transport";
-import { lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
+import { lastAssistantMessageIsCompleteWithApprovalResponses, type UIMessage } from "ai";
 import { toast } from "sonner";
 import {
   getConversations,
@@ -13,6 +13,7 @@ import {
   updateConversationTitleFromFirstMessage,
   saveMessage,
 } from "@/actions/conversation-actions";
+import { collectTurnToSave, textOf } from "@/lib/ai/chat-history";
 import type { Conversation, Message, ApiResponse } from "@/types/database";
 
 interface UseConversationsReturn {
@@ -24,7 +25,8 @@ interface UseConversationsReturn {
   startNewChat: () => Promise<void>;
   deleteConversationWithSwitch: (id: string) => Promise<void>;
   messages: ReturnType<typeof useChat>["messages"];
-  sendMessage: ReturnType<typeof useChat>["sendMessage"];
+  sendMessage: (message: { text: string }) => Promise<void>;
+  regenerate: () => Promise<void>;
   status: ReturnType<typeof useChat>["status"];
   error: ReturnType<typeof useChat>["error"];
   setMessages: ReturnType<typeof useChat>["setMessages"];
@@ -35,57 +37,48 @@ export function useConversations(): UseConversationsReturn {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
-  const [hasSetTitle, setHasSetTitle] = useState(false);
   const initializedRef = useRef(false);
+  const activeConversationRef = useRef<string | null>(null);
+  // Conversation the running request belongs to; its answer is stored there
+  const requestConversationRef = useRef<string | null>(null);
+  // Ids of messages that are already stored (loaded from the database or saved after a turn)
+  const savedMessageIdsRef = useRef(new Set<string>());
+  // Conversations whose title was already taken from the first message
+  const titledConversationsRef = useRef(new Set<string>());
+
+  const persistTurn = async (conversationId: string, message: UIMessage, messages: UIMessage[]) => {
+    const turn = collectTurnToSave(message, messages, savedMessageIdsRef.current);
+    if (!turn) return;
+
+    // Mark first, so an overlapping finish cannot store the same messages again
+    if (turn.user) savedMessageIdsRef.current.add(turn.user.id);
+    turn.assistantIds.forEach((id) => savedMessageIdsRef.current.add(id));
+
+    const userContent = turn.user ? textOf(turn.user) : "";
+    if (userContent) {
+      await saveMessage(conversationId, "user", userContent);
+      if (!titledConversationsRef.current.has(conversationId)) {
+        titledConversationsRef.current.add(conversationId);
+        await updateConversationTitleFromFirstMessage(conversationId, userContent);
+      }
+    }
+    if (turn.assistantContent) {
+      await saveMessage(conversationId, "assistant", turn.assistantContent);
+    }
+    loadConversations();
+  };
 
   const chat = useChat({
     transport: chatTransport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-    onFinish: async ({ message }) => {
-      if (!activeConversationId) return;
-
-      // Skip saving when the message only contains pending tool approvals (no text,
-      // no completed results). This avoids triggering revalidatePath while the
-      // confirmation card is waiting for user input.
-      const hasText = message.parts.some((p) => p.type === "text");
-      const hasPendingApproval = message.parts.some(
-        (p) =>
-          p.type.startsWith("tool-") && (p as { state?: string }).state === "approval-requested"
-      );
-      if (!hasText && hasPendingApproval) return;
-
-      const messagesLength = chat.messages.length;
-      const userMsg =
-        messagesLength >= 2
-          ? chat.messages[messagesLength - 2]
-          : chat.messages.find((m) => m.role === "user");
-
-      if (userMsg?.role === "user") {
-        const userContent = userMsg.parts
-          .filter((p) => p.type === "text")
-          .map((p) => (p as { type: "text"; text: string }).text)
-          .join("");
-        await saveMessage(activeConversationId, "user", userContent);
-      }
-
-      const assistantContent = message.parts
-        .filter((p): p is { type: "text"; text: string } => p.type === "text")
-        .map((p) => p.text)
-        .join("");
-      await saveMessage(activeConversationId, "assistant", assistantContent);
-
-      if (!hasSetTitle) {
-        const firstUserMessage = chat.messages.find((m) => m.role === "user");
-        if (firstUserMessage) {
-          const content = firstUserMessage.parts
-            .filter((p) => p.type === "text")
-            .map((p) => (p as { type: "text"; text: string }).text)
-            .join("");
-          await updateConversationTitleFromFirstMessage(activeConversationId, content);
-          setHasSetTitle(true);
-        }
-      }
-      loadConversations();
+    onFinish: ({ message, messages, isAbort, isError, isDisconnect }) => {
+      // Failed or stopped answers are not stored; a retry stores the turn once it succeeds
+      if (isAbort || isError || isDisconnect) return;
+      const conversationId = requestConversationRef.current;
+      if (!conversationId) return;
+      persistTurn(conversationId, message, messages).catch(() => {
+        toast.error("Nachricht konnte nicht gespeichert werden");
+      });
     },
   });
 
@@ -103,8 +96,10 @@ export function useConversations(): UseConversationsReturn {
 
   const selectConversation = useCallback(
     async (id: string) => {
+      // A running answer belongs to the previous conversation; stop it instead of mixing them
+      await chat.stop();
+      activeConversationRef.current = id;
       setActiveConversationId(id);
-      setHasSetTitle(true);
       const result = await getConversationById(id);
       if (result.success) {
         const uiMessages = result.data.messages.map((msg: Message) => ({
@@ -112,6 +107,10 @@ export function useConversations(): UseConversationsReturn {
           role: msg.role as "user" | "assistant",
           parts: [{ type: "text" as const, text: msg.content }],
         }));
+        uiMessages.forEach((msg) => savedMessageIdsRef.current.add(msg.id));
+        if (uiMessages.some((msg) => msg.role === "user")) {
+          titledConversationsRef.current.add(id);
+        }
         chat.setMessages(uiMessages);
       } else {
         toast.error("Fehler beim Laden des Chats");
@@ -121,10 +120,11 @@ export function useConversations(): UseConversationsReturn {
   );
 
   const startNewChat = useCallback(async () => {
+    await chat.stop();
     const result = await createConversation();
     if (result.success) {
+      activeConversationRef.current = result.data.id;
       setActiveConversationId(result.data.id);
-      setHasSetTitle(false);
       chat.setMessages([]);
       setConversations((prev) => [result.data, ...prev]);
     } else {
@@ -178,7 +178,15 @@ export function useConversations(): UseConversationsReturn {
     startNewChat,
     deleteConversationWithSwitch,
     messages: chat.messages,
-    sendMessage: chat.sendMessage,
+    sendMessage: async (message) => {
+      requestConversationRef.current = activeConversationRef.current;
+      await chat.sendMessage(message);
+    },
+    // Sends the last user message again without adding it a second time
+    regenerate: async () => {
+      requestConversationRef.current = activeConversationRef.current;
+      await chat.regenerate();
+    },
     status: chat.status,
     error: chat.error,
     setMessages: chat.setMessages,

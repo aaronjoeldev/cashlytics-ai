@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { merchantCategories, categories } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { ownsCategory } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 import type { ApiResponse } from "@/types/database";
@@ -56,6 +56,34 @@ export async function suggestCategoryForMerchant(
       success: false,
       error: "Aktion fehlgeschlagen.",
     };
+  }
+}
+
+/**
+ * The user's most used merchant→category mappings, learned from bookings made in the assistant.
+ * The chat puts them into the system prompt so the model proposes the category used before.
+ */
+export async function getMerchantCategoryHints(
+  limit = 30
+): Promise<ApiResponse<{ merchantPattern: string; categoryId: string; categoryName: string }[]>> {
+  const auth = await requireAuth();
+  if (auth.error) return { success: false, error: "Unauthorized" };
+
+  try {
+    const rows = await db
+      .select({
+        merchantPattern: merchantCategories.merchantPattern,
+        categoryId: merchantCategories.categoryId,
+        categoryName: categories.name,
+      })
+      .from(merchantCategories)
+      .innerJoin(categories, eq(merchantCategories.categoryId, categories.id))
+      .where(eq(merchantCategories.userId, auth.userId))
+      .orderBy(desc(merchantCategories.usageCount), desc(merchantCategories.updatedAt))
+      .limit(Math.min(Math.max(1, Math.trunc(limit) || 1), 100));
+    return { success: true, data: rows };
+  } catch {
+    return { success: false, error: "Aktion fehlgeschlagen." };
   }
 }
 
