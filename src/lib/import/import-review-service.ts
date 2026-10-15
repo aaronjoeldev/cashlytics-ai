@@ -420,6 +420,12 @@ function createTxStore(tx: TransactionClient): ImportReviewStore {
       if (!updatedRow) {
         throw new Error("Staged import row not found");
       }
+
+      // The duplicate check ran on the old values and has to run again before confirming
+      await tx
+        .update(importSessions)
+        .set({ reconciledAt: null, updatedAt: new Date() })
+        .where(and(eq(importSessions.id, sessionId), eq(importSessions.userId, userId)));
     },
 
     async excludeRowAndClearConflicts(userId, sessionId, rowId) {

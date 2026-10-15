@@ -51,6 +51,12 @@ export type NearMatchInput = {
   existingTransactions: ReconciliationManualTransaction[];
 };
 
+export type NearMatchResult = {
+  decisions: NearMatchDecision[];
+  /** Rows that could not be checked, for example because the AI call failed */
+  uncheckedRowCount: number;
+};
+
 export type NearMatchDecision = {
   importRowId: string;
   matchedTransactionId: string;
@@ -100,7 +106,7 @@ type ReconciliationStore = {
 
 export type ImportReconciliationEngineDeps = {
   store: ReconciliationStore;
-  resolveNearMatches?: (input: NearMatchInput) => Promise<NearMatchDecision[]>;
+  resolveNearMatches?: (input: NearMatchInput) => Promise<NearMatchResult>;
 };
 
 export type ImportReconciliationInput = {
@@ -113,12 +119,21 @@ export type ImportReconciliationResult = {
   exactMatchCount: number;
   nearMatchCount: number;
   conflictRows: number;
+  /** Rows only checked for exact duplicates because the near-match check failed for them */
+  uncheckedRowCount: number;
   candidates: ImportConflictCandidate[];
 };
 
 type AiNearMatchResolverDeps = {
   runReconciliationPrompt?: (prompt: string) => Promise<string>;
 };
+
+/** Rows per AI call; keeps the prompt and the JSON answer well inside the model limits */
+export const NEAR_MATCH_BATCH_SIZE = 40;
+/** Existing entries further away from every row in a batch are not sent to the AI */
+const NEAR_MATCH_WINDOW_DAYS = 7;
+const MAX_EXISTING_PER_BATCH = 200;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_RESOLUTION_OPTIONS: ImportConflictDecisionOption[] = [
   "replace_existing",
@@ -185,9 +200,14 @@ export function toStagedConflictCandidateRecord(input: {
   return buildConflictCandidateRecord(input.userId, input.sessionId, input.candidate);
 }
 
+function rowDirection(row: ReconciliationStagedRow): "income" | "expense" {
+  return normalizeSignedAmount(row.amount).direction;
+}
+
 function pickDeterministicExactMatch(
   row: ReconciliationStagedRow,
-  manualTransactions: ReconciliationManualTransaction[]
+  manualTransactions: ReconciliationManualTransaction[],
+  claimedTransactionIds: Set<string>
 ): ReconciliationManualTransaction | null {
   if (!row.bookingDate) {
     return null;
@@ -198,6 +218,8 @@ function pickDeterministicExactMatch(
   const rowDescription = normalizeDescription(row.description);
 
   const candidates = manualTransactions
+    // Two identical CSV rows must not both be matched to the same existing entry
+    .filter((transaction) => !claimedTransactionIds.has(transaction.id))
     .filter((transaction) => transaction.type === rowAmount.direction)
     .filter((transaction) => Number.parseFloat(transaction.amount) === rowAmount.absolute)
     .filter((transaction) => asDateKey(transaction.date) === rowDateKey)
@@ -257,26 +279,21 @@ export function createAiNearMatchResolver(deps: AiNearMatchResolverDeps = {}) {
       return result.text;
     });
 
-  return async (input: NearMatchInput): Promise<NearMatchDecision[]> => {
-    if (input.rows.length === 0 || input.existingTransactions.length === 0) {
-      return [];
-    }
-
-    if (!process.env.OPENAI_API_KEY?.trim()) {
-      return [];
-    }
-
+  const resolveBatch = async (
+    rows: ReconciliationStagedRow[],
+    existingTransactions: ReconciliationManualTransaction[]
+  ): Promise<NearMatchDecision[] | null> => {
     try {
       const prompt = buildCsvReconciliationPrompt({
         accountName: "CSV Import Account",
-        rows: input.rows.map((row) => ({
+        rows: rows.map((row) => ({
           csvRowId: row.id,
           date: row.bookingDate ? asDateKey(row.bookingDate) : "unknown",
           amount: parseAmountToNumber(row.amount),
           description: row.description,
           currency: "UNKNOWN",
         })),
-        existingTransactions: input.existingTransactions.map((transaction) => ({
+        existingTransactions: existingTransactions.map((transaction) => ({
           transactionId: transaction.id,
           date: asDateKey(transaction.date),
           amount: parseAmountToNumber(transaction.amount),
@@ -291,7 +308,7 @@ export function createAiNearMatchResolver(deps: AiNearMatchResolverDeps = {}) {
           `AI near-match output rejected (${parsed.errorCode}): ${parsed.message}`,
           "createAiNearMatchResolver"
         );
-        return [];
+        return null;
       }
 
       return parsed.data.decisions
@@ -310,9 +327,64 @@ export function createAiNearMatchResolver(deps: AiNearMatchResolverDeps = {}) {
         "createAiNearMatchResolver",
         error
       );
-      return [];
+      return null;
     }
   };
+
+  return async (input: NearMatchInput): Promise<NearMatchResult> => {
+    if (input.rows.length === 0 || input.existingTransactions.length === 0) {
+      return { decisions: [], uncheckedRowCount: 0 };
+    }
+
+    if (!process.env.OPENAI_API_KEY?.trim()) {
+      return { decisions: [], uncheckedRowCount: input.rows.length };
+    }
+
+    const decisions: NearMatchDecision[] = [];
+    let uncheckedRowCount = 0;
+
+    for (let start = 0; start < input.rows.length; start += NEAR_MATCH_BATCH_SIZE) {
+      const rows = input.rows.slice(start, start + NEAR_MATCH_BATCH_SIZE);
+      const candidates = selectNearMatchCandidates(rows, input.existingTransactions);
+      if (candidates.length === 0) {
+        continue;
+      }
+
+      const batchDecisions = await resolveBatch(rows, candidates);
+      if (batchDecisions === null) {
+        uncheckedRowCount += rows.length;
+      } else {
+        decisions.push(...batchDecisions);
+      }
+    }
+
+    return { decisions, uncheckedRowCount };
+  };
+}
+
+/**
+ * Existing entries worth comparing with a batch of rows: same direction as one of the rows and
+ * within a week of its date, closest first.
+ */
+export function selectNearMatchCandidates(
+  rows: ReconciliationStagedRow[],
+  existingTransactions: ReconciliationManualTransaction[]
+): ReconciliationManualTransaction[] {
+  const rowKeys = rows
+    .filter((row) => row.bookingDate)
+    .map((row) => ({ direction: rowDirection(row), time: row.bookingDate!.getTime() }));
+
+  return existingTransactions
+    .map((transaction) => {
+      const distances = rowKeys
+        .filter((row) => row.direction === transaction.type)
+        .map((row) => Math.abs(row.time - transaction.date.getTime()));
+      return { transaction, distance: distances.length > 0 ? Math.min(...distances) : Infinity };
+    })
+    .filter(({ distance }) => distance <= NEAR_MATCH_WINDOW_DAYS * DAY_MS)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, MAX_EXISTING_PER_BATCH)
+    .map(({ transaction }) => transaction);
 }
 
 export function createImportReconciliationEngine(deps: ImportReconciliationEngineDeps) {
@@ -334,23 +406,34 @@ export function createImportReconciliationEngine(deps: ImportReconciliationEngin
 
       const exactCandidates: ImportConflictCandidate[] = [];
       const unresolvedRows: ReconciliationStagedRow[] = [];
+      // Each existing entry can be the counterpart of one CSV row only
+      const claimedTransactionIds = new Set<string>();
 
       for (const row of stagedRows) {
-        const exactMatch = pickDeterministicExactMatch(row, manualTransactions);
+        const exactMatch = pickDeterministicExactMatch(
+          row,
+          manualTransactions,
+          claimedTransactionIds
+        );
         if (exactMatch) {
+          claimedTransactionIds.add(exactMatch.id);
           exactCandidates.push(createExactCandidate(row, exactMatch));
         } else {
           unresolvedRows.push(row);
         }
       }
 
-      let nearCandidates: ImportConflictCandidate[] = [];
+      const nearCandidates: ImportConflictCandidate[] = [];
+      let uncheckedRowCount = 0;
       if (deps.resolveNearMatches && unresolvedRows.length > 0) {
-        let nearDecisions: NearMatchDecision[] = [];
+        const unclaimedTransactions = manualTransactions.filter(
+          (transaction) => !claimedTransactionIds.has(transaction.id)
+        );
+        let nearResult: NearMatchResult = { decisions: [], uncheckedRowCount: 0 };
         try {
-          nearDecisions = await deps.resolveNearMatches({
+          nearResult = await deps.resolveNearMatches({
             rows: unresolvedRows,
-            existingTransactions: manualTransactions,
+            existingTransactions: unclaimedTransactions,
           });
         } catch (error) {
           logger.error(
@@ -358,23 +441,35 @@ export function createImportReconciliationEngine(deps: ImportReconciliationEngin
             "detectAndStageConflicts",
             error
           );
+          nearResult = { decisions: [], uncheckedRowCount: unresolvedRows.length };
         }
+        uncheckedRowCount = nearResult.uncheckedRowCount;
 
         const rowById = new Map(unresolvedRows.map((row) => [row.id, row]));
         const transactionById = new Map(
-          manualTransactions.map((transaction) => [transaction.id, transaction])
+          unclaimedTransactions.map((transaction) => [transaction.id, transaction])
         );
+        const matchedRowIds = new Set<string>();
 
-        nearCandidates = nearDecisions
-          .map((decision) => {
-            const row = rowById.get(decision.importRowId);
-            const transaction = transactionById.get(decision.matchedTransactionId);
-            if (!row || !transaction) {
-              return null;
-            }
-            return toNearMatchCandidate(row, transaction, decision);
-          })
-          .filter((candidate): candidate is ImportConflictCandidate => candidate !== null);
+        // Highest confidence first, so a contested entry goes to its best match
+        const decisions = [...nearResult.decisions].sort((a, b) => b.confidence - a.confidence);
+        for (const decision of decisions) {
+          const row = rowById.get(decision.importRowId);
+          const transaction = transactionById.get(decision.matchedTransactionId);
+          if (
+            !row ||
+            !transaction ||
+            matchedRowIds.has(row.id) ||
+            claimedTransactionIds.has(transaction.id) ||
+            // An expense row is never a duplicate of an income and vice versa
+            rowDirection(row) !== transaction.type
+          ) {
+            continue;
+          }
+          matchedRowIds.add(row.id);
+          claimedTransactionIds.add(transaction.id);
+          nearCandidates.push(toNearMatchCandidate(row, transaction, decision));
+        }
       }
 
       const allCandidates = [...exactCandidates, ...nearCandidates].sort((a, b) =>
@@ -394,6 +489,7 @@ export function createImportReconciliationEngine(deps: ImportReconciliationEngin
         exactMatchCount: exactCandidates.length,
         nearMatchCount: nearCandidates.length,
         conflictRows: allCandidates.length,
+        uncheckedRowCount,
         candidates: allCandidates,
       };
     },
@@ -491,6 +587,7 @@ function createDbReconciliationStore(): ReconciliationStore {
           .update(importSessions)
           .set({
             conflictRows: conflicts.length,
+            reconciledAt: new Date(),
             updatedAt: new Date(),
           })
           .where(and(eq(importSessions.id, sessionId), eq(importSessions.userId, userId)));

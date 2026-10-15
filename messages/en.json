@@ -204,7 +204,7 @@
   },
   "expenses": {
     "title": "Expenses",
-    "description": "Manage your periodic and daily expenses",
+    "description": "Description",
     "allExpenses": "All Expenses",
     "noExpenses": "No expenses yet. Add your first expense!",
     "addExpense": "Add Expense",
@@ -214,7 +214,6 @@
     "daily": "Daily",
     "name": "Name",
     "namePlaceholder": "e.g. Rent",
-    "description": "Description",
     "descriptionPlaceholder": "e.g. Lunch",
     "amount": "Amount (€)",
     "recurrence": "Recurrence",
@@ -656,7 +655,8 @@
       "title": "Confirm import",
       "subtitle": "Apply approved rows to your transactions.",
       "irreversibleWarning": "This action cannot be undone.",
-      "confirmButton": "Confirm and import"
+      "confirmButton": "Confirm and import",
+      "reconciliationMissing": "The check against your existing entries has not run. Run it before confirming the import."
     },
     "toasts": {
       "stagedSuccess": "CSV file staged successfully.",
@@ -664,7 +664,9 @@
       "decisionsSaved": "Conflict decisions saved.",
       "rowUpdated": "Staged row updated.",
       "rowRemoved": "Staged row removed.",
-      "importConfirmed": "Import completed successfully."
+      "importConfirmed": "Import completed successfully.",
+      "alreadyImported": "This file was already imported into this account on {date}. Bookings that already exist are listed below as conflicts.",
+      "reconciliationPartial": "The AI check could not process {count} rows. For these rows only exact duplicates were looked for."
     },
     "errors": {
       "aiDisabled": "CSV import is unavailable because AI is not configured.",
