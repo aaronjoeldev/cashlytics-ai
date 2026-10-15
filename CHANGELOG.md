@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.12](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.11...v0.8.12) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- compose healthchecks never passed, binary rounding, dashboard dates ([ce20f7f](https://github.com/aaronjoeldev/cashlytics-ai/commit/ce20f7f19a74a300ee16059a38c2d440e2f31d09))
+
 ## [0.8.11](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.10...v0.8.11) (2026-10-15)
 
 ### 🐛 Bug Fixes
