@@ -371,21 +371,16 @@ export async function POST(req: Request) {
       tools,
       stopWhen: stepCountIs(10),
       toolChoice: "auto",
+      // Development only (logger.debug is silent in production)
       onStepFinish: ({ toolCalls, toolResults, finishReason }) => {
-        if (process.env.NODE_ENV === "development") {
-          console.log(`[AI Step] finish=${finishReason}`);
-          if (toolCalls?.length) {
-            for (const call of toolCalls) {
-              console.log(`  → Tool: ${call.toolName}`, JSON.stringify(call.input).slice(0, 200));
-            }
-          }
-          if (toolResults?.length) {
-            for (const result of toolResults) {
-              const preview = JSON.stringify(result.output).slice(0, 300);
-              console.log(`  ← Result: ${preview}`);
-            }
-          }
-        }
+        const calls = toolCalls.map(
+          (c) => `${c.toolName} ${JSON.stringify(c.input).slice(0, 200)}`
+        );
+        const results = toolResults.map((r) => JSON.stringify(r.output).slice(0, 300));
+        logger.debug(
+          `finish=${finishReason} calls=[${calls.join("; ")}] results=[${results.join("; ")}]`,
+          "chat"
+        );
       },
     });
 

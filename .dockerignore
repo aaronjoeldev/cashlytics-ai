@@ -34,17 +34,11 @@ Dockerfile
 docker-compose*.yml
 .dockerignore
 
-# Documentation
+# Documentation and local tooling
 README.md
-DESIGN.MD
-START.MD
-prompt.md
+CHANGELOG.md
 docs/
-
-# Database files
-*.db
-*.db-journal
-vectors.db
+scripts/
 
 # Test files
 coverage

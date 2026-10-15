@@ -8,8 +8,8 @@ import { logger } from "@/lib/logger";
 import { currencies, defaultCurrency, type Currency } from "@/lib/currency";
 import { defaultLocale, locales, type Locale } from "@/i18n/config";
 
-export const LOCALE_COOKIE = "locale";
-export const CURRENCY_COOKIE = "currency";
+const LOCALE_COOKIE = "locale";
+const CURRENCY_COOKIE = "currency";
 
 export type UserPreferences = { currency: Currency; locale: Locale };
 
@@ -20,9 +20,7 @@ const asLocale = (value: string | undefined | null): Locale | undefined =>
   value && locales.includes(value as Locale) ? (value as Locale) : undefined;
 
 /** Stored settings of a user, or null when they never saved any. */
-export async function loadStoredPreferences(
-  userId: string
-): Promise<Partial<UserPreferences> | null> {
+async function loadStoredPreferences(userId: string): Promise<Partial<UserPreferences> | null> {
   const [row] = await db
     .select({ baseCurrency: userSettings.baseCurrency, locale: userSettings.locale })
     .from(userSettings)

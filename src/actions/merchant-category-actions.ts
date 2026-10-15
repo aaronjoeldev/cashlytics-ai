@@ -8,58 +8,6 @@ import { requireAuth } from "@/lib/auth/require-auth";
 import type { ApiResponse } from "@/types/database";
 
 /**
- * Finds the best matching category for a merchant description.
- * Returns null if no learned mapping exists.
- */
-export async function suggestCategoryForMerchant(
-  description: string
-): Promise<ApiResponse<{ categoryId: string; categoryName: string; confidence: number } | null>> {
-  const auth = await requireAuth();
-  if (auth.error) return { success: false, error: "Unauthorized" };
-  const { userId } = auth;
-
-  try {
-    const normalized = description.toLowerCase().trim();
-
-    const mappings = await db
-      .select({
-        merchantPattern: merchantCategories.merchantPattern,
-        categoryId: merchantCategories.categoryId,
-        categoryName: categories.name,
-        usageCount: merchantCategories.usageCount,
-      })
-      .from(merchantCategories)
-      .innerJoin(categories, eq(merchantCategories.categoryId, categories.id))
-      .where(eq(merchantCategories.userId, userId));
-
-    let bestMatch: { categoryId: string; categoryName: string; confidence: number } | null = null;
-    let bestScore = 0;
-
-    for (const mapping of mappings) {
-      const pattern = mapping.merchantPattern.toLowerCase();
-      if (normalized.includes(pattern) || pattern.includes(normalized)) {
-        const score = mapping.usageCount;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = {
-            categoryId: mapping.categoryId,
-            categoryName: mapping.categoryName,
-            confidence: Math.min(score / 5, 1),
-          };
-        }
-      }
-    }
-
-    return { success: true, data: bestMatch };
-  } catch {
-    return {
-      success: false,
-      error: "Aktion fehlgeschlagen.",
-    };
-  }
-}
-
-/**
  * The user's most used merchant→category mappings, learned from bookings made in the assistant.
  * The chat puts them into the system prompt so the model proposes the category used before.
  */

@@ -531,49 +531,6 @@ export async function getImportSessionSnapshot(
   }
 }
 
-export async function updateStagedImportRow(
-  sessionId: string,
-  rowId: string,
-  patch: {
-    bookingDate?: Date | string | null;
-    amount?: string;
-    currency?: string;
-    description?: string;
-    counterparty?: string | null;
-    senderAccount?: string | null;
-    receiverAccount?: string | null;
-    balanceAfterBooking?: string | null;
-  }
-): Promise<ApiResponse<{ rowId: string }>> {
-  const featureGateError = rejectIfImportFeatureDisabled<{ rowId: string }>();
-  if (featureGateError) {
-    return featureGateError;
-  }
-
-  try {
-    const authResult = await requireAuth();
-    if (authResult.error) {
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const result = await importReviewService.updateStagedRow({
-      userId: authResult.userId,
-      sessionId,
-      rowId,
-      patch,
-    });
-
-    revalidatePath("/import");
-    return { success: true, data: result };
-  } catch (error) {
-    logger.error("Failed to update staged import row", "updateStagedImportRow", error);
-    return {
-      success: false,
-      error: resolveImportActionErrorMessage(error, "Staged row update failed."),
-    };
-  }
-}
-
 export async function removeStagedImportRow(
   sessionId: string,
   rowId: string

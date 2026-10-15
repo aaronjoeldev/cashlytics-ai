@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { currencies, defaultCurrency } from "@/lib/currency";
+import { currencies } from "@/lib/currency";
 
 export const recurrenceTypes = [
   "once",
@@ -13,7 +13,6 @@ export const recurrenceTypes = [
 ] as const;
 export const incomeRecurrenceTypes = ["once", "monthly", "yearly"] as const;
 export const transferRecurrenceTypes = ["once", "monthly", "quarterly", "yearly"] as const;
-export const accountTypes = ["checking", "savings", "etf"] as const;
 
 export const expenseSchema = z.object({
   accountId: z.guid("Konto auswählen"),
@@ -64,13 +63,6 @@ export const incomeSchema = z.object({
   info: z.string().optional(),
 });
 
-export const accountSchema = z.object({
-  name: z.string().min(1, "Name ist erforderlich").max(50),
-  type: z.enum(accountTypes),
-  balance: z.string().default("0"),
-  currency: z.string().default(defaultCurrency),
-});
-
 export const transferSchema = z
   .object({
     sourceAccountId: z.guid("Quellkonto auswählen"),
@@ -92,5 +84,4 @@ export const transferSchema = z
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export type DailyExpenseInput = z.infer<typeof dailyExpenseSchema>;
 export type IncomeInput = z.infer<typeof incomeSchema>;
-export type AccountInput = z.infer<typeof accountSchema>;
 export type TransferInput = z.infer<typeof transferSchema>;

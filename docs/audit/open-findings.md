@@ -167,8 +167,9 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       to be read at runtime instead of from `NEXT_PUBLIC_*` variables.
 - [ ] **Server action body limit is the 1 MB default** while uploads promise 5 MB. _(unverified)_
 - [ ] Smaller: `user_settings` has no foreign key to `users`, snapshots `0010` / `0011` are
-      missing in `drizzle/meta`, `package.json` version is never bumped, `scripts/migrate-add-userId.ts`
-      creates a user with password `changeme` when `INITIAL_PASSWORD` is unset.
+      missing in `drizzle/meta`.
+- [x] `package.json` version was never bumped (now set by the release); `scripts/migrate-add-userId.ts`
+      created a user with password `changeme` (removed with `SINGLE_USER_EMAIL`, which only it used).
 
 - [x] **Compose healthchecks never passed**: `wget http://localhost:3000` resolves to `::1` in
       Alpine while the server listens on IPv4 only, so the app stayed unhealthy and the cron
@@ -220,15 +221,16 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 
 ## 7. Cleanup
 
-- [ ] **Dead code**: `accounts-actions.ts`, `expenses-actions.ts`, `incomes-actions.ts` now hold
-      one function each (used by `accounts/[id]/page.tsx`) and can be merged into the singular
-      files; `account-detail-actions.ts`,
-      `lib/auth/user-id.ts`, `lib/email/index.ts`,
-      `organisms/category-list.tsx`, `atoms/category-select.tsx`. (`src/lib/validators/`, the
-      unused `validations/*` schemas and the second daily-expense path were removed.)
-- [ ] **Tracked by accident**: `.tmp/` (agent session files) and
-      `.planning/milestones/v1.0-phases`, a byte-identical copy of `.planning/phases/01…05`.
-- [ ] **Outdated notes**: `.planning/codebase/CONCERNS.md` and `TESTING.md`.
+- [x] **Dead code** removed: the duplicate `accounts-`/`expenses-`/`incomes-actions.ts`,
+      `account-detail-actions.ts`, `exchange-rates-actions.ts`, six unused server actions, unused
+      components, helpers and exports, `date-fns`, `public/Logo.ai` and `logo-dark.svg`.
+- [x] **Tracked by accident / outdated**: `.tmp/`, `.planning/` (including the duplicate
+      milestone copy and the outdated notes) and the per-file docs under `docs/` (api, components,
+      pages, architecture), which described code that no longer exists. The README covers setup
+      and structure.
+- [ ] **Noisy build log**: `next build` prints 16 `[ERROR] ... Dynamic server usage` lines. The
+      actions' `catch` blocks log Next's own signal that a page renders dynamically; the build
+      succeeds and the pages work, but the log looks like failures.
 - [ ] **Test coverage**: nothing covers auth, the server actions, the chat route or the import edge
       cases above. CI runs no tests.
 - [ ] **Local tooling**: the pre-commit hook needs Git 2.32 or newer.
