@@ -241,6 +241,8 @@ export function OverviewClient({
       day: "numeric",
       month: "long",
       year: "numeric",
+      // Calendar days are stored as UTC midnight
+      timeZone: "UTC",
     }).format(date);
   };
 

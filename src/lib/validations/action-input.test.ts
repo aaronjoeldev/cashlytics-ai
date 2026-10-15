@@ -10,6 +10,7 @@ import {
   createIncomeInput,
   createTransferInput,
   parseInput,
+  roundDecimal,
   updateAccountInput,
   updateExpenseInput,
 } from "./action-input";
@@ -38,6 +39,24 @@ test("amounts are normalised to two decimals and accept numbers", () => {
   });
   assert.ok(fromNumber.success);
   assert.equal(fromNumber.data.amount, "0.30");
+});
+
+test("amounts round half away from zero on the decimal digits", () => {
+  assert.equal(roundDecimal(5.555, 2), "5.56");
+  assert.equal(roundDecimal(1.005, 2), "1.01");
+  assert.equal(roundDecimal(-5.555, 2), "-5.56");
+  assert.equal(roundDecimal(5.554, 2), "5.55");
+  assert.equal(roundDecimal(1.0000005, 6), "1.000001");
+  assert.equal(roundDecimal(12, 2), "12.00");
+
+  const result = parseInput(createDailyExpenseInput, {
+    accountId: ACCOUNT,
+    description: "REWE",
+    amount: "5.555",
+    date: "2026-03-01",
+  });
+  assert.ok(result.success);
+  assert.equal(result.data.amount, "5.56");
 });
 
 test("negative, zero, non-numeric and oversized amounts are rejected", () => {

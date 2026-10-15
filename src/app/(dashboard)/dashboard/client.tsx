@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useNow, useTimeZone, useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -15,8 +15,8 @@ import {
   Calendar,
 } from "lucide-react";
 import { useSettings } from "@/lib/settings-context";
+import { formatCalendarDate } from "@/lib/format-date";
 import type { DailyExpenseWithDetails } from "@/types/database";
-import type { Locale } from "@/i18n/config";
 
 interface DashboardStats {
   totalAssets: number;
@@ -65,12 +65,6 @@ interface DashboardClientProps {
   categoryBreakdown: CategoryBreakdown[];
   recentTransactions: DailyExpenseWithDetails[];
   upcomingPayments: UpcomingPayment[];
-}
-
-function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(
-    new Date(date)
-  );
 }
 
 interface KpiCardProps {
@@ -161,6 +155,7 @@ export function DashboardClient({
   const t = useTranslations("dashboard");
   const tCommon = useTranslations("common");
   const { formatCurrency, locale } = useSettings();
+  const format = useFormatter();
   const [viewMode, setViewMode] = useState<"reserve" | "cashflow">("reserve");
   const activeStats = viewMode === "reserve" ? stats.reserveView : stats.cashflowView;
   const portfolioMonthlyBalance = stats.cashflowView.savingsRate;
@@ -168,29 +163,26 @@ export function DashboardClient({
   const hasTransactions = recentTransactions.length > 0;
   const hasUpcoming = upcomingPayments.length > 0;
 
-  const localeMap: Record<Locale, string> = {
-    de: "de-DE",
-    en: "en-US",
-  };
-
-  const intlLocale = localeMap[locale];
-  const today = new Date().toLocaleDateString(intlLocale, {
+  // Server and browser format with the configured time zone, so both render the same day
+  const now = useNow();
+  const timeZone = useTimeZone() ?? "Europe/Berlin";
+  const today = format.dateTime(now, {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+  // Payment dates are calendar days stored as UTC midnight; compare them with today's day
+  const todayDay = Date.parse(new Intl.DateTimeFormat("en-CA", { timeZone }).format(now));
 
   function formatRelativeDate(date: Date): string {
-    const now = new Date();
-    const diffTime = date.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round((date.getTime() - todayDay) / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return tCommon("today");
     if (diffDays === 1) return tCommon("tomorrow");
     if (diffDays <= 7) return tCommon("inDays", { count: diffDays });
 
-    return new Intl.DateTimeFormat(intlLocale, { day: "numeric", month: "short" }).format(date);
+    return formatCalendarDate(date, locale, { day: "numeric", month: "short" });
   }
 
   return (
@@ -230,7 +222,8 @@ export function DashboardClient({
             className="text-foreground text-xl font-bold tracking-[-0.03em]"
             style={{ fontFamily: "var(--font-syne)" }}
           >
-            {stats.hasMultiCurrency ? "≈\u202f" : ""}{formatCurrency(portfolioMonthlyBalance)}
+            {stats.hasMultiCurrency ? "≈\u202f" : ""}
+            {formatCurrency(portfolioMonthlyBalance)}
           </span>
         </div>
       </div>
@@ -533,7 +526,10 @@ export function DashboardClient({
                         >
                           {transaction.category?.name || tCommon("withoutCategory")}
                           <span className="mx-1.5 opacity-40">·</span>
-                          {formatDate(transaction.date)}
+                          {formatCalendarDate(transaction.date, locale, {
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
                         </p>
                       </div>
                     </div>
