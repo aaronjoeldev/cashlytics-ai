@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.7](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.6...v0.8.7) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **currency:** show amounts in their own currency, backfill old transfers ([d0b45d6](https://github.com/aaronjoeldev/cashlytics-ai/commit/d0b45d61c9a4668f30b2041facf6f05f5255348f))
+
 ## [0.8.6](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.5...v0.8.6) (2026-10-15)
 
 ### 🐛 Bug Fixes
