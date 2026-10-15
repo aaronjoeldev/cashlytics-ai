@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { accounts, incomes, expenses, dailyExpenses, categories } from "@/lib/db/schema";
-import { and, gte, lte, sql, desc, eq } from "drizzle-orm";
+import { and, gte, lt, lte, sql, desc, eq } from "drizzle-orm";
 import type { ApiResponse, Account, DailyExpenseWithDetails } from "@/types/database";
 import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
@@ -255,6 +255,7 @@ export async function getCategoryBreakdown(
   const { userId } = auth;
 
   try {
+    const nextMonthStart = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
     const baseCurrency = await getBaseCurrency();
     const categoryMap = new Map<
       string,
@@ -277,7 +278,14 @@ export async function getCategoryBreakdown(
       })
       .from(dailyExpenses)
       .leftJoin(categories, sql`${dailyExpenses.categoryId} = ${categories.id}`)
-      .where(and(eq(dailyExpenses.userId, userId), gte(dailyExpenses.date, startDate)));
+      .where(
+        and(
+          eq(dailyExpenses.userId, userId),
+          gte(dailyExpenses.date, startDate),
+          // Without an upper bound, entries dated in later months counted as this month
+          lt(dailyExpenses.date, nextMonthStart)
+        )
+      );
 
     for (const row of dailyExpensesResult) {
       const categoryId = row.categoryId || "uncategorized";

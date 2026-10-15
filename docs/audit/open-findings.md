@@ -81,12 +81,14 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **Existing transfers are stored as EUR** regardless of their accounts. New transfers are
       correct; old rows need a one-off backfill if non-EUR accounts exist.
 - [x] **`updateTransfer` allows the same account as source and target** when only one side is sent.
-- [ ] **Date inputs render empty and submit the current time** in the expense, income and transfer
-      forms (`valueAsDate` with a `Date` default). _(unverified)_
+- [x] **Date inputs rendered empty and submitted the current time** in the expense, income and
+      transfer forms. They use the controlled `DateInput` (UTC calendar day) and new entries default
+      to today's local calendar day at midnight.
+- [ ] **Future-dated daily expenses appear first in "Recent transactions"** on the dashboard.
 - [ ] **Amounts in another currency are shown with the base-currency symbol** without conversion in
       the transfers list, import review, search dialog and scan success screen.
-- [ ] **Dashboard category breakdown has no upper date bound** for daily expenses, so future-dated
-      entries count as "this month".
+- [x] **Dashboard category breakdown had no upper date bound** for daily expenses, so future-dated
+      entries counted as "this month".
 - [x] **Delete actions reported success when no row matched** (`deleteExpense`, `deleteDailyExpense`,
       `deleteIncome`, `deleteAccount`, `deleteCategory`).
 - [x] **No server-side validation in the actions.** Create and update actions now parse their input
@@ -182,10 +184,13 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **Currency and locale jump after login** (`src/lib/settings-context.tsx`): the provider
       overwrites the cookies with defaults on the login page, the server then computes with the
       wrong currency and amounts appear with the wrong symbol until the next navigation.
-- [ ] **Failed server actions are swallowed** in the expense, income and transfer forms, the
-      document list and the scan page; most form validation errors are never rendered.
-- [ ] **Category select in the floating expense dialog is always empty** (`expense-form.tsx` copies
-      the initial prop into state).
+- [x] **Failed server actions were swallowed** in the expense, income and transfer forms. Server
+      errors and the first client validation error are shown as a toast.
+- [ ] **Failed actions are still swallowed** in the document list and on the scan page.
+- [x] **A category could not be removed when editing an expense**: the form sent `undefined`. There
+      is now a "Without category" option and the form sends `null`.
+- [x] **Category select in the floating expense dialog was always empty** (`expense-form.tsx`
+      copied the initial prop into state).
 - [ ] **Calendar does not restore the current month** when navigating back (`overview/client.tsx`).
 - [ ] **Push toggle** throws a raw error when no VAPID key is configured.
 - [ ] **Translations**: `common.error` is missing, English plurals are built from German suffixes

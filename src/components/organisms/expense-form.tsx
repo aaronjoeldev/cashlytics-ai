@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm, type FieldErrors } from "react-hook-form";
+import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Check, Upload, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -33,6 +34,8 @@ import { FileUpload } from "@/components/molecules/file-upload";
 import { DocumentList, type DocumentListRef } from "@/components/molecules/document-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/molecules/date-input";
+import { getLocalCalendarDay } from "@/lib/recurrence";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -52,6 +55,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Account, Category, Expense, DailyExpense } from "@/types/database";
 import { cn } from "@/lib/utils";
+
+/** Shows the first client-side validation message; most fields have no inline error. */
+function showFirstError(errors: FieldErrors) {
+  const first = Object.values(errors)[0];
+  if (first?.message) toast.error(String(first.message));
+}
+
+// Radix Select cannot use "" as an item value
+const NO_CATEGORY = "none";
 
 const ALLOWED_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -84,7 +96,12 @@ export function ExpenseForm({
   const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"periodic" | "daily">("periodic");
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  // The floating dialog mounts before its categories are loaded, so they are not copied into state
+  const [createdCategories, setCreatedCategories] = useState<Category[]>([]);
+  const categories = [
+    ...initialCategories,
+    ...createdCategories.filter((c) => !initialCategories.some((i) => i.id === c.id)),
+  ];
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");
@@ -162,7 +179,7 @@ export function ExpenseForm({
       name: "",
       amount: "",
       recurrenceType: "monthly",
-      startDate: new Date(),
+      startDate: getLocalCalendarDay(),
       endDate: null,
       isSubscription: false,
       info: "",
@@ -176,7 +193,7 @@ export function ExpenseForm({
       categoryId: "",
       description: "",
       amount: "",
-      date: new Date(),
+      date: getLocalCalendarDay(),
       info: "",
     },
   });
@@ -218,7 +235,7 @@ export function ExpenseForm({
         name: "",
         amount: "",
         recurrenceType: "monthly",
-        startDate: new Date(),
+        startDate: getLocalCalendarDay(),
         endDate: null,
         isSubscription: false,
         info: "",
@@ -228,7 +245,7 @@ export function ExpenseForm({
         categoryId: "",
         description: "",
         amount: "",
-        date: new Date(),
+        date: getLocalCalendarDay(),
         info: "",
       });
       setCreatedExpenseId(null);
@@ -272,7 +289,7 @@ export function ExpenseForm({
       };
       const result = await createCategory(input);
       if (result.success) {
-        setCategories((prev) => [...prev, result.data]);
+        setCreatedCategories((prev) => [...prev, result.data]);
         onCategoryCreated?.(result.data);
         // Auto-select the new category in whichever tab is active
         if (activeTab === "periodic") {
@@ -303,7 +320,7 @@ export function ExpenseForm({
       if (editExpense) {
         const result = await updateExpense(editExpense.id, {
           accountId: data.accountId,
-          categoryId: data.categoryId || undefined,
+          categoryId: data.categoryId || null,
           name: data.name,
           amount: data.amount,
           currency: data.currency,
@@ -314,6 +331,7 @@ export function ExpenseForm({
           isSubscription: data.isSubscription,
           info: data.info,
         });
+        if (!result.success) toast.error(result.error);
         if (result.success) {
           periodicForm.reset();
           setOpen(false);
@@ -322,7 +340,7 @@ export function ExpenseForm({
       } else {
         const result = await createExpense({
           accountId: data.accountId,
-          categoryId: data.categoryId || undefined,
+          categoryId: data.categoryId || null,
           name: data.name,
           amount: data.amount,
           recurrenceType: data.recurrenceType,
@@ -333,6 +351,7 @@ export function ExpenseForm({
           info: data.info,
           currency: data.currency,
         });
+        if (!result.success) toast.error(result.error);
         if (result.success) {
           if (pendingFile) {
             await uploadPendingFile(result.data.id, undefined);
@@ -354,13 +373,14 @@ export function ExpenseForm({
       if (editDailyExpense) {
         const result = await updateDailyExpense(editDailyExpense.id, {
           accountId: data.accountId,
-          categoryId: data.categoryId || undefined,
+          categoryId: data.categoryId || null,
           description: data.description,
           amount: data.amount,
           currency: data.currency,
           date: data.date,
           info: data.info,
         });
+        if (!result.success) toast.error(result.error);
         if (result.success) {
           dailyForm.reset();
           setOpen(false);
@@ -369,13 +389,14 @@ export function ExpenseForm({
       } else {
         const result = await createDailyExpense({
           accountId: data.accountId,
-          categoryId: data.categoryId || undefined,
+          categoryId: data.categoryId || null,
           description: data.description,
           amount: data.amount,
           date: data.date,
           info: data.info,
           currency: data.currency,
         });
+        if (!result.success) toast.error(result.error);
         if (result.success) {
           if (pendingFile) {
             await uploadPendingFile(undefined, result.data.id);
@@ -416,7 +437,10 @@ export function ExpenseForm({
           )}
 
           <TabsContent value="periodic" className="mt-4 space-y-4">
-            <form onSubmit={periodicForm.handleSubmit(handlePeriodicSubmit)} className="space-y-4">
+            <form
+              onSubmit={periodicForm.handleSubmit(handlePeriodicSubmit, showFirstError)}
+              className="space-y-4"
+            >
               <div className="space-y-2">
                 <Label>{t("name")}</Label>
                 <Input {...periodicForm.register("name")} placeholder={t("namePlaceholder")} />
@@ -550,13 +574,16 @@ export function ExpenseForm({
                   ) : (
                     <div className="flex gap-1.5">
                       <Select
-                        value={periodicForm.watch("categoryId")}
-                        onValueChange={(v) => periodicForm.setValue("categoryId", v)}
+                        value={periodicForm.watch("categoryId") || NO_CATEGORY}
+                        onValueChange={(v) =>
+                          periodicForm.setValue("categoryId", v === NO_CATEGORY ? "" : v)
+                        }
                       >
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder={tCommon("all")} />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value={NO_CATEGORY}>{tCommon("withoutCategory")}</SelectItem>
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={cat.id}>
                               {cat.icon} {cat.name}
@@ -613,14 +640,31 @@ export function ExpenseForm({
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{t("startDate")}</Label>
-                  <Input
-                    type="date"
-                    {...periodicForm.register("startDate", { valueAsDate: true })}
+                  <Controller
+                    control={periodicForm.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <DateInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("endDate")}</Label>
-                  <Input type="date" {...periodicForm.register("endDate", { valueAsDate: true })} />
+                  <Controller
+                    control={periodicForm.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <DateInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  />
                 </div>
               </div>
 
@@ -720,7 +764,10 @@ export function ExpenseForm({
           </TabsContent>
 
           <TabsContent value="daily" className="mt-4 space-y-4">
-            <form onSubmit={dailyForm.handleSubmit(handleDailySubmit)} className="space-y-4">
+            <form
+              onSubmit={dailyForm.handleSubmit(handleDailySubmit, showFirstError)}
+              className="space-y-4"
+            >
               <div className="space-y-2">
                 <Label>{t("description")}</Label>
                 <Input
@@ -776,7 +823,17 @@ export function ExpenseForm({
                 </div>
                 <div className="space-y-2">
                   <Label>{t("date")}</Label>
-                  <Input type="date" {...dailyForm.register("date", { valueAsDate: true })} />
+                  <Controller
+                    control={dailyForm.control}
+                    name="date"
+                    render={({ field }) => (
+                      <DateInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                      />
+                    )}
+                  />
                 </div>
               </div>
 
@@ -814,13 +871,16 @@ export function ExpenseForm({
                   ) : (
                     <div className="flex gap-1.5">
                       <Select
-                        value={dailyForm.watch("categoryId")}
-                        onValueChange={(v) => dailyForm.setValue("categoryId", v)}
+                        value={dailyForm.watch("categoryId") || NO_CATEGORY}
+                        onValueChange={(v) =>
+                          dailyForm.setValue("categoryId", v === NO_CATEGORY ? "" : v)
+                        }
                       >
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder={tCommon("all")} />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value={NO_CATEGORY}>{tCommon("withoutCategory")}</SelectItem>
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={cat.id}>
                               {cat.icon} {cat.name}
