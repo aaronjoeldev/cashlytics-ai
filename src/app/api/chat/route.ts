@@ -12,6 +12,7 @@ import { rateLimit } from "@/lib/rate-limiter";
 import { isAiEnabled } from "@/lib/import/feature-gating";
 import { auth } from "@/auth";
 import { logger } from "@/lib/logger";
+import { parseTimeZone, TIME_ZONE_HEADER } from "@/lib/ai/chat-transport";
 
 const MAX_MESSAGES = 100;
 const MAX_REQUEST_CHARS = 400_000;
@@ -123,17 +124,25 @@ Weise den Nutzer freundlich darauf hin, falls er dich bittet, ein Dokument zu le
 5. Nach Genehmigung: Kurz bestätigen was durchgeführt wurde
 6. Bei Ablehnung: Akzeptiere die Entscheidung und biete ggf. Alternativen an`;
 
-async function buildSystemPrompt(): Promise<string> {
-  const today = new Date();
-  const dateStr = today.toLocaleDateString("de-DE", {
+/**
+ * Builds the system prompt. "Today" is the calendar day in the user's time zone (sent by the
+ * browser); the server usually runs in UTC, which is a day behind shortly after midnight in Europe.
+ */
+async function buildSystemPrompt(timeZone: string | undefined): Promise<string> {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("de-DE", {
+    timeZone,
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const isoDate = today.toISOString().split("T")[0];
-  const currentMonth = today.getMonth() + 1;
-  const currentYear = today.getFullYear();
+  // en-CA formats as YYYY-MM-DD
+  const isoDate = now.toLocaleDateString("en-CA", { timeZone });
+  const currentYear = Number(isoDate.slice(0, 4));
+  const currentMonth = Number(isoDate.slice(5, 7));
+  // Stored dates are calendar days at UTC midnight
+  const monthStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
 
   const [
     accountsResult,
@@ -148,7 +157,7 @@ async function buildSystemPrompt(): Promise<string> {
     getCategories(),
     getExpenses(),
     getDashboardStats(),
-    getDailyExpenses({ startDate: new Date(today.getFullYear(), today.getMonth(), 1) }),
+    getDailyExpenses({ startDate: monthStart }),
     getIncomes(),
     getActiveInsights(),
   ]);
@@ -175,9 +184,11 @@ async function buildSystemPrompt(): Promise<string> {
       ? expensesResult.data
           .map((e) => {
             const cat = e.category?.name ? ` [${sanitizeForPrompt(e.category.name)}]` : "";
-            const start = new Date(e.startDate).toLocaleDateString("de-DE");
-            const end = e.endDate ? ` bis ${new Date(e.endDate).toLocaleDateString("de-DE")}` : "";
-            return `  - "${sanitizeForPrompt(e.name)}"${cat} | ${e.amount}€ | ${e.recurrenceType} | ab ${start}${end} | ID: ${e.id}`;
+            const start = new Date(e.startDate).toLocaleDateString("de-DE", { timeZone: "UTC" });
+            const end = e.endDate
+              ? ` bis ${new Date(e.endDate).toLocaleDateString("de-DE", { timeZone: "UTC" })}`
+              : "";
+            return `  - "${sanitizeForPrompt(e.name)}"${cat} | ${e.amount} ${e.currency} | ${e.recurrenceType} | ab ${start}${end} | ID: ${e.id}`;
           })
           .join("\n")
       : "  (Keine periodischen Ausgaben vorhanden)";
@@ -200,7 +211,7 @@ ${recentDailyResult.data
   .slice(0, 10)
   .map(
     (e) =>
-      `  - ${new Date(e.date).toLocaleDateString("de-DE")}: "${sanitizeForPrompt(e.description)}" ${e.amount}€${e.category ? ` [${sanitizeForPrompt(e.category.name)}]` : ""}`
+      `  - ${new Date(e.date).toLocaleDateString("de-DE", { timeZone: "UTC" })}: "${sanitizeForPrompt(e.description)}" ${e.amount} ${e.currency}${e.category ? ` [${sanitizeForPrompt(e.category.name)}]` : ""}`
   )
   .join("\n")}`
       : "";
@@ -210,7 +221,8 @@ ${recentDailyResult.data
       ? `### Bestehende Einnahmen:
 ${incomesResult.data
   .map(
-    (i) => `  - "${sanitizeForPrompt(i.source)}" | ${i.amount}€ | ${i.recurrenceType} | ID: ${i.id}`
+    (i) =>
+      `  - "${sanitizeForPrompt(i.source)}" | ${i.amount} ${i.currency} | ${i.recurrenceType} | ID: ${i.id}`
   )
   .join("\n")}`
       : "";
@@ -330,7 +342,7 @@ export async function POST(req: Request) {
     // The client re-sends the whole history; keep long conversations usable by sending only
     // the most recent turns to the model.
     const validatedMessages = (messages as UIMessage[]).slice(-MAX_MESSAGES);
-    const systemPrompt = await buildSystemPrompt();
+    const systemPrompt = await buildSystemPrompt(parseTimeZone(req.headers.get(TIME_ZONE_HEADER)));
 
     const result = streamText({
       model: openai("gpt-4o"),

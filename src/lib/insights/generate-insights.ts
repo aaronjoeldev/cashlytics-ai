@@ -1,121 +1,93 @@
 import { db } from "@/lib/db";
-import { insights, dailyExpenses, categories } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { safeParseFloat } from "@/lib/safe-parse";
+import { insights, dailyExpenses, categories, userSettings } from "@/lib/db/schema";
+import { eq, and, gte, lt, like, min, notInArray, sql } from "drizzle-orm";
+import { currencies, defaultCurrency, type Currency } from "@/lib/currency";
+import { computeInsights, HISTORY_MONTHS, monthKey } from "@/lib/insights/compute-insights";
 
 /**
  * Generates insights by analyzing user's financial data.
  * Called by the insights cron route only. Kept out of `src/actions` because every export of a
  * "use server" file is a public endpoint, and this one takes the user id as an argument.
+ *
+ * Each finding has a key per month: a later run updates its text instead of adding a copy, and an
+ * unread finding that no longer applies is removed.
  */
-export async function generateInsights(userId: string): Promise<{ generated: number }> {
-  const now = new Date();
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-  const expiresAt = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+export async function generateInsights(
+  userId: string,
+  now: Date = new Date()
+): Promise<{ generated: number }> {
+  const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const historyStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - HISTORY_MONTHS, 1)
+  );
+
+  const [[settings], [first]] = await Promise.all([
+    db
+      .select({ baseCurrency: userSettings.baseCurrency })
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId))
+      .limit(1),
+    db
+      .select({ date: min(dailyExpenses.date) })
+      .from(dailyExpenses)
+      .where(eq(dailyExpenses.userId, userId)),
+  ]);
+
+  const baseCurrency =
+    settings && currencies.includes(settings.baseCurrency as Currency)
+      ? (settings.baseCurrency as Currency)
+      : defaultCurrency;
+
+  const rows = await db
+    .select({
+      categoryId: dailyExpenses.categoryId,
+      categoryName: categories.name,
+      amount: dailyExpenses.amount,
+      currency: dailyExpenses.currency,
+      date: dailyExpenses.date,
+    })
+    .from(dailyExpenses)
+    .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
+    .where(
+      and(
+        eq(dailyExpenses.userId, userId),
+        gte(dailyExpenses.date, historyStart),
+        lt(dailyExpenses.date, nextMonthStart)
+      )
+    );
+
+  const computed = computeInsights({
+    now,
+    baseCurrency,
+    firstExpenseDate: first?.date ?? null,
+    rows,
+  });
 
   let generated = 0;
-  const newInsights: Array<typeof insights.$inferInsert> = [];
+  for (const insight of computed) {
+    const [row] = await db
+      .insert(insights)
+      .values({ userId, ...insight, expiresAt: nextMonthStart })
+      .onConflictDoUpdate({
+        target: [insights.userId, insights.dedupKey],
+        set: { title: insight.title, message: insight.message, severity: insight.severity },
+      })
+      // xmax is 0 for a freshly inserted row and set for one the conflict clause updated
+      .returning({ inserted: sql<boolean>`(xmax = 0)` });
+    if (row?.inserted) generated++;
+  }
 
-  // --- Spending Anomaly Detection ---
-  const currentDailyByCategory = await db
-    .select({
-      categoryId: dailyExpenses.categoryId,
-      categoryName: categories.name,
-      total: sql<string>`SUM(CAST(${dailyExpenses.amount} AS numeric))`,
-    })
-    .from(dailyExpenses)
-    .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
+  const keys = computed.map((i) => i.dedupKey);
+  await db
+    .delete(insights)
     .where(
       and(
-        eq(dailyExpenses.userId, userId),
-        gte(dailyExpenses.date, currentMonthStart),
-        lte(dailyExpenses.date, currentMonthEnd)
+        eq(insights.userId, userId),
+        eq(insights.isRead, false),
+        like(insights.dedupKey, `%:${monthKey(now)}`),
+        keys.length > 0 ? notInArray(insights.dedupKey, keys) : undefined
       )
-    )
-    .groupBy(dailyExpenses.categoryId, categories.name);
-
-  const threeMonthsAgoStart = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-  const avgDailyByCategory = await db
-    .select({
-      categoryId: dailyExpenses.categoryId,
-      categoryName: categories.name,
-      avgMonthly: sql<string>`SUM(CAST(${dailyExpenses.amount} AS numeric)) / 3`,
-    })
-    .from(dailyExpenses)
-    .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
-    .where(
-      and(
-        eq(dailyExpenses.userId, userId),
-        gte(dailyExpenses.date, threeMonthsAgoStart),
-        lte(dailyExpenses.date, lastMonthEnd)
-      )
-    )
-    .groupBy(dailyExpenses.categoryId, categories.name);
-
-  const avgMap = new Map(
-    avgDailyByCategory.map((a) => [a.categoryId, safeParseFloat(a.avgMonthly)])
-  );
-
-  for (const current of currentDailyByCategory) {
-    const avg = avgMap.get(current.categoryId) ?? 0;
-    const currentTotal = safeParseFloat(current.total);
-    if (avg > 0 && currentTotal > avg * 1.5 && currentTotal > 50) {
-      const pctOver = Math.round(((currentTotal - avg) / avg) * 100);
-      newInsights.push({
-        userId,
-        type: "spending_anomaly",
-        title: `${current.categoryName}: ${pctOver}% über Durchschnitt`,
-        message: `Du hast diesen Monat ${Math.round(currentTotal)}€ für "${current.categoryName}" ausgegeben — das sind ${pctOver}% mehr als dein 3-Monats-Durchschnitt von ${Math.round(avg)}€.`,
-        severity: pctOver > 100 ? "warning" : "info",
-        expiresAt,
-      });
-    }
-  }
-
-  // --- Budget Warning ---
-  const dayOfMonth = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const monthProgress = dayOfMonth / daysInMonth;
-
-  const totalCurrentExpenses = currentDailyByCategory.reduce(
-    (sum, c) => sum + safeParseFloat(c.total),
-    0
-  );
-  const totalAvgExpenses = Array.from(avgMap.values()).reduce((sum, v) => sum + v, 0);
-
-  if (totalAvgExpenses > 0 && totalCurrentExpenses > totalAvgExpenses * monthProgress * 1.2) {
-    const projected = Math.round(totalCurrentExpenses / monthProgress);
-    newInsights.push({
-      userId,
-      type: "budget_warning",
-      title: "Ausgaben-Tempo über Plan",
-      message: `Bei aktuellem Tempo wirst du diesen Monat ca. ${projected}€ ausgeben — ${Math.round((projected / totalAvgExpenses - 1) * 100)}% mehr als üblich (${Math.round(totalAvgExpenses)}€).`,
-      severity: "warning",
-      expiresAt,
-    });
-  }
-
-  // Insert (skip duplicates by title within current month)
-  for (const insight of newInsights) {
-    const existing = await db
-      .select({ id: insights.id })
-      .from(insights)
-      .where(
-        and(
-          eq(insights.userId, userId),
-          eq(insights.title, insight.title),
-          gte(insights.createdAt, currentMonthStart)
-        )
-      )
-      .limit(1);
-
-    if (existing.length === 0) {
-      await db.insert(insights).values(insight);
-      generated++;
-    }
-  }
+    );
 
   return { generated };
 }

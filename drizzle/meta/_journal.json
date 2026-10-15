@@ -120,6 +120,13 @@
       "when": 1791962014768,
       "tag": "0016_indexes_and_category_set_null",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792044527993,
+      "tag": "0017_insights_dedup_key",
+      "breakpoints": true
     }
   ]
 }

@@ -19,17 +19,24 @@ export async function GET(req: Request) {
   try {
     const allUsers = await db.select({ id: users.id }).from(users);
     let totalGenerated = 0;
+    let failed = 0;
 
+    // One user's broken data must not stop the run for everyone else
     for (const user of allUsers) {
-      const result = await generateInsights(user.id);
-      totalGenerated += result.generated;
+      try {
+        const result = await generateInsights(user.id);
+        totalGenerated += result.generated;
+      } catch (error) {
+        failed++;
+        logger.error(`Insights failed for user ${user.id}`, "cron/insights", error);
+      }
     }
 
     logger.info(
-      `Insights generated: ${totalGenerated} for ${allUsers.length} users`,
+      `Insights generated: ${totalGenerated} for ${allUsers.length} users (${failed} failed)`,
       "cron/insights"
     );
-    return NextResponse.json({ success: true, totalGenerated, users: allUsers.length });
+    return NextResponse.json({ success: true, totalGenerated, users: allUsers.length, failed });
   } catch (error) {
     logger.error("Cron insights failed", "cron/insights", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

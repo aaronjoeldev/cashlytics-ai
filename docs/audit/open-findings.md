@@ -4,8 +4,7 @@ Result of the full repository audit from 2026-10-13. This file lists what is sti
 off as they are fixed. Line numbers refer to commit `e37f3a9` (release 0.8.0) and may have shifted.
 
 Items ticked `[x]` were fixed after this list was written (branches `fix/security-hardening`,
-`fix/auth-sessions-and-pwa` and `fix/ops-and-database`); the release workflow change has not run in
-CI yet.
+`fix/auth-sessions-and-pwa`, `fix/ops-and-database` and the later rounds).
 
 Already fixed and not listed here: dependency updates and Node 24, the cross-user leak in the
 dashboard queries, the unauthenticated `/api/documents/[id]` route, push subscription ownership,
@@ -139,13 +138,15 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **`getDailyExpenses` tool advertises `minAmount` / `maxAmount`** that the action ignores.
 - [x] **Missing `OPENAI_API_KEY` is not checked in the chat route**; the stream fails with a generic
       error and a retry button that cannot succeed.
-- [ ] **"Today" in the system prompt is the UTC date**; around midnight entries are booked a day
-      early. Amounts are labelled `€` regardless of currency.
-- [ ] **Insights cron is never scheduled** in any compose file, so the feature stays empty.
-- [ ] **Insight quality**: the dedup key contains a changing percentage (duplicates on every run),
+- [x] **"Today" in the system prompt is the UTC date**; around midnight entries are booked a day
+      early. Amounts are labelled `€` regardless of currency. _The browser now sends its time zone;
+      the dashboard totals in the prompt still carry no currency label, and a few tools
+      (`checkAffordability`, `getSpendingSummary`) still pick the month by server time._
+- [x] **Insights cron is never scheduled** in any compose file, so the feature stays empty.
+- [x] **Insight quality**: the dedup key contains a changing percentage (duplicates on every run),
       uncategorised spend is titled "null: …", the average divides by three even with one month of
       history, and the budget warning fires on day one of a month.
-- [ ] **One failing user aborts the whole insights run.**
+- [x] **One failing user aborts the whole insights run.**
 - [ ] Smaller: merchant-category learning is written but never read.
 
 ## 5. Deployment and database

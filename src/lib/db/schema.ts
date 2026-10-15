@@ -740,9 +740,15 @@ export const insights = pgTable(
     isRead: boolean("is_read").default(false).notNull(),
     expiresAt: timestamp("expires_at"),
     metadata: text("metadata"),
+    // Identifies the finding (type, subject and month) so a daily run updates it instead of
+    // adding a copy. Null for rows created before the key existed.
+    dedupKey: text("dedup_key"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [index("insights_user_id_idx").on(t.userId)]
+  (t) => [
+    index("insights_user_id_idx").on(t.userId),
+    unique("insights_user_id_dedup_key_unique").on(t.userId, t.dedupKey),
+  ]
 );
 
 export const insightsRelations = relations(insights, ({ one }) => ({
