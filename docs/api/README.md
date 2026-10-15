@@ -39,18 +39,19 @@ type ApiResponse<T> = { success: true; data: T } | { success: false; error: stri
 
 ## Documentation Sections
 
-| Section                               | Description                            |
-| ------------------------------------- | -------------------------------------- |
-| [Expenses](./expenses.md)             | Periodic and daily expense management  |
-| [Incomes](./incomes.md)               | Income source management               |
-| [Accounts](./accounts.md)             | Account CRUD and transaction details   |
-| [Categories](./categories.md)         | Category management for expenses       |
-| [Transfers](./transfers.md)           | Inter-account transfers                |
-| [Analytics](./analytics.md)           | Financial analytics and reports        |
-| [Dashboard](./dashboard.md)           | Dashboard statistics and widgets       |
-| [Forecast](./forecast.md)             | Account balance forecasting            |
-| [Chat Assistant](./chat-assistant.md) | AI chatbot and conversation management |
-| [Search](./search.md)                 | Global search functionality            |
+| Section                               | Description                                                    |
+| ------------------------------------- | -------------------------------------------------------------- |
+| [Expenses](./expenses.md)             | Periodic and daily expense management                          |
+| [Incomes](./incomes.md)               | Income source management                                       |
+| [Accounts](./accounts.md)             | Account CRUD and transaction details                           |
+| [Categories](./categories.md)         | Category management for expenses                               |
+| [Transfers](./transfers.md)           | Inter-account transfers                                        |
+| [Analytics](./analytics.md)           | Financial analytics and reports                                |
+| [Dashboard](./dashboard.md)           | Dashboard statistics and widgets                               |
+| [Forecast](./forecast.md)             | Account balance forecasting                                    |
+| [Chat Assistant](./chat-assistant.md) | AI chatbot and conversation management                         |
+| [Search](./search.md)                 | Global search functionality                                    |
+| [REST API v1](./rest-v1.md)           | Token-authenticated read API for integrations (Home Assistant) |
 
 ## Database Types
 

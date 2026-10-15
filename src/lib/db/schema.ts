@@ -128,6 +128,37 @@ export const passwordResetTokens = pgTable(
   (t) => [index("password_reset_tokens_user_id_idx").on(t.userId)]
 );
 
+// Personal API tokens for integrations such as Home Assistant (REST API under /api/v1)
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // SHA-256 of the raw token; the raw value is shown once and never stored
+    tokenHash: text("token_hash").notNull().unique(),
+    // First characters of the raw token, so the user can tell tokens apart in the list
+    tokenPrefix: text("token_prefix").notNull(),
+    // Only "read" exists so far; write endpoints must check for their own scope
+    scope: text("scope", { enum: ["read"] })
+      .notNull()
+      .default("read"),
+    lastUsedAt: timestamp("last_used_at"),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("api_tokens_user_id_idx").on(t.userId)]
+);
+
+export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [apiTokens.userId],
+    references: [users.id],
+  }),
+}));
+
 // User relations - enables querying user's data with Drizzle relational queries
 export const usersRelations = relations(users, ({ one, many }) => ({
   accounts: many(accounts),
@@ -145,6 +176,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   importDecisions: many(importDecisions),
   merchantCategories: many(merchantCategories),
   insights: many(insights),
+  apiTokens: many(apiTokens),
   settings: one(userSettings, {
     fields: [users.id],
     references: [userSettings.userId],
@@ -782,4 +814,5 @@ export type NewExchangeRate = typeof exchangeRates.$inferInsert;
 export type MerchantCategory = typeof merchantCategories.$inferSelect;
 export type NewMerchantCategory = typeof merchantCategories.$inferInsert;
 export type Insight = typeof insights.$inferSelect;
+export type ApiToken = typeof apiTokens.$inferSelect;
 export type NewInsight = typeof insights.$inferInsert;

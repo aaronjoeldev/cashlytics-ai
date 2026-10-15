@@ -2,10 +2,11 @@
 
 import { db } from "@/lib/db";
 import { insights } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth/require-auth";
 import type { ApiResponse } from "@/types/database";
 import type { Insight } from "@/lib/db/schema";
+import { listActiveInsights } from "@/lib/services/insights";
 
 /**
  * Returns active (unread, unexpired) insights for the current user.
@@ -16,21 +17,7 @@ export async function getActiveInsights(): Promise<ApiResponse<Insight[]>> {
   const { userId } = auth;
 
   try {
-    const now = new Date();
-    const result = await db
-      .select()
-      .from(insights)
-      .where(
-        and(
-          eq(insights.userId, userId),
-          eq(insights.isRead, false),
-          sql`(${insights.expiresAt} IS NULL OR ${insights.expiresAt} > ${now.toISOString()})`
-        )
-      )
-      .orderBy(desc(insights.createdAt))
-      .limit(10);
-
-    return { success: true, data: result };
+    return { success: true, data: await listActiveInsights(userId) };
   } catch {
     return { success: false, error: "Aktion fehlgeschlagen." };
   }

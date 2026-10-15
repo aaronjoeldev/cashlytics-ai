@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { expenses, incomes, dailyExpenses, categories, accounts } from "@/lib/db/schema";
+import { expenses, dailyExpenses, categories } from "@/lib/db/schema";
 import { logger } from "@/lib/logger";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth/require-auth";
@@ -11,134 +11,38 @@ import type {
   Forecast,
   CategoryBreakdown,
   ExpenseWithDetails,
-  IncomeWithAccount,
 } from "@/types/database";
 import { safeParseFloat } from "@/lib/safe-parse";
-import {
-  countOccurrencesInMonth,
-  getBudgetedAmountForMonth,
-  getOccurrencesInMonth,
-  normalizeToMonthly,
-  type RecurringItem,
-} from "@/lib/recurrence";
+import { getBudgetedAmountForMonth } from "@/lib/recurrence";
 import { getBaseCurrency } from "@/lib/user-preferences";
 import { toBaseCurrency as toBase } from "@/lib/currency";
 import { getRates } from "@/lib/exchange-rates";
+import type { FinanceContext } from "@/lib/services/context";
+import {
+  computeForecast,
+  computeMonthlyOverview,
+  listNormalizedExpenses,
+  listScheduledPayments,
+} from "@/lib/services/analytics";
+
+/** Session user with base currency and rates, or null when signed out. */
+async function getSessionContext(): Promise<FinanceContext | null> {
+  const auth = await requireAuth();
+  if (auth.error) return null;
+  const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
+  return { userId: auth.userId, baseCurrency, rates };
+}
 
 export async function getMonthlyOverview(
   month: number,
   year: number,
   accountId?: string
 ): Promise<ApiResponse<MonthlyOverview>> {
-  const auth = await requireAuth();
-  if (auth.error) return { success: false, error: "Unauthorized" };
-  const { userId } = auth;
+  const ctx = await getSessionContext();
+  if (!ctx) return { success: false, error: "Unauthorized" };
 
   try {
-    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
-    const startDate = new Date(Date.UTC(year, month - 1, 1));
-    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59));
-
-    const expensesResult = await db
-      .select({
-        expense: expenses,
-        category: categories,
-        account: accounts,
-      })
-      .from(expenses)
-      .leftJoin(categories, eq(expenses.categoryId, categories.id))
-      .leftJoin(accounts, eq(expenses.accountId, accounts.id))
-      .where(
-        and(
-          eq(expenses.userId, userId),
-          lte(expenses.startDate, endDate),
-          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${startDate.toISOString()})`,
-          accountId ? eq(expenses.accountId, accountId) : undefined
-        )
-      );
-
-    // One-time entries belong only to the month they are dated in
-    const isRelevantInMonth = (item: RecurringItem) =>
-      item.recurrenceType !== "once" || countOccurrencesInMonth(item, year, month) > 0;
-
-    const expensesWithDetails: ExpenseWithDetails[] = expensesResult
-      .map((r) => ({
-        ...r.expense,
-        category: r.category,
-        account: r.account,
-      }))
-      .filter(isRelevantInMonth);
-
-    const incomesResult = await db
-      .select({
-        income: incomes,
-        account: accounts,
-      })
-      .from(incomes)
-      .leftJoin(accounts, eq(incomes.accountId, accounts.id))
-      .where(
-        and(
-          eq(incomes.userId, userId),
-          lte(incomes.startDate, endDate),
-          sql`(${incomes.endDate} IS NULL OR ${incomes.endDate} >= ${startDate.toISOString()})`,
-          accountId ? eq(incomes.accountId, accountId) : undefined
-        )
-      );
-
-    const incomesWithAccount: IncomeWithAccount[] = incomesResult
-      .map((r) => ({
-        ...r.income,
-        account: r.account,
-      }))
-      .filter(isRelevantInMonth);
-
-    const dailyExpensesResult = await db
-      .select({
-        amount: dailyExpenses.amount,
-        entryCurrency: dailyExpenses.currency,
-      })
-      .from(dailyExpenses)
-      .where(
-        and(
-          eq(dailyExpenses.userId, userId),
-          gte(dailyExpenses.date, startDate),
-          lte(dailyExpenses.date, endDate),
-          accountId ? eq(dailyExpenses.accountId, accountId) : undefined
-        )
-      );
-
-    // Convert each expense to baseCurrency using the entry's own currency
-    const totalMonthlyExpenses = expensesWithDetails.reduce((sum, e) => {
-      const rawAmount = getBudgetedAmountForMonth(e, safeParseFloat(e.amount), year, month);
-      return sum + toBase(rawAmount, e.currency, baseCurrency, rates);
-    }, 0);
-
-    // Convert each daily expense to baseCurrency using the entry's own currency
-    const totalDailyExpenses = dailyExpensesResult.reduce((sum, e) => {
-      return sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency, rates);
-    }, 0);
-
-    // Convert each income to baseCurrency using the entry's own currency
-    const totalIncome = incomesWithAccount.reduce((sum, i) => {
-      const rawAmount = getBudgetedAmountForMonth(i, safeParseFloat(i.amount), year, month);
-      return sum + toBase(rawAmount, i.currency, baseCurrency, rates);
-    }, 0);
-
-    const totalExpenses = totalMonthlyExpenses + totalDailyExpenses;
-    const balance = totalIncome - totalExpenses;
-
-    return {
-      success: true,
-      data: {
-        month,
-        year,
-        totalIncome,
-        totalExpenses,
-        balance,
-        expenses: expensesWithDetails,
-        incomes: incomesWithAccount,
-      },
-    };
+    return { success: true, data: await computeMonthlyOverview(ctx, month, year, accountId) };
   } catch (error) {
     logger.error("Failed to get monthly overview", "getMonthlyOverview", error);
     return { success: false, error: "Monatsübersicht konnte nicht geladen werden." };
@@ -146,51 +50,11 @@ export async function getMonthlyOverview(
 }
 
 export async function getForecast(months: number): Promise<ApiResponse<Forecast>> {
-  const auth = await requireAuth();
-  if (auth.error) return { success: false, error: "Unauthorized" };
+  const ctx = await getSessionContext();
+  if (!ctx) return { success: false, error: "Unauthorized" };
 
   try {
-    const now = new Date();
-
-    const monthTargets = Array.from({ length: months }, (_, i) => {
-      const targetDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      return { month: targetDate.getMonth() + 1, year: targetDate.getFullYear() };
-    });
-
-    const results = await Promise.all(
-      monthTargets.map(({ month, year }) => getMonthlyOverview(month, year))
-    );
-
-    let totalProjectedIncome = 0;
-    let totalProjectedExpenses = 0;
-    const monthlyDetails: Forecast["monthlyDetails"] = [];
-
-    for (let i = 0; i < months; i++) {
-      const overviewResult = results[i];
-      if (overviewResult.success && overviewResult.data) {
-        const overview = overviewResult.data;
-        monthlyDetails.push({
-          month: monthTargets[i].month,
-          year: monthTargets[i].year,
-          income: overview.totalIncome,
-          expenses: overview.totalExpenses,
-          balance: overview.balance,
-        });
-        totalProjectedIncome += overview.totalIncome;
-        totalProjectedExpenses += overview.totalExpenses;
-      }
-    }
-
-    return {
-      success: true,
-      data: {
-        months,
-        projectedIncome: totalProjectedIncome,
-        projectedExpenses: totalProjectedExpenses,
-        projectedBalance: totalProjectedIncome - totalProjectedExpenses,
-        monthlyDetails,
-      },
-    };
+    return { success: true, data: await computeForecast(ctx, months) };
   } catch (error) {
     logger.error("Failed to get forecast", "getForecast", error);
     return { success: false, error: "Prognose konnte nicht erstellt werden." };
@@ -324,45 +188,11 @@ export async function getCategoryBreakdown(
 export async function getNormalizedMonthlyExpenses(): Promise<
   ApiResponse<Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>>
 > {
-  const auth = await requireAuth();
-  if (auth.error) return { success: false, error: "Unauthorized" };
-  const { userId } = auth;
+  const ctx = await getSessionContext();
+  if (!ctx) return { success: false, error: "Unauthorized" };
 
   try {
-    const expensesResult = await db
-      .select({
-        expense: expenses,
-        category: categories,
-        account: accounts,
-      })
-      .from(expenses)
-      .leftJoin(categories, eq(expenses.categoryId, categories.id))
-      .leftJoin(accounts, eq(expenses.accountId, accounts.id))
-      .where(eq(expenses.userId, userId));
-
-    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
-
-    const normalizedExpenses = expensesResult.map((r) => {
-      const expenseWithDetails: ExpenseWithDetails = {
-        ...r.expense,
-        category: r.category,
-        account: r.account,
-      };
-
-      const rawMonthly = normalizeToMonthly(
-        safeParseFloat(r.expense.amount),
-        r.expense.recurrenceType,
-        r.expense.recurrenceInterval
-      );
-      const monthlyAmount = toBase(rawMonthly, r.expense.currency, baseCurrency, rates);
-
-      return {
-        expense: expenseWithDetails,
-        monthlyAmount,
-      };
-    });
-
-    return { success: true, data: normalizedExpenses };
+    return { success: true, data: await listNormalizedExpenses(ctx) };
   } catch (error) {
     logger.error(
       "Failed to get normalized monthly expenses",
@@ -376,45 +206,11 @@ export async function getNormalizedMonthlyExpenses(): Promise<
 export async function getSubscriptions(): Promise<
   ApiResponse<Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>>
 > {
-  const auth = await requireAuth();
-  if (auth.error) return { success: false, error: "Unauthorized" };
-  const { userId } = auth;
+  const ctx = await getSessionContext();
+  if (!ctx) return { success: false, error: "Unauthorized" };
 
   try {
-    const expensesResult = await db
-      .select({
-        expense: expenses,
-        category: categories,
-        account: accounts,
-      })
-      .from(expenses)
-      .leftJoin(categories, eq(expenses.categoryId, categories.id))
-      .leftJoin(accounts, eq(expenses.accountId, accounts.id))
-      .where(and(eq(expenses.isSubscription, true), eq(expenses.userId, userId)));
-
-    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
-
-    const subscriptions = expensesResult.map((r) => {
-      const expenseWithDetails: ExpenseWithDetails = {
-        ...r.expense,
-        category: r.category,
-        account: r.account,
-      };
-
-      const rawMonthly = normalizeToMonthly(
-        safeParseFloat(r.expense.amount),
-        r.expense.recurrenceType,
-        r.expense.recurrenceInterval
-      );
-      const monthlyAmount = toBase(rawMonthly, r.expense.currency, baseCurrency, rates);
-
-      return {
-        expense: expenseWithDetails,
-        monthlyAmount,
-      };
-    });
-
-    return { success: true, data: subscriptions };
+    return { success: true, data: await listNormalizedExpenses(ctx, { subscriptionsOnly: true }) };
   } catch (error) {
     logger.error("Failed to fetch subscriptions", "getSubscriptions", error);
     return { success: false, error: "Abonnements konnten nicht geladen werden." };
@@ -446,14 +242,12 @@ export async function getMonthlyPaymentsCalendar(
   year: number,
   month: number
 ): Promise<ApiResponse<CalendarDay[]>> {
-  const auth = await requireAuth();
-  if (auth.error) return { success: false, error: "Unauthorized" };
-  const { userId } = auth;
+  const ctx = await getSessionContext();
+  if (!ctx) return { success: false, error: "Unauthorized" };
 
   try {
-    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
     const monthStart = new Date(Date.UTC(year, month - 1, 1));
-    const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59));
+    const monthEnd = new Date(Date.UTC(year, month, 0));
     const now = new Date();
     const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 
@@ -464,117 +258,20 @@ export async function getMonthlyPaymentsCalendar(
     const daysInCalendar = 42;
     const calendarDays: CalendarDay[] = [];
 
-    const [expensesResult, dailyExpensesResult, incomesResult] = await Promise.all([
-      db
-        .select({
-          expense: expenses,
-          category: categories,
-        })
-        .from(expenses)
-        .leftJoin(categories, eq(expenses.categoryId, categories.id))
-        .where(
-          and(
-            eq(expenses.userId, userId),
-            lte(expenses.startDate, monthEnd),
-            sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${monthStart.toISOString()})`
-          )
-        ),
-      db
-        .select({
-          dailyExpense: dailyExpenses,
-          category: categories,
-        })
-        .from(dailyExpenses)
-        .leftJoin(categories, eq(dailyExpenses.categoryId, categories.id))
-        .where(
-          and(
-            eq(dailyExpenses.userId, userId),
-            gte(dailyExpenses.date, monthStart),
-            lte(dailyExpenses.date, monthEnd)
-          )
-        ),
-      db
-        .select({
-          income: incomes,
-        })
-        .from(incomes)
-        .where(
-          and(
-            eq(incomes.userId, userId),
-            lte(incomes.startDate, monthEnd),
-            sql`(${incomes.endDate} IS NULL OR ${incomes.endDate} >= ${monthStart.toISOString()})`
-          )
-        ),
-    ]);
-
     const paymentsByDay = new Map<number, CalendarPayment[]>();
-    const addPayment = (date: Date, payment: CalendarPayment) => {
-      const day = new Date(date).getUTCDate();
-      paymentsByDay.set(day, [...(paymentsByDay.get(day) ?? []), payment]);
-    };
-
-    for (const item of expensesResult) {
-      for (const paymentDate of getOccurrencesInMonth(item.expense, year, month)) {
-        addPayment(paymentDate, {
-          id: item.expense.id,
-          name: item.expense.name,
-          amount: toBase(
-            safeParseFloat(item.expense.amount),
-            item.expense.currency,
-            baseCurrency,
-            rates
-          ),
-          type: "expense",
-          category: item.category
-            ? {
-                name: item.category.name,
-                icon: item.category.icon,
-                color: item.category.color,
-              }
-            : null,
-          isSubscription: item.expense.isSubscription ?? false,
-        });
-      }
-    }
-
-    for (const item of dailyExpensesResult) {
-      addPayment(item.dailyExpense.date, {
-        id: item.dailyExpense.id,
-        name: item.dailyExpense.description,
-        amount: toBase(
-          safeParseFloat(item.dailyExpense.amount),
-          item.dailyExpense.currency,
-          baseCurrency,
-          rates
-        ),
-        type: "daily_expense",
-        category: item.category
-          ? {
-              name: item.category.name,
-              icon: item.category.icon,
-              color: item.category.color,
-            }
-          : null,
-        isSubscription: false,
-      });
-    }
-
-    for (const item of incomesResult) {
-      for (const paymentDate of getOccurrencesInMonth(item.income, year, month)) {
-        addPayment(paymentDate, {
-          id: item.income.id,
-          name: item.income.source,
-          amount: toBase(
-            safeParseFloat(item.income.amount),
-            item.income.currency,
-            baseCurrency,
-            rates
-          ),
-          type: "income",
-          category: null,
-          isSubscription: false,
-        });
-      }
+    for (const payment of await listScheduledPayments(ctx, monthStart, monthEnd)) {
+      const day = payment.date.getUTCDate();
+      paymentsByDay.set(day, [
+        ...(paymentsByDay.get(day) ?? []),
+        {
+          id: payment.id,
+          name: payment.name,
+          amount: payment.amount,
+          type: payment.type,
+          category: payment.category,
+          isSubscription: payment.isSubscription,
+        },
+      ]);
     }
 
     for (let i = 0; i < daysInCalendar; i++) {
