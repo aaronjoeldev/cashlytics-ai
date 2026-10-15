@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.9](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.8...v0.8.9) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **auth:** store e-mails in lower case and enforce one account per address ([8e2acab](https://github.com/aaronjoeldev/cashlytics-ai/commit/8e2acab4098531b89861c781cfe2ce5a8aed3dac))
+
 ## [0.8.8](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.7...v0.8.8) (2026-10-15)
 
 ### 🐛 Bug Fixes
