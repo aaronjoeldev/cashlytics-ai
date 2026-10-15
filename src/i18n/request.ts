@@ -1,18 +1,13 @@
-import { getRequestConfig } from 'next-intl/server';
-import { cookies } from 'next/headers';
-import { defaultLocale, locales, type Locale } from './config';
+import { getRequestConfig } from "next-intl/server";
+import { getUserPreferences } from "@/lib/user-preferences";
 
 export default getRequestConfig(async () => {
-  const cookieStore = await cookies();
-  const localeCookie = cookieStore.get('locale')?.value;
-
-  const locale: Locale = locales.includes(localeCookie as Locale)
-    ? (localeCookie as Locale)
-    : defaultLocale;
+  // Stored user setting first, cookie as fallback for signed-out pages
+  const { locale } = await getUserPreferences();
 
   return {
     locale,
     messages: (await import(`../../messages/${locale}.json`)).default,
-    timeZone: 'Europe/Berlin',
+    timeZone: "Europe/Berlin",
   };
 });

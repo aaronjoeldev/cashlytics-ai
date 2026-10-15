@@ -325,7 +325,9 @@ export function ExpenseForm({
           amount: data.amount,
           currency: data.currency,
           recurrenceType: data.recurrenceType,
-          recurrenceInterval: data.recurrenceInterval,
+          // Only a custom recurrence has an interval; clear it for the others
+          recurrenceInterval:
+            data.recurrenceType === "custom" ? (data.recurrenceInterval ?? null) : null,
           startDate: data.startDate,
           endDate,
           isSubscription: data.isSubscription,
@@ -344,7 +346,9 @@ export function ExpenseForm({
           name: data.name,
           amount: data.amount,
           recurrenceType: data.recurrenceType,
-          recurrenceInterval: data.recurrenceInterval,
+          // Only a custom recurrence has an interval; clear it for the others
+          recurrenceInterval:
+            data.recurrenceType === "custom" ? (data.recurrenceInterval ?? null) : null,
           startDate: data.startDate,
           endDate,
           isSubscription: data.isSubscription,
@@ -521,6 +525,29 @@ export function ExpenseForm({
                   </Select>
                 </div>
               </div>
+
+              {periodicForm.watch("recurrenceType") === "custom" && (
+                <div className="space-y-2">
+                  <Label htmlFor="expense-recurrence-interval">{t("recurrenceInterval")}</Label>
+                  <Input
+                    id="expense-recurrence-interval"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={120}
+                    step={1}
+                    className="w-32"
+                    value={periodicForm.watch("recurrenceInterval") ?? ""}
+                    onChange={(e) =>
+                      periodicForm.setValue(
+                        "recurrenceInterval",
+                        e.target.value === "" ? undefined : Number(e.target.value)
+                      )
+                    }
+                  />
+                  <p className="text-muted-foreground text-xs">{t("recurrenceIntervalHint")}</p>
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
                 <Button

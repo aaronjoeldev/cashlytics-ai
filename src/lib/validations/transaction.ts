@@ -25,7 +25,12 @@ export const expenseSchema = z.object({
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Betrag muss positiv sein"),
   currency: z.enum(currencies),
   recurrenceType: z.enum(recurrenceTypes),
-  recurrenceInterval: z.number().optional(),
+  recurrenceInterval: z
+    .number()
+    .int("Intervall muss eine ganze Zahl sein")
+    .min(1, "Intervall muss mindestens 1 sein")
+    .max(120, "Intervall ist zu groß")
+    .optional(),
   startDate: z.date({ message: "Startdatum ist erforderlich" }),
   endDate: z.any().optional().nullable(),
   isSubscription: z.boolean(),

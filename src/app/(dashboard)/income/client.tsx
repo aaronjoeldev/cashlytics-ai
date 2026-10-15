@@ -15,6 +15,7 @@ import { IncomeForm } from "@/components/organisms/income-form";
 import { deleteIncome } from "@/actions/income-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
+import { formatCalendarDate } from "@/lib/format-date";
 import { currencySymbols } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type { Account, IncomeWithAccount, Income } from "@/types/database";
@@ -24,13 +25,10 @@ interface IncomeClientProps {
   initialIncomes: IncomeWithAccount[];
 }
 
-function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat().format(new Date(date));
-}
-
 export function IncomeClient({ accounts, initialIncomes }: IncomeClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency, locale } = useSettings();
+  const formatDate = (date: Date | string) => formatCalendarDate(date, locale);
   const t = useTranslations("income");
   const tCommon = useTranslations("common");
   const tRecurrence = useTranslations("recurrence");
@@ -39,7 +37,8 @@ export function IncomeClient({ accounts, initialIncomes }: IncomeClientProps) {
   const formatEntryAmount = (amount: string | number, entryCurrency?: string | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount;
     if (entryCurrency && entryCurrency !== baseCurrency) {
-      const symbol = currencySymbols[entryCurrency as keyof typeof currencySymbols] ?? entryCurrency;
+      const symbol =
+        currencySymbols[entryCurrency as keyof typeof currencySymbols] ?? entryCurrency;
       return `${num.toFixed(2)} ${symbol}`;
     }
     return formatCurrency(num);
@@ -56,8 +55,8 @@ export function IncomeClient({ accounts, initialIncomes }: IncomeClientProps) {
 
   const getDebitLabel = (recurrenceType: string, startDate: Date | string): string => {
     const date = new Date(startDate);
-    const day = date.getDate();
-    const month = date.toLocaleDateString(undefined, { month: "short" });
+    const day = date.getUTCDate();
+    const month = formatCalendarDate(date, locale, { month: "short" });
     switch (recurrenceType) {
       case "monthly":
         return tRecurrence("monthly");

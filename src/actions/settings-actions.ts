@@ -2,45 +2,12 @@
 
 import { db } from "@/lib/db";
 import { userSettings } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { logger } from "@/lib/logger";
-import { currencies, defaultCurrency } from "@/lib/currency";
-import { locales, defaultLocale } from "@/i18n/config";
+import { currencies } from "@/lib/currency";
+import { locales } from "@/i18n/config";
+import { getUserPreferences } from "@/lib/user-preferences";
 import type { ApiResponse } from "@/types/database";
-
-export interface UserSettingsData {
-  baseCurrency: string;
-  locale: string;
-}
-
-const DEFAULT_SETTINGS: UserSettingsData = {
-  baseCurrency: defaultCurrency,
-  locale: defaultLocale,
-};
-
-export async function getUserSettings(): Promise<UserSettingsData> {
-  try {
-    const authResult = await requireAuth();
-    if (authResult.error) return DEFAULT_SETTINGS;
-
-    const [settings] = await db
-      .select()
-      .from(userSettings)
-      .where(eq(userSettings.userId, authResult.userId))
-      .limit(1);
-
-    if (!settings) return DEFAULT_SETTINGS;
-
-    return {
-      baseCurrency: settings.baseCurrency,
-      locale: settings.locale,
-    };
-  } catch (error) {
-    logger.error("Failed to fetch user settings", "getUserSettings", error);
-    return DEFAULT_SETTINGS;
-  }
-}
 
 export async function updateBaseCurrency(currency: string): Promise<ApiResponse<void>> {
   try {
@@ -56,7 +23,7 @@ export async function updateBaseCurrency(currency: string): Promise<ApiResponse<
       .values({
         userId: authResult.userId,
         baseCurrency: currency,
-        locale: defaultLocale,
+        locale: (await getUserPreferences()).locale,
       })
       .onConflictDoUpdate({
         target: userSettings.userId,
@@ -86,7 +53,7 @@ export async function updateLocale(locale: string): Promise<ApiResponse<void>> {
       .insert(userSettings)
       .values({
         userId: authResult.userId,
-        baseCurrency: defaultCurrency,
+        baseCurrency: (await getUserPreferences()).currency,
         locale: locale,
       })
       .onConflictDoUpdate({

@@ -1,7 +1,7 @@
 "use client";
 
 import { getLocalCalendarDay, getNextOccurrence } from "@/lib/recurrence";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useSettings } from "@/lib/settings-context";
 import { getMonthlyPaymentsCalendar } from "@/actions/analytics-actions";
+import { toast } from "sonner";
 import type {
   MonthlyOverview,
   Forecast,
@@ -98,6 +99,8 @@ export function OverviewClient({
           return tRecurrence("monthly");
         case "quarterly":
           return tRecurrence("quarterly");
+        case "semiannual":
+          return tRecurrence("semiannual");
         case "yearly":
           return tRecurrence("yearly");
         case "custom":
@@ -137,48 +140,56 @@ export function OverviewClient({
     [tCommon, locale]
   );
 
-  const fetchCalendarData = useCallback(async (y: number, m: number) => {
-    setCalendarLoading(true);
-    try {
-      const result = await getMonthlyPaymentsCalendar(y, m);
-      if (result.success && result.data) {
-        setCalendarDays(result.data);
+  // Only the latest navigation may update the calendar; slower earlier answers are dropped
+  const calendarRequestRef = useRef(0);
+
+  const showCalendarMonth = useCallback(
+    async (y: number, m: number) => {
+      const request = ++calendarRequestRef.current;
+      setCalendarYear(y);
+      setCalendarMonth(m);
+      setSelectedDay(null);
+
+      if (y === year && m === month) {
+        setCalendarDays(initialCalendarDays);
+        setCalendarLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to fetch calendar data:", error);
-    } finally {
-      setCalendarLoading(false);
-    }
-  }, []);
 
-  useEffect(() => {
-    if (calendarMonth !== month || calendarYear !== year) {
-      fetchCalendarData(calendarYear, calendarMonth);
-    }
-  }, [calendarMonth, calendarYear, month, year, fetchCalendarData]);
+      setCalendarLoading(true);
+      try {
+        const result = await getMonthlyPaymentsCalendar(y, m);
+        if (request !== calendarRequestRef.current) return;
+        if (result.success) {
+          setCalendarDays(result.data);
+        } else {
+          setCalendarDays([]);
+          toast.error(t("calendarLoadFailed"));
+        }
+      } catch (error) {
+        console.error("Failed to fetch calendar data:", error);
+        if (request === calendarRequestRef.current) {
+          setCalendarDays([]);
+          toast.error(t("calendarLoadFailed"));
+        }
+      } finally {
+        if (request === calendarRequestRef.current) setCalendarLoading(false);
+      }
+    },
+    [initialCalendarDays, month, year, t]
+  );
 
-  const goToPrevMonth = () => {
-    if (calendarMonth === 1) {
-      setCalendarMonth(12);
-      setCalendarYear(calendarYear - 1);
-    } else {
-      setCalendarMonth(calendarMonth - 1);
-    }
-  };
+  const goToPrevMonth = () =>
+    calendarMonth === 1
+      ? showCalendarMonth(calendarYear - 1, 12)
+      : showCalendarMonth(calendarYear, calendarMonth - 1);
 
-  const goToNextMonth = () => {
-    if (calendarMonth === 12) {
-      setCalendarMonth(1);
-      setCalendarYear(calendarYear + 1);
-    } else {
-      setCalendarMonth(calendarMonth + 1);
-    }
-  };
+  const goToNextMonth = () =>
+    calendarMonth === 12
+      ? showCalendarMonth(calendarYear + 1, 1)
+      : showCalendarMonth(calendarYear, calendarMonth + 1);
 
-  const goToCurrentMonth = () => {
-    setCalendarMonth(month);
-    setCalendarYear(year);
-  };
+  const goToCurrentMonth = () => showCalendarMonth(year, month);
 
   const isCurrentMonth = calendarMonth === month && calendarYear === year;
 
@@ -448,10 +459,7 @@ export function OverviewClient({
                   <div>
                     <CardTitle className="text-base">{formatDayDate(selectedDay.date)}</CardTitle>
                     <CardDescription>
-                      {t("paymentsCount", {
-                        count: selectedDay.payments.length,
-                        plural: selectedDay.payments.length !== 1 ? "en" : "",
-                      })}
+                      {t("paymentsCount", { count: selectedDay.payments.length })}
                     </CardDescription>
                   </div>
                 </div>
@@ -594,11 +602,8 @@ export function OverviewClient({
                 <div>
                   <CardTitle>{t("activeSubscriptions")}</CardTitle>
                   <CardDescription>
-                    {t("subscriptionsCount", {
-                      count: filteredSubscriptions.length,
-                      s: filteredSubscriptions.length !== 1 ? "s" : "",
-                    })}{" "}
-                    &middot; {t("monthlyLabel")}{" "}
+                    {t("subscriptionsCount", { count: filteredSubscriptions.length })} &middot;{" "}
+                    {t("monthlyLabel")}{" "}
                     <span className="text-foreground font-semibold">
                       {formatCurrency(totalSubscriptionsMonthly)}
                     </span>

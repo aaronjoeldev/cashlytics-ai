@@ -35,7 +35,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
 import { CircleHelp, Download } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import type { Account } from "@/types/database";
 import {
   buildDecisionPayload,
@@ -122,6 +122,7 @@ export function ImportClient({ accounts }: ImportClientProps) {
   const { toast } = useToast();
   const { formatAmount } = useSettings();
   const t = useTranslations("csvImport");
+  const format = useFormatter();
 
   const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -532,7 +533,9 @@ export function ImportClient({ accounts }: ImportClientProps) {
             </div>
             {alreadyImportedAt && (
               <p className="text-destructive mt-3 text-sm">
-                {t("toasts.alreadyImported", { date: alreadyImportedAt.toLocaleDateString() })}
+                {t("toasts.alreadyImported", {
+                  date: format.dateTime(alreadyImportedAt, { dateStyle: "medium" }),
+                })}
               </p>
             )}
           </CardContent>

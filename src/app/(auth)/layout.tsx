@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { getTranslations } from "next-intl/server";
 import { OfflineCacheOwner } from "@/components/pwa/offline-cache-owner";
 
 export const metadata: Metadata = {
   title: "Cashlytics — Auth",
 };
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  const t = await getTranslations("auth");
   return (
     <div className="flex min-h-screen">
       <OfflineCacheOwner userId={null} />
@@ -46,15 +48,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               className="text-2xl leading-snug font-bold tracking-tight text-white"
               style={{ fontFamily: "var(--font-syne)" }}
             >
-              Your finances,
+              {t("taglineLine1")}
               <br />
-              under control.
+              {t("taglineLine2")}
             </p>
             <p
               className="text-sm leading-relaxed text-white/40"
               style={{ fontFamily: "var(--font-jakarta)" }}
             >
-              AI-powered budget tracking for people who take their money seriously.
+              {t("taglineDescription")}
             </p>
           </div>
 

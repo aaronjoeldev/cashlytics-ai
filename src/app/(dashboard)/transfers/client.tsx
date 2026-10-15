@@ -8,6 +8,7 @@ import { TransferForm } from "@/components/organisms/transfer-form";
 import { deleteTransfer } from "@/actions/transfer-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
+import { formatCalendarDate } from "@/lib/format-date";
 import { convertCurrency, currencies, type Currency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type { Account, TransferWithDetails } from "@/types/database";
@@ -17,13 +18,10 @@ interface TransfersClientProps {
   initialTransfers: TransferWithDetails[];
 }
 
-function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat().format(new Date(date));
-}
-
 export function TransfersClient({ accounts, initialTransfers }: TransfersClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt, formatAmount, currency: baseCurrency } = useSettings();
+  const { formatCurrency: fmt, formatAmount, currency: baseCurrency, locale } = useSettings();
+  const formatDate = (date: Date | string) => formatCalendarDate(date, locale);
   const t = useTranslations("transfers");
   const tRecurrence = useTranslations("recurrence");
   const formatCurrency = (amount: string | number) =>
@@ -43,8 +41,8 @@ export function TransfersClient({ accounts, initialTransfers }: TransfersClientP
     startDate: Date | string;
   }): string => {
     const date = new Date(transfer.startDate);
-    const day = date.getDate();
-    const month = date.toLocaleDateString(undefined, { month: "short" });
+    const day = date.getUTCDate();
+    const month = formatCalendarDate(date, locale, { month: "short" });
 
     switch (transfer.recurrenceType) {
       case "monthly":

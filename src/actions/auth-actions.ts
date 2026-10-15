@@ -7,7 +7,12 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword } from "@/lib/auth/password";
-import { MAX_PASSWORD_LENGTH, emailSchema, registerSchema } from "@/lib/validations/auth";
+import {
+  MAX_PASSWORD_LENGTH,
+  emailSchema,
+  registerSchema,
+  type AuthErrorKey,
+} from "@/lib/validations/auth";
 import { markPasswordChanged } from "@/lib/auth/session-validity";
 import { headers } from "next/headers";
 import { rateLimit } from "@/lib/rate-limiter";
@@ -22,6 +27,7 @@ import {
 import { renderResetPasswordEmail, renderWelcomeEmail } from "@/emails";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import { getTranslations } from "next-intl/server";
 
 export type AuthActionState = {
   error?: string;
@@ -61,7 +67,8 @@ export async function loginAction(
     shouldRedirect = true;
   } catch (error) {
     if (error instanceof AuthError) {
-      return { error: "Invalid email or password" };
+      const t = await getTranslations("auth.errors");
+      return { error: t("invalidCredentials") };
     }
     throw error;
   }
@@ -73,11 +80,13 @@ export async function registerAction(
   _prevState: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
+  const t = await getTranslations("auth.errors");
+
   // --- SINGLE_USER_MODE GATE ---
   const registrationOpen = await isRegistrationOpen();
   if (!registrationOpen) {
     return {
-      error: "Registration is disabled. This instance is configured for a single user.",
+      error: t("registrationDisabled"),
     };
   }
   // --- END MODE GATE ---
@@ -87,7 +96,7 @@ export async function registerAction(
   const forwardedFor = (await headers()).get("x-forwarded-for");
   const clientAddress = forwardedFor?.split(",").at(-1)?.trim() || "unknown";
   if (!rateLimit(`register:${clientAddress}`, 5, 60 * 60_000).allowed) {
-    return { error: "Too many registration attempts. Please try again later." };
+    return { error: t("tooManyRegistrations") };
   }
 
   const result = registerSchema.safeParse({
@@ -100,14 +109,14 @@ export async function registerAction(
     const fieldErrors: AuthActionState["fieldErrors"] = {};
     for (const issue of result.error.issues) {
       const field = issue.path[0] as keyof NonNullable<typeof fieldErrors>;
-      if (!fieldErrors[field]) fieldErrors[field] = issue.message;
+      if (!fieldErrors[field]) fieldErrors[field] = t(issue.message as AuthErrorKey);
     }
     return { fieldErrors };
   }
 
   const { email, password } = result.data;
 
-  const emailTakenError = { fieldErrors: { email: "An account with this email already exists" } };
+  const emailTakenError = { fieldErrors: { email: t("emailTaken") } };
 
   const [existing] = await db
     .select({ id: users.id })
@@ -164,13 +173,13 @@ const forgotPasswordSchema = z.object({
   email: emailSchema,
 });
 
-const passwordResetRequestMessage =
-  "If an account exists with this email, you will receive a reset link.";
-
 export async function forgotPasswordAction(
   _prevState: ForgotPasswordState,
   formData: FormData
 ): Promise<ForgotPasswordState> {
+  const t = await getTranslations("auth.errors");
+  const passwordResetRequestMessage = t("resetRequestSent");
+
   // Validate email format
   const result = forgotPasswordSchema.safeParse({
     email: formData.get("email"),
@@ -178,7 +187,7 @@ export async function forgotPasswordAction(
 
   if (!result.success) {
     const fieldError = result.error.issues[0]?.message;
-    return { error: fieldError };
+    return { error: t((fieldError ?? "emailInvalid") as AuthErrorKey) };
   }
 
   const { email } = result.data;
@@ -233,13 +242,12 @@ export async function forgotPasswordAction(
   };
 }
 
-const invalidResetLinkMessage =
-  "This reset link is invalid or has expired. Please request a new one.";
-
 export async function resetPasswordAction(
   _prevState: ResetPasswordState,
   formData: FormData
 ): Promise<ResetPasswordState> {
+  const t = await getTranslations("auth.errors");
+  const invalidResetLinkMessage = t("invalidResetLink");
   const token = formData.get("token");
   const password = formData.get("password");
   const confirmPassword = formData.get("confirmPassword");
@@ -248,25 +256,25 @@ export async function resetPasswordAction(
     return { error: invalidResetLinkMessage };
   }
   if (typeof password !== "string" || typeof confirmPassword !== "string") {
-    return { fieldErrors: { password: "Password must be at least 8 characters" } };
+    return { fieldErrors: { password: t("passwordTooShort") } };
   }
 
   // Validate password match
   if (password !== confirmPassword) {
-    return { fieldErrors: { confirmPassword: "Passwords do not match" } };
+    return { fieldErrors: { confirmPassword: t("passwordsDontMatch") } };
   }
 
   // Validate password strength (min 8 chars, contains number)
   if (password.length < 8) {
-    return { fieldErrors: { password: "Password must be at least 8 characters" } };
+    return { fieldErrors: { password: t("passwordTooShort") } };
   }
 
   if (password.length > MAX_PASSWORD_LENGTH) {
-    return { fieldErrors: { password: "Password is too long" } };
+    return { fieldErrors: { password: t("passwordTooLong") } };
   }
 
   if (!/\d/.test(password)) {
-    return { fieldErrors: { password: "Password must contain at least one number" } };
+    return { fieldErrors: { password: t("passwordNeedsNumber") } };
   }
 
   // Validate token

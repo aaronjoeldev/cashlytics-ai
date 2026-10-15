@@ -8,15 +8,8 @@ import { safeParseFloat } from "@/lib/safe-parse";
 import { getDueAmountForMonth } from "@/lib/recurrence";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
-import { cookies } from "next/headers";
-import { convertCurrency, defaultCurrency, currencies, type Currency } from "@/lib/currency";
-
-async function getBaseCurrency(): Promise<Currency> {
-  const cookieStore = await cookies();
-  const value = cookieStore.get("currency")?.value;
-  if (value && currencies.includes(value as Currency)) return value as Currency;
-  return defaultCurrency;
-}
+import { getBaseCurrency } from "@/lib/user-preferences";
+import { convertCurrency, currencies, type Currency } from "@/lib/currency";
 
 function toBase(
   amount: number,

@@ -7,21 +7,14 @@ import type { ApiResponse, Account, DailyExpenseWithDetails } from "@/types/data
 import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
-import { cookies } from "next/headers";
-import { convertCurrency, defaultCurrency, currencies, type Currency } from "@/lib/currency";
+import { getBaseCurrency } from "@/lib/user-preferences";
+import { convertCurrency, currencies, type Currency } from "@/lib/currency";
 import {
   getBudgetedAmountForMonth,
   getDueAmountForMonth,
   getNextOccurrence,
   type RecurringItem,
 } from "@/lib/recurrence";
-
-async function getBaseCurrency(): Promise<Currency> {
-  const cookieStore = await cookies();
-  const value = cookieStore.get("currency")?.value;
-  if (value && currencies.includes(value as Currency)) return value as Currency;
-  return defaultCurrency;
-}
 
 function toBase(
   amount: number,

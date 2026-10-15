@@ -46,13 +46,7 @@ type FloatingActionItem = {
 };
 
 type FloatingActionLabels = Record<ActionKey, string>;
-const MINI_CHAT_PROMPTS = ["45€ Tanken", "Budget diesen Monat?", "Einnahmen zeigen"];
-const MINI_CHAT_TITLE = "Cashlytics Assistent";
-const MINI_CHAT_EMPTY_STATE = "Frag mich nach deinen Finanzen oder buche schnell eine Ausgabe.";
-const MINI_CHAT_PLACEHOLDER = "z.B. '45€ REWE'";
-const MINI_CHAT_OPEN_FULL_VIEW = "Vollansicht öffnen";
-const MINI_CHAT_CLOSE = "Chat schließen";
-const MINI_CHAT_SEND = "Senden";
+const MINI_CHAT_PROMPTS = ["fuel", "budget", "income"] as const;
 
 export function getFloatingActions(
   aiEnabled: boolean,
@@ -111,6 +105,7 @@ export function getFloatingActions(
 export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
   const t = useTranslations("floatingActions");
   const tCsvImport = useTranslations("csvImport");
+  const tMini = useTranslations("chat.mini");
   const pathname = usePathname();
   const isAssistantPage = pathname === "/assistant";
 
@@ -205,16 +200,11 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
             <div className="from-primary/20 to-primary/5 flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br">
               <Bot className="text-primary h-4 w-4" />
             </div>
-            <p className="text-sm font-semibold">{MINI_CHAT_TITLE}</p>
+            <p className="text-sm font-semibold">{tMini("title")}</p>
           </div>
           <div className="flex items-center gap-1">
             <Link href="/assistant" onClick={() => setChatOpen(false)}>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                title={MINI_CHAT_OPEN_FULL_VIEW}
-              >
+              <Button variant="ghost" size="icon" className="h-7 w-7" title={tMini("openFullView")}>
                 <ExternalLink className="h-3.5 w-3.5" />
               </Button>
             </Link>
@@ -223,7 +213,7 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
               size="icon"
               className="h-7 w-7"
               onClick={() => setChatOpen(false)}
-              aria-label={MINI_CHAT_CLOSE}
+              aria-label={tMini("close")}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -236,15 +226,15 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
               <div className="from-primary/20 to-primary/5 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br">
                 <MessageSquare className="text-primary h-6 w-6" />
               </div>
-              <p className="text-muted-foreground text-sm">{MINI_CHAT_EMPTY_STATE}</p>
+              <p className="text-muted-foreground text-sm">{tMini("empty")}</p>
               <div className="flex w-full flex-col gap-2">
                 {MINI_CHAT_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}
                     className="bg-muted/50 hover:bg-muted cursor-pointer rounded-lg px-3 py-2 text-left text-xs transition-colors"
-                    onClick={() => sendMessage({ text: prompt })}
+                    onClick={() => sendMessage({ text: tMini(`prompts.${prompt}`) })}
                   >
-                    {prompt}
+                    {tMini(`prompts.${prompt}`)}
                   </button>
                 ))}
               </div>
@@ -276,7 +266,7 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
                   handleChatSend();
                 }
               }}
-              placeholder={MINI_CHAT_PLACEHOLDER}
+              placeholder={tMini("placeholder")}
               disabled={chatLoading}
               className="h-8 border-0 bg-transparent px-2 text-sm shadow-none focus-visible:ring-0"
             />
@@ -285,7 +275,7 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
               className="h-8 shrink-0 px-3"
               disabled={!chatInput.trim() || chatLoading}
               onClick={handleChatSend}
-              aria-label={MINI_CHAT_SEND}
+              aria-label={tMini("send")}
             >
               {chatLoading ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -357,7 +347,7 @@ export function FloatingActions({ aiEnabled }: { aiEnabled: boolean }) {
               setMenuOpen(false);
               setChatOpen((prev) => !prev);
             }}
-            aria-label={chatOpen ? MINI_CHAT_CLOSE : "Chat öffnen"}
+            aria-label={chatOpen ? tMini("close") : tMini("open")}
           >
             {chatOpen ? <X className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
           </Button>

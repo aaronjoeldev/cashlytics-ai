@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { globalSearch, type SearchResult } from "@/actions/search-actions";
@@ -36,22 +36,37 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  // Only the latest query may fill the list; slower earlier answers are dropped
+  const searchRequestRef = useRef(0);
+
+  // Start empty each time the dialog opens (state adjusted during render, not in an effect)
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setQuery("");
+      setResults([]);
+    }
+  }
 
   const performSearch = useCallback(async (searchQuery: string) => {
+    const request = ++searchRequestRef.current;
     if (searchQuery.trim().length < 2) {
       setResults([]);
+      setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
       const searchResults = await globalSearch(searchQuery);
+      if (request !== searchRequestRef.current) return;
       setResults(searchResults);
       setSelectedIndex(0);
     } catch {
-      setResults([]);
+      if (request === searchRequestRef.current) setResults([]);
     } finally {
-      setLoading(false);
+      if (request === searchRequestRef.current) setLoading(false);
     }
   }, []);
 
@@ -62,13 +77,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
     return () => clearTimeout(debounce);
   }, [query, performSearch]);
-
-  useEffect(() => {
-    if (open) {
-      setQuery("");
-      setResults([]);
-    }
-  }, [open]);
 
   const handleSelect = (result: SearchResult) => {
     onOpenChange(false);

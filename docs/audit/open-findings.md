@@ -188,27 +188,34 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 
 ## 6. User interface
 
-- [ ] **Currency and locale jump after login** (`src/lib/settings-context.tsx`): the provider
-      overwrites the cookies with defaults on the login page, the server then computes with the
-      wrong currency and amounts appear with the wrong symbol until the next navigation.
+- [x] **Currency and locale jumped after login**: the provider wrote default cookies on the login
+      page and the server computed with them. The server now reads currency and locale from the
+      stored user settings (`src/lib/user-preferences.ts`, cookies only as fallback when signed out),
+      and the provider takes both from the server instead of loading them after mount.
 - [x] **Failed server actions were swallowed** in the expense, income and transfer forms. Server
       errors and the first client validation error are shown as a toast.
-- [ ] **Failed actions are still swallowed** in the document list and on the scan page.
+- [x] **Failed actions were still swallowed** in the document list and on the scan page. Loading,
+      preview, download and delete errors are shown; the documents page tells a failed load apart
+      from an empty list; the scan page reports a receipt that could not be attached.
 - [x] **A category could not be removed when editing an expense**: the form sent `undefined`. There
       is now a "Without category" option and the form sends `null`.
 - [x] **Category select in the floating expense dialog was always empty** (`expense-form.tsx`
       copied the initial prop into state).
-- [ ] **Calendar does not restore the current month** when navigating back (`overview/client.tsx`).
-- [ ] **Push toggle** throws a raw error when no VAPID key is configured.
-- [ ] **Translations**: `common.error` is missing, English plurals are built from German suffixes
-      ("5 categorn"), `semiannual` has no label in the overview, chat components and auth forms are
-      not translated, 72 keys are unused.
-- [ ] **Hydration mismatches** from `Intl.DateTimeFormat()` without a locale in five list pages.
-- [ ] **Eleven effects trigger `react-hooks/set-state-in-effect`**, currently downgraded to a warning
-      in `eslint.config.mjs`.
-- [ ] Smaller: "custom" recurrence has no interval input, the notification dot in the header has
-      no handler, the forgot-password form redirects without showing its confirmation, manifest
-      icons are maskable-only.
+- [x] **Calendar did not restore the current month** when navigating back: it kept the days of the
+      last viewed month. Navigation now loads directly and drops slower, outdated answers.
+- [x] **Push toggle** threw a raw error when no VAPID key is configured. It now says push is not set
+      up on this server and stays disabled.
+- [x] **Translations**: `common.error` added, plurals use ICU (`{count, plural, ...}`), `semiannual`
+      has a label in the overview, chat components, the approval card and the auth pages (including
+      server error messages) are translated, 68 unused keys removed. A test keeps `de` and `en` in sync.
+- [x] **Hydration mismatches** from `Intl.DateTimeFormat()` without a locale in five list pages.
+      Calendar days are formatted with the app locale in UTC (`src/lib/format-date.ts`), timestamps
+      with the next-intl formatter.
+- [x] **Effects triggered `react-hooks/set-state-in-effect`** (ten after the calendar change). All
+      are migrated and the rule is back to its default (error).
+- [x] Smaller: "custom" recurrence has an interval input; the header bell lists unread insights and
+      shows its dot only when there are some; the forgot-password form shows its confirmation
+      instead of redirecting; manifest icons are listed for `any` and `maskable`.
 
 ## 7. Cleanup
 

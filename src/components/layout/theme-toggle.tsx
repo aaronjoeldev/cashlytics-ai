@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
@@ -15,21 +14,9 @@ import {
 export function ThemeToggle() {
   const t = useTranslations("settings");
   const { setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
 
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <Button variant="ghost" size="icon" className="rounded-xl">
-        <Sun className="h-[1.2rem] w-[1.2rem]" />
-        <span className="sr-only">{t("theme")}</span>
-      </Button>
-    );
-  }
-
+  // The icons switch via the `dark` class, so nothing here depends on the resolved theme and the
+  // server markup matches the first client render without a mounted flag.
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

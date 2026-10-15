@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Bell, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -23,28 +23,48 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return outputArray;
 }
 
-type SupportState = "checking" | "supported" | "unsupported";
+type SupportState = "checking" | "supported" | "unsupported" | "notConfigured";
 type PermissionState = "default" | "granted" | "denied" | "unknown";
+
+const noSubscription = () => () => {};
+
+/** Browser capability, read once on the client; the server renders "checking". */
+function useBrowserPush(): { supported: boolean | null; permission: PermissionState } {
+  const supported = useSyncExternalStore(
+    noSubscription,
+    () => "serviceWorker" in navigator && "PushManager" in window,
+    () => null
+  );
+  const permission = useSyncExternalStore(
+    noSubscription,
+    () => ("Notification" in window ? (Notification.permission as PermissionState) : "unknown"),
+    () => "unknown" as PermissionState
+  );
+  return { supported, permission };
+}
 
 export function NotificationSettings() {
   const t = useTranslations("settings.pushNotifications");
-  const [support, setSupport] = useState<SupportState>("checking");
-  const [permission, setPermission] = useState<PermissionState>("unknown");
+  const browser = useBrowserPush();
+  const [serverSupport, setServerSupport] = useState<SupportState>("checking");
+  // Set once the user answered the permission prompt in this session
+  const [requestedPermission, setPermission] = useState<PermissionState | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // On mount: detect browser support, current permission, and subscription state.
+  const support: SupportState =
+    browser.supported === null ? "checking" : browser.supported ? serverSupport : "unsupported";
+  const permission = requestedPermission ?? browser.permission;
+
+  // On mount: check the server configuration and the current subscription
   useEffect(() => {
-    const isSupported =
-      typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+    if (!browser.supported) return;
 
-    if (!isSupported) {
-      setSupport("unsupported");
-      return;
-    }
-
-    setSupport("supported");
-    setPermission(Notification.permission as PermissionState);
+    // Without VAPID keys on the server, subscribing can only fail
+    fetch("/api/push/vapid-public-key")
+      .then((res) => res.json() as Promise<{ key: string | null }>)
+      .then(({ key }) => setServerSupport(key ? "supported" : "notConfigured"))
+      .catch(() => setServerSupport("notConfigured"));
 
     // Check whether there is already an active push subscription.
     navigator.serviceWorker.ready
@@ -56,7 +76,7 @@ export function NotificationSettings() {
         // If the SW isn't ready yet or errored, treat as not subscribed.
         setSubscribed(false);
       });
-  }, []);
+  }, [browser.supported]);
 
   async function handleEnable() {
     setLoading(true);
@@ -76,10 +96,10 @@ export function NotificationSettings() {
 
       // 3. Fetch VAPID public key from the backend.
       const keyRes = await fetch("/api/push/vapid-public-key");
-      if (!keyRes.ok) {
+      const { key: publicKey } = (await keyRes.json().catch(() => ({}))) as { key?: string | null };
+      if (!keyRes.ok || !publicKey) {
         throw new Error(t("errors.vapidKeyFetch"));
       }
-      const { key: publicKey } = await keyRes.json();
 
       // 4. Subscribe the browser to push.
       const subscription = await registration.pushManager.subscribe({
@@ -158,12 +178,16 @@ export function NotificationSettings() {
 
   const isUnsupported = support === "unsupported";
   const isChecking = support === "checking";
+  const isNotConfigured = support === "notConfigured";
   const isDenied = permission === "denied";
-  const isDisabled = isUnsupported || isChecking || loading || isDenied;
+  // Turning off stays possible for an old subscription after the keys were removed
+  const isDisabled =
+    isUnsupported || isChecking || loading || isDenied || (isNotConfigured && !subscribed);
 
   function statusLabel(): string {
     if (isChecking) return t("status.checking");
     if (isUnsupported) return t("status.unsupported");
+    if (isNotConfigured && !subscribed) return t("status.notConfigured");
     if (isDenied) return t("status.blocked");
     if (loading) return subscribed ? t("status.disabling") : t("status.enabling");
     if (subscribed) return t("status.enabled");
@@ -214,6 +238,16 @@ export function NotificationSettings() {
           <div className="border-destructive/20 bg-destructive/5 flex items-start gap-3 rounded-xl border px-4 py-3">
             <AlertTriangle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-destructive text-sm leading-relaxed">{t("warnings.denied")}</p>
+          </div>
+        )}
+
+        {/* Server without VAPID keys */}
+        {isNotConfigured && (
+          <div className="border-border/60 bg-muted/40 flex items-start gap-3 rounded-xl border px-4 py-3 dark:border-white/[0.06]">
+            <AlertTriangle className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {t("warnings.notConfigured")}
+            </p>
           </div>
         )}
 

@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { useRouter } from "next/navigation";
 import { forgotPasswordAction, type ForgotPasswordState } from "@/actions/auth-actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,11 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 const initialState: ForgotPasswordState = {};
 
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const t = useTranslations("auth.forgot");
   return (
     <Button
       type="submit"
@@ -24,10 +25,10 @@ function SubmitButton() {
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Sending...
+          {t("submitting")}
         </>
       ) : (
-        "Send reset link"
+        t("submit")
       )}
     </Button>
   );
@@ -35,13 +36,7 @@ function SubmitButton() {
 
 export function ForgotPasswordForm() {
   const [state, action] = useActionState(forgotPasswordAction, initialState);
-  const router = useRouter();
-
-  useEffect(() => {
-    if (state.success) {
-      router.push("/login");
-    }
-  }, [state.success, router]);
+  const t = useTranslations("auth");
 
   return (
     <div className="w-full max-w-sm">
@@ -63,45 +58,59 @@ export function ForgotPasswordForm() {
           className="mb-1 text-2xl font-bold tracking-tight"
           style={{ fontFamily: "var(--font-syne)" }}
         >
-          Reset password
+          {state.success ? t("forgot.sentTitle") : t("forgot.title")}
         </h1>
-        <p className="text-muted-foreground/70 mb-6 text-sm">
-          Enter your email to receive a reset link
-        </p>
 
-        {/* Global error */}
-        {state.error && (
-          <div className="bg-destructive/10 border-destructive/20 mb-4 rounded-lg border px-4 py-3">
-            <p className="text-destructive text-sm">{state.error}</p>
+        {state.success ? (
+          // Same text whether or not the address has an account
+          <div className="space-y-6">
+            <p className="text-muted-foreground/70 text-sm">{state.message}</p>
+            <Link
+              href="/login"
+              className="text-sm text-amber-500 underline-offset-4 transition-colors hover:text-amber-400 hover:underline"
+            >
+              {t("forgot.backToLogin")}
+            </Link>
           </div>
+        ) : (
+          <>
+            <p className="text-muted-foreground/70 mb-6 text-sm">{t("forgot.subtitle")}</p>
+
+            {/* Global error */}
+            {state.error && (
+              <div className="bg-destructive/10 border-destructive/20 mb-4 rounded-lg border px-4 py-3">
+                <p className="text-destructive text-sm">{state.error}</p>
+              </div>
+            )}
+
+            <form action={action} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="email">{t("email")}</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder={t("emailPlaceholder")}
+                />
+              </div>
+
+              <div className="pt-1">
+                <SubmitButton />
+              </div>
+            </form>
+          </>
         )}
-
-        <form action={action} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-            />
-          </div>
-
-          <div className="pt-1">
-            <SubmitButton />
-          </div>
-        </form>
       </div>
 
       {/* Sign in link */}
       <p className="text-muted-foreground mt-4 text-center text-sm">
-        Remember your password?{" "}
+        {t("forgot.rememberPassword")}{" "}
         <Link
           href="/login"
           className="text-amber-500 underline-offset-4 transition-colors hover:text-amber-400 hover:underline"
         >
-          Sign in
+          {t("forgot.login")}
         </Link>
       </p>
     </div>
