@@ -141,6 +141,13 @@
       "when": 1792050471278,
       "tag": "0019_import_reconciled_at",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792052390830,
+      "tag": "0020_users_email_case_unique",
+      "breakpoints": true
     }
   ]
 }

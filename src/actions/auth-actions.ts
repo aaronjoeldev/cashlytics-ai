@@ -120,11 +120,11 @@ export async function registerAction(
   }
 
   const hashedPassword = await hashPassword(password);
-  // A concurrent registration with the same address loses on the unique constraint
+  // A concurrent registration with the same address loses on a unique index (email or lower(email))
   const [created] = await db
     .insert(users)
     .values({ email, password: hashedPassword })
-    .onConflictDoNothing({ target: users.email })
+    .onConflictDoNothing()
     .returning({ id: users.id });
   if (!created) {
     return emailTakenError;
@@ -195,6 +195,8 @@ export async function forgotPasswordAction(
       .select({ id: users.id, email: users.email })
       .from(users)
       .where(sql`lower(${users.email}) = ${email}`)
+      // Same account as the login picks when two differ only in case
+      .orderBy(users.createdAt)
       .limit(1);
   } catch (error) {
     logger.error("Failed to look up user for password reset", "auth", error);

@@ -11,7 +11,7 @@ export async function getCurrentUserId(): Promise<string> {
   const { auth } = await import("@/auth");
   const { db } = await import("@/lib/db");
   const { users } = await import("@/lib/db/schema");
-  const { eq } = await import("drizzle-orm");
+  const { sql } = await import("drizzle-orm");
 
   // Try to get user from session first
   const session = await auth();
@@ -25,7 +25,8 @@ export async function getCurrentUserId(): Promise<string> {
     const [user] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.email, singleUserEmail))
+      .where(sql`lower(${users.email}) = ${singleUserEmail.trim().toLowerCase()}`)
+      .orderBy(users.createdAt)
       .limit(1);
 
     if (user) {

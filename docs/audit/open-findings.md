@@ -61,8 +61,10 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [x] **Password length was inconsistent** between sign-in, registration and reset.
 - [x] **E-mails were case-sensitive.** They are normalised to lower case on sign-in, registration
       and reset, and looked up case-insensitively.
-- [ ] **Existing accounts that differ only in e-mail case** are not merged, and there is no unique
-      index on `lower(email)`.
+- [x] **Existing accounts that differ only in e-mail case** are not merged, and there is no unique
+      index on `lower(email)`. (Migration `0020` lower-cases addresses and adds the unique index
+      when no case duplicates exist; duplicates are not merged automatically, login uses the
+      oldest account.)
 - [ ] **User enumeration**: explicit "account already exists" message on registration; response time
       of the forgot-password action reveals whether the address exists.
 - [x] **A concurrent duplicate registration raised an unhandled unique violation.**
