@@ -9,19 +9,8 @@ import { getDueAmountForMonth } from "@/lib/recurrence";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { getBaseCurrency } from "@/lib/user-preferences";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
-
-function toBase(
-  amount: number,
-  fromCurrency: string | null | undefined,
-  baseCurrency: Currency
-): number {
-  const from =
-    fromCurrency && currencies.includes(fromCurrency as Currency)
-      ? (fromCurrency as Currency)
-      : baseCurrency;
-  return convertCurrency(amount, from, baseCurrency);
-}
+import { toBaseCurrency as toBase } from "@/lib/currency";
+import { getRates } from "@/lib/exchange-rates";
 
 export type AccountForecast = {
   account: Account;
@@ -95,8 +84,13 @@ export async function getAccountForecast(
     ]);
 
     // Projected flows are in the base currency, so the starting balance has to be as well
-    const baseCurrency = await getBaseCurrency();
-    const currentBalance = toBase(safeParseFloat(account.balance), account.currency, baseCurrency);
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
+    const currentBalance = toBase(
+      safeParseFloat(account.balance),
+      account.currency,
+      baseCurrency,
+      rates
+    );
     const today = new Date();
     const projectedMonths: AccountForecast["projectedMonths"] = [];
 
@@ -116,7 +110,7 @@ export async function getAccountForecast(
           targetYear,
           targetMonth
         );
-        monthIncome += toBase(rawAmount, income.currency, baseCurrency);
+        monthIncome += toBase(rawAmount, income.currency, baseCurrency, rates);
       }
 
       let monthExpenses = 0;
@@ -127,7 +121,7 @@ export async function getAccountForecast(
           targetYear,
           targetMonth
         );
-        monthExpenses += toBase(rawAmount, expense.currency, baseCurrency);
+        monthExpenses += toBase(rawAmount, expense.currency, baseCurrency, rates);
       }
 
       let transfersIn = 0;
@@ -140,7 +134,7 @@ export async function getAccountForecast(
           targetMonth
         );
         if (rawAmount > 0) {
-          const amount = toBase(rawAmount, transfer.sourceCurrency, baseCurrency);
+          const amount = toBase(rawAmount, transfer.sourceCurrency, baseCurrency, rates);
           if (transfer.targetAccountId === accountId) {
             transfersIn += amount;
           } else if (transfer.sourceAccountId === accountId) {

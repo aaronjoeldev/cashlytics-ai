@@ -22,23 +22,8 @@ import {
   type RecurringItem,
 } from "@/lib/recurrence";
 import { getBaseCurrency } from "@/lib/user-preferences";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
-
-/**
- * Converts an amount from `fromCurrency` to `baseCurrency`.
- * Returns the original amount unchanged when currencies match.
- */
-function toBase(
-  amount: number,
-  fromCurrency: string | null | undefined,
-  baseCurrency: Currency
-): number {
-  const from =
-    fromCurrency && currencies.includes(fromCurrency as Currency)
-      ? (fromCurrency as Currency)
-      : baseCurrency;
-  return convertCurrency(amount, from, baseCurrency);
-}
+import { toBaseCurrency as toBase } from "@/lib/currency";
+import { getRates } from "@/lib/exchange-rates";
 
 export async function getMonthlyOverview(
   month: number,
@@ -50,7 +35,7 @@ export async function getMonthlyOverview(
   const { userId } = auth;
 
   try {
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
     const startDate = new Date(Date.UTC(year, month - 1, 1));
     const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59));
 
@@ -125,18 +110,18 @@ export async function getMonthlyOverview(
     // Convert each expense to baseCurrency using the entry's own currency
     const totalMonthlyExpenses = expensesWithDetails.reduce((sum, e) => {
       const rawAmount = getBudgetedAmountForMonth(e, safeParseFloat(e.amount), year, month);
-      return sum + toBase(rawAmount, e.currency, baseCurrency);
+      return sum + toBase(rawAmount, e.currency, baseCurrency, rates);
     }, 0);
 
     // Convert each daily expense to baseCurrency using the entry's own currency
     const totalDailyExpenses = dailyExpensesResult.reduce((sum, e) => {
-      return sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency);
+      return sum + toBase(safeParseFloat(e.amount), e.entryCurrency, baseCurrency, rates);
     }, 0);
 
     // Convert each income to baseCurrency using the entry's own currency
     const totalIncome = incomesWithAccount.reduce((sum, i) => {
       const rawAmount = getBudgetedAmountForMonth(i, safeParseFloat(i.amount), year, month);
-      return sum + toBase(rawAmount, i.currency, baseCurrency);
+      return sum + toBase(rawAmount, i.currency, baseCurrency, rates);
     }, 0);
 
     const totalExpenses = totalMonthlyExpenses + totalDailyExpenses;
@@ -222,7 +207,7 @@ export async function getCategoryBreakdown(
   const { userId } = auth;
 
   try {
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
     const categoryMap = new Map<
       string,
       { category: typeof categories.$inferSelect | null; amount: number }
@@ -250,7 +235,8 @@ export async function getCategoryBreakdown(
       const amount = toBase(
         safeParseFloat(item.dailyExpense.amount),
         item.dailyExpense.currency,
-        baseCurrency
+        baseCurrency,
+        rates
       );
 
       if (categoryMap.has(categoryId)) {
@@ -301,7 +287,7 @@ export async function getCategoryBreakdown(
 
       const categoryId = item.category?.id ?? "uncategorized";
       // Convert to baseCurrency using entry's own currency
-      const monthlyAmount = toBase(rawAmount, item.expense.currency, baseCurrency);
+      const monthlyAmount = toBase(rawAmount, item.expense.currency, baseCurrency, rates);
 
       if (categoryMap.has(categoryId)) {
         const existing = categoryMap.get(categoryId)!;
@@ -354,7 +340,7 @@ export async function getNormalizedMonthlyExpenses(): Promise<
       .leftJoin(accounts, eq(expenses.accountId, accounts.id))
       .where(eq(expenses.userId, userId));
 
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
 
     const normalizedExpenses = expensesResult.map((r) => {
       const expenseWithDetails: ExpenseWithDetails = {
@@ -368,7 +354,7 @@ export async function getNormalizedMonthlyExpenses(): Promise<
         r.expense.recurrenceType,
         r.expense.recurrenceInterval
       );
-      const monthlyAmount = toBase(rawMonthly, r.expense.currency, baseCurrency);
+      const monthlyAmount = toBase(rawMonthly, r.expense.currency, baseCurrency, rates);
 
       return {
         expense: expenseWithDetails,
@@ -406,7 +392,7 @@ export async function getSubscriptions(): Promise<
       .leftJoin(accounts, eq(expenses.accountId, accounts.id))
       .where(and(eq(expenses.isSubscription, true), eq(expenses.userId, userId)));
 
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
 
     const subscriptions = expensesResult.map((r) => {
       const expenseWithDetails: ExpenseWithDetails = {
@@ -420,7 +406,7 @@ export async function getSubscriptions(): Promise<
         r.expense.recurrenceType,
         r.expense.recurrenceInterval
       );
-      const monthlyAmount = toBase(rawMonthly, r.expense.currency, baseCurrency);
+      const monthlyAmount = toBase(rawMonthly, r.expense.currency, baseCurrency, rates);
 
       return {
         expense: expenseWithDetails,
@@ -465,7 +451,7 @@ export async function getMonthlyPaymentsCalendar(
   const { userId } = auth;
 
   try {
-    const baseCurrency = await getBaseCurrency();
+    const [baseCurrency, rates] = await Promise.all([getBaseCurrency(), getRates()]);
     const monthStart = new Date(Date.UTC(year, month - 1, 1));
     const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59));
     const now = new Date();
@@ -532,7 +518,12 @@ export async function getMonthlyPaymentsCalendar(
         addPayment(paymentDate, {
           id: item.expense.id,
           name: item.expense.name,
-          amount: toBase(safeParseFloat(item.expense.amount), item.expense.currency, baseCurrency),
+          amount: toBase(
+            safeParseFloat(item.expense.amount),
+            item.expense.currency,
+            baseCurrency,
+            rates
+          ),
           type: "expense",
           category: item.category
             ? {
@@ -553,7 +544,8 @@ export async function getMonthlyPaymentsCalendar(
         amount: toBase(
           safeParseFloat(item.dailyExpense.amount),
           item.dailyExpense.currency,
-          baseCurrency
+          baseCurrency,
+          rates
         ),
         type: "daily_expense",
         category: item.category
@@ -572,7 +564,12 @@ export async function getMonthlyPaymentsCalendar(
         addPayment(paymentDate, {
           id: item.income.id,
           name: item.income.source,
-          amount: toBase(safeParseFloat(item.income.amount), item.income.currency, baseCurrency),
+          amount: toBase(
+            safeParseFloat(item.income.amount),
+            item.income.currency,
+            baseCurrency,
+            rates
+          ),
           type: "income",
           category: null,
           isSubscription: false,

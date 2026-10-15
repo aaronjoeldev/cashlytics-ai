@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { exchangeRates } from "@/lib/currency";
 import { computeInsights, getHistoryMonths, type ExpenseRow } from "./compute-insights";
 
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -88,6 +89,18 @@ test("amounts in other currencies are converted to the base currency", () => {
     rows: [row("2026-09-10", 100), row("2026-10-02", 10000, "food", "JPY")],
   });
   assert.deepEqual(result, []);
+});
+
+test("conversion uses the rates passed in", () => {
+  // With 1 EUR = 10 JPY the same 10,000 JPY are 1,000 EUR, far above the 100 EUR average
+  const result = computeInsights({
+    now: day("2026-10-03"),
+    baseCurrency: "EUR",
+    rates: { ...exchangeRates, JPY: 10 },
+    firstExpenseDate: day("2026-09-01"),
+    rows: [row("2026-09-10", 100), row("2026-10-02", 10000, "food", "JPY")],
+  });
+  assert.equal(result[0]?.title, "Essen: 900% über Durchschnitt", JSON.stringify(result));
 });
 
 test("the spending pace is not judged in the first days of a month", () => {

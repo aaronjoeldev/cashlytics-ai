@@ -9,7 +9,7 @@ import { deleteTransfer } from "@/actions/transfer-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
 import { formatCalendarDate } from "@/lib/format-date";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
+import { currencies, type Currency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type { Account, TransferWithDetails } from "@/types/database";
 
@@ -20,7 +20,13 @@ interface TransfersClientProps {
 
 export function TransfersClient({ accounts, initialTransfers }: TransfersClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt, formatAmount, currency: baseCurrency, locale } = useSettings();
+  const {
+    formatCurrency: fmt,
+    formatAmount,
+    currency: baseCurrency,
+    locale,
+    convert,
+  } = useSettings();
   const formatDate = (date: Date | string) => formatCalendarDate(date, locale);
   const t = useTranslations("transfers");
   const tRecurrence = useTranslations("recurrence");
@@ -32,7 +38,7 @@ export function TransfersClient({ accounts, initialTransfers }: TransfersClientP
       entryCurrency && currencies.includes(entryCurrency as Currency)
         ? (entryCurrency as Currency)
         : baseCurrency;
-    return convertCurrency(amount, from, baseCurrency);
+    return convert(amount, from, baseCurrency);
   };
   const [transfers, setTransfers] = useState(initialTransfers);
 

@@ -5,6 +5,7 @@ import { Providers } from "@/components/providers";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import { getLocale, getMessages, getTimeZone } from "next-intl/server";
 import { getUserPreferences } from "@/lib/user-preferences";
+import { getRates } from "@/lib/exchange-rates";
 import { type Locale } from "@/i18n/config";
 
 const syne = Syne({
@@ -63,7 +64,10 @@ export default async function RootLayout({
   const locale = (await getLocale()) as Locale;
   const messages = await getMessages();
   const timeZone = await getTimeZone();
-  const { currency: initialCurrency } = await getUserPreferences();
+  const [{ currency: initialCurrency }, rates] = await Promise.all([
+    getUserPreferences(),
+    getRates(),
+  ]);
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -76,6 +80,7 @@ export default async function RootLayout({
           messages={messages}
           timeZone={timeZone}
           initialCurrency={initialCurrency}
+          rates={rates}
         >
           {children}
         </Providers>

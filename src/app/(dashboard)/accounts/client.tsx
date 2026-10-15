@@ -10,7 +10,7 @@ import { AccountForm } from "@/components/organisms/account-form";
 import { deleteAccount, updateAccount } from "@/actions/account-actions";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
+import { currencies, type Currency } from "@/lib/currency";
 import { Trash2, Pencil, Building2, PiggyBank, TrendingUp, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type {
@@ -35,7 +35,7 @@ export function AccountsClient({
 }: AccountsClientProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency, convert } = useSettings();
   const formatCurrency = (amount: string | number) =>
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
 
@@ -44,7 +44,7 @@ export function AccountsClient({
       entryCurrency && currencies.includes(entryCurrency as Currency)
         ? (entryCurrency as Currency)
         : baseCurrency;
-    return convertCurrency(amount, from, baseCurrency);
+    return convert(amount, from, baseCurrency);
   };
   const [accounts, setAccounts] = useState(initialAccounts);
   const [editingId, setEditingId] = useState<string | null>(null);

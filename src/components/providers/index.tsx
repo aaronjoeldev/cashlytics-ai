@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SettingsProvider } from "@/lib/settings-context";
 import { NextIntlClientProvider, type AbstractIntlMessages } from "next-intl";
 import { type Locale } from "@/i18n/config";
-import { type Currency } from "@/lib/currency";
+import { type Currency, type ExchangeRateTable } from "@/lib/currency";
 import { SessionProvider } from "next-auth/react";
 
 interface ProvidersProps {
@@ -15,6 +15,7 @@ interface ProvidersProps {
   messages: AbstractIntlMessages;
   timeZone?: string;
   initialCurrency?: Currency;
+  rates?: ExchangeRateTable;
 }
 
 export function Providers({
@@ -23,11 +24,12 @@ export function Providers({
   messages,
   timeZone,
   initialCurrency,
+  rates,
 }: ProvidersProps) {
   return (
     <SessionProvider>
       <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
-        <SettingsProvider initialLocale={locale} initialCurrency={initialCurrency}>
+        <SettingsProvider initialLocale={locale} initialCurrency={initialCurrency} rates={rates}>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"

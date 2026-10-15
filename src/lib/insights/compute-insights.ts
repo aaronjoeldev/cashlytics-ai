@@ -1,5 +1,10 @@
 import { safeParseFloat } from "@/lib/safe-parse";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
+import {
+  exchangeRates,
+  toBaseCurrency,
+  type Currency,
+  type ExchangeRateTable,
+} from "@/lib/currency";
 
 /** Months of history the average is taken over, at most. */
 export const HISTORY_MONTHS = 3;
@@ -25,6 +30,8 @@ export interface ComputedInsight {
 interface ComputeInput {
   now: Date;
   baseCurrency: Currency;
+  /** Exchange rates (base EUR) used to convert entries into the base currency */
+  rates?: ExchangeRateTable;
   /** Date of the user's first daily expense, or null when there is none. */
   firstExpenseDate: Date | null;
   /** Daily expenses from the start of the history window up to the end of the current month. */
@@ -45,12 +52,8 @@ export function getHistoryMonths(now: Date, firstExpenseDate: Date | null): numb
   return Math.max(0, Math.min(HISTORY_MONTHS, monthIndex(now) - monthIndex(firstExpenseDate)));
 }
 
-function toBase(row: ExpenseRow, baseCurrency: Currency): number {
-  const from =
-    row.currency && currencies.includes(row.currency as Currency)
-      ? (row.currency as Currency)
-      : baseCurrency;
-  return convertCurrency(safeParseFloat(row.amount), from, baseCurrency);
+function toBase(row: ExpenseRow, baseCurrency: Currency, rates: ExchangeRateTable): number {
+  return toBaseCurrency(safeParseFloat(row.amount), row.currency, baseCurrency, rates);
 }
 
 /**
@@ -60,6 +63,7 @@ function toBase(row: ExpenseRow, baseCurrency: Currency): number {
 export function computeInsights({
   now,
   baseCurrency,
+  rates = exchangeRates,
   firstExpenseDate,
   rows,
 }: ComputeInput): ComputedInsight[] {
@@ -78,7 +82,7 @@ export function computeInsights({
   const history = new Map<string, number>();
   for (const row of rows) {
     const key = row.categoryId ?? "none";
-    const amount = toBase(row, baseCurrency);
+    const amount = toBase(row, baseCurrency, rates);
     const age = currentMonth - monthIndex(new Date(row.date));
     if (age === 0) {
       const entry = current.get(key) ?? { name: row.categoryName ?? "Ohne Kategorie", total: 0 };

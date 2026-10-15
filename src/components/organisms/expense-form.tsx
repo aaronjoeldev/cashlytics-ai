@@ -19,13 +19,8 @@ import {
   updateExpense,
   updateDailyExpense,
 } from "@/actions/expense-actions";
-import {
-  currencies,
-  type Currency,
-  currencySymbols,
-  convertCurrency,
-  defaultCurrency,
-} from "@/lib/currency";
+import { currencies, type Currency, currencySymbols, defaultCurrency } from "@/lib/currency";
+import { useSettings } from "@/lib/settings-context";
 import { createCategory } from "@/actions/category-actions";
 import { uploadDocument } from "@/actions/document-actions";
 import type { CategoryInput } from "@/lib/validations/category";
@@ -93,6 +88,7 @@ export function ExpenseForm({
   const tCommon = useTranslations("common");
   const tRecurrence = useTranslations("recurrence");
   const tCurrency = useTranslations("currency");
+  const { convert } = useSettings();
   const [internalOpen, setInternalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"periodic" | "daily">("periodic");
@@ -487,11 +483,7 @@ export function ExpenseForm({
                     const accountCurrency = (account?.currency as Currency) || defaultCurrency;
                     const rawAmount = parseFloat(periodicForm.watch("amount") || "0");
                     if (periodicCurrency !== accountCurrency && rawAmount > 0) {
-                      const converted = convertCurrency(
-                        rawAmount,
-                        periodicCurrency,
-                        accountCurrency
-                      );
+                      const converted = convert(rawAmount, periodicCurrency, accountCurrency);
                       return (
                         <p className="text-muted-foreground text-xs">
                           {tCurrency("convertedAmount", {
@@ -835,7 +827,7 @@ export function ExpenseForm({
                     const accountCurrency = (account?.currency as Currency) || defaultCurrency;
                     const rawAmount = parseFloat(dailyForm.watch("amount") || "0");
                     if (dailyCurrency !== accountCurrency && rawAmount > 0) {
-                      const converted = convertCurrency(rawAmount, dailyCurrency, accountCurrency);
+                      const converted = convert(rawAmount, dailyCurrency, accountCurrency);
                       return (
                         <p className="text-muted-foreground text-xs">
                           {tCurrency("convertedAmount", {

@@ -76,31 +76,11 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 
 ## 2. Calculations and currency
 
-- [ ] **Totals use the hardcoded rate table** in `src/lib/currency.ts`. The live-rate module
-      `src/lib/exchange-rates.ts` is only used by the converter tool. Affects four action files,
-      five client pages and both forms.
-- [x] **Existing transfers are stored as EUR** regardless of their accounts. New transfers are
-      correct; old rows need a one-off backfill if non-EUR accounts exist. _Migration 0018 takes the
-      account currency for rows without exchange rate or target amount; `updateTransfer` now takes
-      over the currency of a newly chosen account._
-- [x] **`updateTransfer` allows the same account as source and target** when only one side is sent.
-- [x] **Date inputs rendered empty and submitted the current time** in the expense, income and
-      transfer forms. They use the controlled `DateInput` (UTC calendar day) and new entries default
-      to today's local calendar day at midnight.
-- [x] **Future-dated daily expenses appear first in "Recent transactions"** on the dashboard.
-- [x] **Amounts in another currency are shown with the base-currency symbol** without conversion in
-      the transfers list, import review, search dialog and scan success screen.
-- [x] **Dashboard category breakdown had no upper date bound** for daily expenses, so future-dated
-      entries counted as "this month".
-- [x] **Delete actions reported success when no row matched** (`deleteExpense`, `deleteDailyExpense`,
-      `deleteIncome`, `deleteAccount`, `deleteCategory`).
-- [x] **No server-side validation in the actions.** Create and update actions now parse their input
-      with `src/lib/validations/action-input.ts` (amount range, enums, currencies, dates, end after
-      start, text length, unknown keys dropped); this also covers the AI tools.
-- [x] **Form and AI tool schemas rejected the demo ids**: zod 4 `uuid()` requires an RFC version
-      digit, which the fixed ids of the demo seed lack. All id checks use `z.guid()`.
-- [x] **End date is not checked against the stored start date** when an update sets only one of
-      the two (for example the AI `updateExpense` tool setting only `endDate`).
+- [x] **Totals used the hardcoded rate table.** All totals, insights, forms and the converter
+      now use the live rates from `src/lib/exchange-rates.ts` (Frankfurter API, DB cache for
+      24 hours, kept in memory for an hour, 5-second API timeout). The table in
+      `src/lib/currency.ts` is only the fallback when neither API nor cache has rates. The root
+      layout passes the server's rates to the client, so both compute with the same numbers.
 
 - [x] **Amounts were rounded in binary**: server validation stored `5.555` as `5.55`
       (`toFixed`); `roundDecimal` now rounds half away from zero like Postgres. _(found in the Docker
@@ -229,16 +209,21 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [x] **Dashboard dates followed the runtime time zone**: header date and "In X Tagen" caused a
       hydration mismatch when server (UTC) and browser were on different days; recent transaction
       dates were German-only and shifted a day west of UTC. _(found in the Docker e2e run)_
-- [ ] Found in the Docker e2e run, not fixed yet: - month labels on the analytics page (server-rendered) and in the account detail month
-      picker are hard-coded `de-DE` - icon-only edit/delete buttons in the lists have no `aria-label` or `title` - `deleteCategory` returns the English "Category not found", the other actions German - every prefetch of a sidebar link is stored in the user's offline cache under a new
-      `?_rsc=` key; these entries are never used offline and only expire after 7 days
+- [ ] **Found in the Docker e2e run, not fixed yet.** Month labels on the analytics page
+      (server-rendered) and in the account detail month picker are hard-coded `de-DE`. Icon-only
+      edit/delete buttons in the lists have no `aria-label` or `title`. `deleteCategory` returns
+      the English "Category not found", the other actions German. Every prefetch of a sidebar link
+      is stored in the user's offline cache under a new `?_rsc=` key; these entries are never used
+      offline and only expire after 7 days. The account filters at the top of a page open their
+      list aligned on the selected account, so with several accounts "Alle Konten" is pushed above
+      the viewport and has to be scrolled to.
 
 ## 7. Cleanup
 
 - [ ] **Dead code**: `accounts-actions.ts`, `expenses-actions.ts`, `incomes-actions.ts` now hold
       one function each (used by `accounts/[id]/page.tsx`) and can be merged into the singular
       files; `account-detail-actions.ts`,
-      `exchange-rates-actions.ts`, `lib/auth/user-id.ts`, `lib/email/index.ts`,
+      `lib/auth/user-id.ts`, `lib/email/index.ts`,
       `organisms/category-list.tsx`, `atoms/category-select.tsx`. (`src/lib/validators/`, the
       unused `validations/*` schemas and the second daily-expense path were removed.)
 - [ ] **Tracked by accident**: `.tmp/` (agent session files) and

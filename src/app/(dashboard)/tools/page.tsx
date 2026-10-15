@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, Coins, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowRightLeft, Coins } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,54 +14,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSettings } from "@/lib/settings-context";
-import {
-  exchangeRates as fallbackRates,
-  popularConverterCurrencies,
-  type Currency,
-} from "@/lib/currency";
-
-type RatesResponse = Partial<Record<Currency, number>>;
+import { popularConverterCurrencies, type Currency } from "@/lib/currency";
 
 const QUICK_CURRENCIES: Currency[] = ["USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "PLN"];
 
 export default function ToolsPage() {
   const t = useTranslations("tools");
   const tCurrency = useTranslations("currency");
-  const { locale, currency: baseCurrency } = useSettings();
+  // Same live rates the server uses for all totals
+  const { locale, currency: baseCurrency, rates } = useSettings();
 
   const [amount, setAmount] = useState("100");
   const [sourceCurrency, setSourceCurrency] = useState<Currency>(baseCurrency);
   const [targetCurrency, setTargetCurrency] = useState<Currency>("USD");
-  const [rates, setRates] = useState<RatesResponse>(fallbackRates);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadRates() {
-      try {
-        const response = await fetch("/api/exchange-rates", { cache: "no-store" });
-        if (!response.ok) throw new Error("Failed to fetch rates");
-
-        const data = (await response.json()) as RatesResponse;
-        if (!isMounted) return;
-
-        setRates({ ...fallbackRates, ...data, EUR: 1 });
-      } catch {
-        if (!isMounted) return;
-        setRates(fallbackRates);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadRates();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   function handleSourceChange(value: Currency) {
     setSourceCurrency(value);
     if (value === targetCurrency) setTargetCurrency(sourceCurrency);
@@ -79,8 +44,8 @@ export default function ToolsPage() {
 
   const parsedAmount = Number.parseFloat(amount.replace(",", "."));
   const safeAmount = Number.isFinite(parsedAmount) ? parsedAmount : 0;
-  const sourceRate = rates[sourceCurrency] ?? fallbackRates[sourceCurrency] ?? 1;
-  const targetRate = rates[targetCurrency] ?? fallbackRates[targetCurrency] ?? 1;
+  const sourceRate = rates[sourceCurrency];
+  const targetRate = rates[targetCurrency];
   const exchangeRate = targetRate / sourceRate;
   const convertedAmount = safeAmount * exchangeRate;
 
@@ -238,7 +203,6 @@ export default function ToolsPage() {
                 {t("converter.convertedAmount")}
               </p>
               <div className="mt-2 flex items-center gap-2">
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-amber-500" /> : null}
                 <p className="text-3xl font-semibold">{targetFormatted}</p>
               </div>
               <p className="text-muted-foreground mt-2 text-sm">

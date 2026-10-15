@@ -30,7 +30,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import { useSettings } from "@/lib/settings-context";
-import { convertCurrency, currencies, type Currency } from "@/lib/currency";
+import { currencies, type Currency } from "@/lib/currency";
 import { useTranslations } from "next-intl";
 import type {
   Account,
@@ -87,7 +87,7 @@ export function AccountDetailClient({
   initialTransfers,
 }: AccountDetailClientProps) {
   const router = useRouter();
-  const { formatCurrency: fmt, currency: baseCurrency } = useSettings();
+  const { formatCurrency: fmt, currency: baseCurrency, convert } = useSettings();
   const formatCurrency = (amount: string | number) =>
     fmt(typeof amount === "string" ? parseFloat(amount) : amount);
   const toBase = (amount: number, entryCurrency?: string | null): number => {
@@ -95,7 +95,7 @@ export function AccountDetailClient({
       entryCurrency && currencies.includes(entryCurrency as Currency)
         ? (entryCurrency as Currency)
         : baseCurrency;
-    return convertCurrency(amount, from, baseCurrency);
+    return convert(amount, from, baseCurrency);
   };
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
