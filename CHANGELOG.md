@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.5](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.4...v0.8.5) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **forms:** show stored dates, allow removing categories, surface errors ([e8a8a58](https://github.com/aaronjoeldev/cashlytics-ai/commit/e8a8a5815ad9b4bd6441b5bb1238ee980359e8c8))
+
 ## [0.8.4](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.3...v0.8.4) (2026-10-14)
 
 ### 🐛 Bug Fixes
