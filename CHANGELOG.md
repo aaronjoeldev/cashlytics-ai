@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.6](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.5...v0.8.6) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **insights:** stop duplicates, schedule the daily run, use the user's day in chat ([3358a8c](https://github.com/aaronjoeldev/cashlytics-ai/commit/3358a8cb13b89191e2959175855443386760750d))
+
 ## [0.8.5](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.4...v0.8.5) (2026-10-15)
 
 ### 🐛 Bug Fixes
