@@ -127,6 +127,13 @@
       "when": 1792044527993,
       "tag": "0017_insights_dedup_key",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792045670873,
+      "tag": "0018_transfer_currency_backfill",
+      "breakpoints": true
     }
   ]
 }

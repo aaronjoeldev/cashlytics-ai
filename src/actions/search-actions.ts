@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { accounts, expenses, incomes, transfers, dailyExpenses, categories } from "@/lib/db/schema";
-import { and, ilike, sql, eq } from "drizzle-orm";
+import { accounts, expenses, incomes, transfers, dailyExpenses } from "@/lib/db/schema";
+import { and, ilike, eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth/require-auth";
 
 export interface SearchResult {
@@ -11,6 +11,8 @@ export interface SearchResult {
   title: string;
   subtitle?: string;
   amount?: string;
+  /** Currency of `amount`; amounts are not converted. */
+  currency?: string;
   href: string;
   icon?: string;
 }
@@ -45,6 +47,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
             ? "Sparkonto"
             : "ETF-Konto",
       amount: account.balance,
+      currency: account.currency,
       href: `/accounts/${account.id}`,
       icon: account.type === "checking" ? "🏦" : account.type === "savings" ? "🐷" : "📈",
     });
@@ -56,11 +59,9 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       id: expenses.id,
       name: expenses.name,
       amount: expenses.amount,
-      accountId: expenses.accountId,
-      categoryId: expenses.categoryId,
+      currency: expenses.currency,
     })
     .from(expenses)
-    .leftJoin(categories, sql`${expenses.categoryId} = ${categories.id}`)
     .where(and(eq(expenses.userId, userId), ilike(expenses.name, searchTerm)));
 
   for (const expense of expenseResults) {
@@ -70,6 +71,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       title: expense.name,
       subtitle: "Periodische Ausgabe",
       amount: expense.amount,
+      currency: expense.currency,
       href: `/expenses`,
       icon: "💸",
     });
@@ -81,7 +83,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       id: dailyExpenses.id,
       description: dailyExpenses.description,
       amount: dailyExpenses.amount,
-      date: dailyExpenses.date,
+      currency: dailyExpenses.currency,
     })
     .from(dailyExpenses)
     .where(and(eq(dailyExpenses.userId, userId), ilike(dailyExpenses.description, searchTerm)));
@@ -93,6 +95,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       title: expense.description,
       subtitle: `Tägliche Ausgabe`,
       amount: expense.amount,
+      currency: expense.currency,
       href: `/expenses`,
       icon: "🧾",
     });
@@ -111,6 +114,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       title: income.source,
       subtitle: "Einnahme",
       amount: income.amount,
+      currency: income.currency,
       href: `/income`,
       icon: "💰",
     });
@@ -129,6 +133,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       title: transfer.description || "Transfer",
       subtitle: "Umbuchung",
       amount: transfer.amount,
+      currency: transfer.sourceCurrency,
       href: `/transfers`,
       icon: "🔄",
     });

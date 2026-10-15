@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  changesDateRange,
+  checkUpdatedRange,
   createAccountInput,
   createCategoryInput,
   createDailyExpenseInput,
@@ -188,5 +190,32 @@ test("ids are checked for format only, so the fixed demo ids are accepted", () =
   assert.equal(
     parseInput(createExpenseInput, { ...validExpense, accountId: "a0000000" }).success,
     false
+  );
+});
+
+test("an update setting only one date is checked against the stored range", () => {
+  const stored = { startDate: new Date("2026-03-01"), endDate: null };
+  assert.equal(changesDateRange({}), false);
+  assert.equal(changesDateRange({ endDate: null }), false);
+  assert.equal(changesDateRange({ endDate: new Date("2026-04-01") }), true);
+  assert.equal(
+    checkUpdatedRange({ endDate: new Date("2026-02-01") }, stored),
+    "Enddatum liegt vor dem Startdatum"
+  );
+  assert.equal(checkUpdatedRange({ endDate: new Date("2026-03-01") }, stored), null);
+  assert.equal(
+    checkUpdatedRange(
+      { startDate: new Date("2026-06-01") },
+      { startDate: new Date("2026-01-01"), endDate: new Date("2026-05-01") }
+    ),
+    "Enddatum liegt vor dem Startdatum"
+  );
+  // Removing the end date is always allowed
+  assert.equal(
+    checkUpdatedRange(
+      { startDate: new Date("2026-06-01"), endDate: null },
+      { startDate: new Date("2026-01-01"), endDate: new Date("2026-05-01") }
+    ),
+    null
   );
 });

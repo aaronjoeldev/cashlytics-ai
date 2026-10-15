@@ -64,7 +64,29 @@ export const accountTypes = ["checking", "savings", "etf"] as const;
 type DateRange = { startDate?: Date; endDate?: Date | null };
 const endNotBeforeStart = (data: DateRange) =>
   !data.startDate || !data.endDate || data.endDate >= data.startDate;
-const endDateIssue = { message: "Enddatum liegt vor dem Startdatum", path: ["endDate"] };
+const END_BEFORE_START = "Enddatum liegt vor dem Startdatum";
+// zod normalises the params object passed to refine() in place, so do not read from it
+const endDateIssue = { message: END_BEFORE_START, path: ["endDate"] };
+
+/** True when an update changes the date range, so it has to be checked against the stored row. */
+export function changesDateRange(updates: DateRange): boolean {
+  return updates.startDate !== undefined || updates.endDate != null;
+}
+
+/**
+ * Checks an update against the stored range. The schema can only compare dates sent together;
+ * an update that sets only the end date must not end before the stored start, and vice versa.
+ */
+export function checkUpdatedRange(
+  updates: DateRange,
+  stored: { startDate: Date; endDate: Date | null }
+): string | null {
+  const merged = {
+    startDate: updates.startDate ?? stored.startDate,
+    endDate: updates.endDate === undefined ? stored.endDate : updates.endDate,
+  };
+  return endNotBeforeStart(merged) ? null : END_BEFORE_START;
+}
 
 // --- Accounts ---------------------------------------------------------------
 

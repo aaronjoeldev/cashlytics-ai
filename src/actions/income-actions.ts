@@ -8,7 +8,13 @@ import type { ApiResponse, Income, NewIncome, IncomeWithAccount } from "@/types/
 import { logger } from "@/lib/logger";
 import { ownsAccount } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
-import { createIncomeInput, parseInput, updateIncomeInput } from "@/lib/validations/action-input";
+import {
+  changesDateRange,
+  checkUpdatedRange,
+  createIncomeInput,
+  parseInput,
+  updateIncomeInput,
+} from "@/lib/validations/action-input";
 
 export async function getIncomes(filters?: {
   accountId?: string;
@@ -117,6 +123,19 @@ export async function updateIncome(
     }
     if (updates.accountId && !(await ownsAccount(userId, updates.accountId))) {
       return { success: false, error: "Konto nicht gefunden oder kein Zugriff." };
+    }
+
+    if (changesDateRange(updates)) {
+      const [stored] = await db
+        .select({ startDate: incomes.startDate, endDate: incomes.endDate })
+        .from(incomes)
+        .where(and(eq(incomes.id, id), eq(incomes.userId, userId)))
+        .limit(1);
+      if (!stored) {
+        return { success: false, error: "Einnahme nicht gefunden." };
+      }
+      const rangeError = checkUpdatedRange(updates, stored);
+      if (rangeError) return { success: false, error: rangeError };
     }
 
     const [income] = await db

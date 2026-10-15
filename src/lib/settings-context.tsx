@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { type Locale, defaultLocale, locales } from "@/i18n/config";
 import {
   type Currency,
@@ -15,18 +8,20 @@ import {
   currencies,
   formatCurrency as formatCurrencyUtil,
 } from "@/lib/currency";
-import {
-  getUserSettings,
-  updateBaseCurrency,
-  updateLocale,
-} from "@/actions/settings-actions";
+import { getUserSettings, updateBaseCurrency, updateLocale } from "@/actions/settings-actions";
 
 export interface SettingsContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   currency: Currency;
   setCurrency: (currency: Currency) => void;
+  /** Formats an amount that is already in the base currency. */
   formatCurrency: (amount: number) => string;
+  /**
+   * Formats an amount in its own currency, without conversion. Unknown or missing currencies
+   * fall back to the base currency.
+   */
+  formatAmount: (amount: number | string, currency?: string | null) => string;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -104,7 +99,11 @@ export function SettingsProvider({
     setLocaleState(newLocale);
     setCookie(LOCALE_COOKIE, newLocale);
     // Await DB write before reloading — reload cancels inflight requests
-    try { await updateLocale(newLocale); } catch { /* cookie already set */ }
+    try {
+      await updateLocale(newLocale);
+    } catch {
+      /* cookie already set */
+    }
     window.location.reload();
   }, []);
 
@@ -112,7 +111,11 @@ export function SettingsProvider({
     setCurrencyState(newCurrency);
     setCookie(CURRENCY_COOKIE, newCurrency);
     // Await DB write before reloading — reload cancels inflight requests
-    try { await updateBaseCurrency(newCurrency); } catch { /* cookie already set */ }
+    try {
+      await updateBaseCurrency(newCurrency);
+    } catch {
+      /* cookie already set */
+    }
     window.location.reload();
   }, []);
 
@@ -129,6 +132,23 @@ export function SettingsProvider({
     [currency, locale]
   );
 
+  const formatAmount = useCallback(
+    (amount: number | string, entryCurrency?: string | null) => {
+      const value = typeof amount === "string" ? Number.parseFloat(amount) : amount;
+      const target =
+        entryCurrency && currencies.includes(entryCurrency as Currency)
+          ? (entryCurrency as Currency)
+          : currency;
+      return formatCurrencyUtil(
+        Number.isFinite(value) ? value : 0,
+        target,
+        locale === "en" ? "en-US" : "de-DE",
+        target
+      );
+    },
+    [currency, locale]
+  );
+
   return (
     <SettingsContext.Provider
       value={{
@@ -137,6 +157,7 @@ export function SettingsProvider({
         currency,
         setCurrency,
         formatCurrency,
+        formatAmount,
       }}
     >
       {children}

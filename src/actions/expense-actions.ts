@@ -17,6 +17,8 @@ import { logger } from "@/lib/logger";
 import { ownsAccount, ownsCategory } from "@/lib/auth/ownership";
 import { requireAuth } from "@/lib/auth/require-auth";
 import {
+  changesDateRange,
+  checkUpdatedRange,
   createDailyExpenseInput,
   createExpenseInput,
   parseInput,
@@ -148,6 +150,19 @@ export async function updateExpense(
     }
     if (updates.categoryId && !(await ownsCategory(userId, updates.categoryId))) {
       return { success: false, error: "Kategorie nicht gefunden oder kein Zugriff." };
+    }
+
+    if (changesDateRange(updates)) {
+      const [stored] = await db
+        .select({ startDate: expenses.startDate, endDate: expenses.endDate })
+        .from(expenses)
+        .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
+        .limit(1);
+      if (!stored) {
+        return { success: false, error: "Ausgabe nicht gefunden." };
+      }
+      const rangeError = checkUpdatedRange(updates, stored);
+      if (rangeError) return { success: false, error: rangeError };
     }
 
     const [expense] = await db
