@@ -46,12 +46,7 @@ import {
 
 type DecisionValue = "keep_both" | "replace_existing" | "skip_import_row";
 type UploadProcessingStage =
-  | "idle"
-  | "staging"
-  | "reconciling"
-  | "loadingSnapshot"
-  | "done"
-  | "error";
+  "idle" | "staging" | "reconciling" | "loadingSnapshot" | "done" | "error";
 
 interface ImportClientProps {
   accounts: Account[];
@@ -123,7 +118,7 @@ function getUploadProcessingMeta(stage: UploadProcessingStage): {
 
 export function ImportClient({ accounts }: ImportClientProps) {
   const { toast } = useToast();
-  const { formatCurrency: fmt } = useSettings();
+  const { formatAmount } = useSettings();
   const t = useTranslations("csvImport");
 
   const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id ?? "");
@@ -155,7 +150,6 @@ export function ImportClient({ accounts }: ImportClientProps) {
     unresolvedConflictCount,
   });
 
-  const formatCurrency = (value: string) => fmt(Number.parseFloat(value));
   const uploadProcessingMeta = getUploadProcessingMeta(uploadProcessingStage);
 
   const refreshSnapshot = async (sessionId: string) => {
@@ -523,12 +517,19 @@ export function ImportClient({ accounts }: ImportClientProps) {
                 <div key={conflict.id} className="space-y-2 rounded-xl border p-4">
                   <p className="font-medium">{t("conflict.importedRecord")}</p>
                   <p className="text-sm">{importRow?.description ?? "-"}</p>
-                  <p className="text-sm">{importRow ? formatCurrency(importRow.amount) : "-"}</p>
+                  <p className="text-sm">
+                    {importRow ? formatAmount(importRow.amount, importRow.currency) : "-"}
+                  </p>
                   {conflict.existingRecord && (
                     <>
                       <p className="font-medium">{t("conflict.existingRecord")}</p>
                       <p className="text-sm">{conflict.existingRecord.description}</p>
-                      <p className="text-sm">{formatCurrency(conflict.existingRecord.amount)}</p>
+                      <p className="text-sm">
+                        {formatAmount(
+                          conflict.existingRecord.amount,
+                          conflict.existingRecord.currency
+                        )}
+                      </p>
                     </>
                   )}
                   {confidenceValue !== null && (
@@ -593,7 +594,7 @@ export function ImportClient({ accounts }: ImportClientProps) {
                   <div>
                     <p className="font-medium">{row.description}</p>
                     <p className="text-muted-foreground text-sm">
-                      {formatCurrency(row.amount)} - {row.currency}
+                      {formatAmount(row.amount, row.currency)}
                     </p>
                   </div>
                   <Button

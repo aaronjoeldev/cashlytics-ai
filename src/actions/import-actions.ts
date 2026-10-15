@@ -64,6 +64,7 @@ export type ImportSessionSnapshot = {
       type: "expense" | "income";
       description: string;
       amount: string;
+      currency: string;
       date: Date;
     } | null;
     decision: ImportDecisionValue | null;
@@ -410,6 +411,7 @@ export async function getImportSessionSnapshot(
               id: dailyExpenses.id,
               description: dailyExpenses.description,
               amount: dailyExpenses.amount,
+              currency: dailyExpenses.currency,
               date: dailyExpenses.date,
             })
             .from(dailyExpenses)
@@ -426,6 +428,7 @@ export async function getImportSessionSnapshot(
               id: incomes.id,
               description: incomes.source,
               amount: incomes.amount,
+              currency: incomes.currency,
               date: incomes.startDate,
             })
             .from(incomes)
@@ -464,6 +467,7 @@ export async function getImportSessionSnapshot(
                   type: "expense" as const,
                   description: expenseRecord.description,
                   amount: expenseRecord.amount,
+                  currency: expenseRecord.currency,
                   date: expenseRecord.date,
                 }
               : incomeRecord
@@ -472,6 +476,7 @@ export async function getImportSessionSnapshot(
                     type: "income" as const,
                     description: incomeRecord.description,
                     amount: incomeRecord.amount,
+                    currency: incomeRecord.currency,
                     date: incomeRecord.date,
                   }
                 : null,

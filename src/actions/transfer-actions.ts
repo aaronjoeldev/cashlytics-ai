@@ -6,13 +6,24 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { ApiResponse, Transfer, NewTransfer, TransferWithDetails } from "@/types/database";
 import { logger } from "@/lib/logger";
-import { ownsAccount } from "@/lib/auth/ownership";
+import type { Currency } from "@/lib/currency";
 import { requireAuth } from "@/lib/auth/require-auth";
 import {
+  checkUpdatedRange,
   createTransferInput,
   parseInput,
   updateTransferInput,
 } from "@/lib/validations/action-input";
+
+/** Currency of the account if it belongs to the user, otherwise null. Not exported: not an action. */
+async function getOwnedAccountCurrency(userId: string, accountId: string): Promise<string | null> {
+  const [account] = await db
+    .select({ currency: accounts.currency })
+    .from(accounts)
+    .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+    .limit(1);
+  return account?.currency ?? null;
+}
 
 export async function getTransfers(filters?: {
   sourceAccountId?: string;
@@ -131,6 +142,8 @@ export async function updateTransfer(
       .select({
         sourceAccountId: transfers.sourceAccountId,
         targetAccountId: transfers.targetAccountId,
+        startDate: transfers.startDate,
+        endDate: transfers.endDate,
       })
       .from(transfers)
       .where(and(eq(transfers.id, id), eq(transfers.userId, userId)))
@@ -139,16 +152,28 @@ export async function updateTransfer(
       return { success: false, error: "Transfer nicht gefunden." };
     }
 
+    const rangeError = checkUpdatedRange(updates, existing);
+    if (rangeError) return { success: false, error: rangeError };
+
     const sourceAccountId = updates.sourceAccountId ?? existing.sourceAccountId;
     const targetAccountId = updates.targetAccountId ?? existing.targetAccountId;
     if (sourceAccountId === targetAccountId) {
       return { success: false, error: "Quell- und Zielkonto müssen unterschiedlich sein" };
     }
-    if (updates.sourceAccountId && !(await ownsAccount(userId, updates.sourceAccountId))) {
-      return { success: false, error: "Quellkonto nicht gefunden oder kein Zugriff." };
+    // A new account brings its currency along unless the caller sets one explicitly
+    if (updates.sourceAccountId) {
+      const currency = await getOwnedAccountCurrency(userId, updates.sourceAccountId);
+      if (!currency) {
+        return { success: false, error: "Quellkonto nicht gefunden oder kein Zugriff." };
+      }
+      updates.sourceCurrency ??= currency as Currency;
     }
-    if (updates.targetAccountId && !(await ownsAccount(userId, updates.targetAccountId))) {
-      return { success: false, error: "Zielkonto nicht gefunden oder kein Zugriff." };
+    if (updates.targetAccountId) {
+      const currency = await getOwnedAccountCurrency(userId, updates.targetAccountId);
+      if (!currency) {
+        return { success: false, error: "Zielkonto nicht gefunden oder kein Zugriff." };
+      }
+      updates.targetCurrency ??= currency as Currency;
     }
 
     const [transfer] = await db

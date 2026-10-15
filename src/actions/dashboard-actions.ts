@@ -376,13 +376,18 @@ export async function getRecentTransactions(
   const { userId } = auth;
 
   try {
+    // Planned entries with a later date are not "recent". Dates are UTC-midnight calendar days.
+    const now = new Date();
+    const tomorrow = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+    );
     const transactions = await db.query.dailyExpenses.findMany({
       with: {
         account: true,
         category: true,
       },
-      where: eq(dailyExpenses.userId, userId),
-      orderBy: [desc(dailyExpenses.date)],
+      where: and(eq(dailyExpenses.userId, userId), lt(dailyExpenses.date, tomorrow)),
+      orderBy: [desc(dailyExpenses.date), desc(dailyExpenses.createdAt)],
       limit,
     });
 

@@ -18,6 +18,7 @@ import {
 import { createDailyExpense } from "@/actions/expense-actions";
 import { uploadDocument } from "@/actions/document-actions";
 import { currencies, type Currency, currencySymbols, convertCurrency } from "@/lib/currency";
+import { useSettings } from "@/lib/settings-context";
 import type { Account, Category } from "@/types/database";
 import type { ReceiptScanResult } from "@/types/receipt";
 
@@ -34,6 +35,7 @@ interface ScanClientProps {
 export function ScanClient({ accounts, categories }: ScanClientProps) {
   const router = useRouter();
   const t = useTranslations("receiptScan");
+  const { formatAmount } = useSettings();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<ScanStep>("idle");
@@ -447,11 +449,7 @@ export function ScanClient({ accounts, categories }: ScanClientProps) {
               <h2 className="text-lg font-semibold">{t("success.title")}</h2>
               {description && amount && (
                 <p className="text-muted-foreground mt-1 text-sm">
-                  {parseFloat(amount).toLocaleString("de-DE", {
-                    style: "currency",
-                    currency: scanResult?.currency ?? "EUR",
-                  })}{" "}
-                  · {description}
+                  {formatAmount(amount, selectedCurrency)} · {description}
                 </p>
               )}
             </div>

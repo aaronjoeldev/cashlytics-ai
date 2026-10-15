@@ -77,14 +77,16 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **Totals use the hardcoded rate table** in `src/lib/currency.ts`. The live-rate module
       `src/lib/exchange-rates.ts` is only used by the converter tool. Affects four action files,
       five client pages and both forms.
-- [ ] **Existing transfers are stored as EUR** regardless of their accounts. New transfers are
-      correct; old rows need a one-off backfill if non-EUR accounts exist.
+- [x] **Existing transfers are stored as EUR** regardless of their accounts. New transfers are
+      correct; old rows need a one-off backfill if non-EUR accounts exist. _Migration 0018 takes the
+      account currency for rows without exchange rate or target amount; `updateTransfer` now takes
+      over the currency of a newly chosen account._
 - [x] **`updateTransfer` allows the same account as source and target** when only one side is sent.
 - [x] **Date inputs rendered empty and submitted the current time** in the expense, income and
       transfer forms. They use the controlled `DateInput` (UTC calendar day) and new entries default
       to today's local calendar day at midnight.
-- [ ] **Future-dated daily expenses appear first in "Recent transactions"** on the dashboard.
-- [ ] **Amounts in another currency are shown with the base-currency symbol** without conversion in
+- [x] **Future-dated daily expenses appear first in "Recent transactions"** on the dashboard.
+- [x] **Amounts in another currency are shown with the base-currency symbol** without conversion in
       the transfers list, import review, search dialog and scan success screen.
 - [x] **Dashboard category breakdown had no upper date bound** for daily expenses, so future-dated
       entries counted as "this month".
@@ -95,7 +97,7 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       start, text length, unknown keys dropped); this also covers the AI tools.
 - [x] **Form and AI tool schemas rejected the demo ids**: zod 4 `uuid()` requires an RFC version
       digit, which the fixed ids of the demo seed lack. All id checks use `z.guid()`.
-- [ ] **End date is not checked against the stored start date** when an update sets only one of
+- [x] **End date is not checked against the stored start date** when an update sets only one of
       the two (for example the AI `updateExpense` tool setting only `endDate`).
 
 ## 3. CSV import
