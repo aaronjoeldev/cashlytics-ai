@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.13](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.12...v0.8.13) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **currency:** compute totals with live exchange rates ([fd975b6](https://github.com/aaronjoeldev/cashlytics-ai/commit/fd975b6eb82c4a84c7d11ee9d20e21636513d829))
+
 ## [0.8.12](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.11...v0.8.12) (2026-10-15)
 
 ### 🐛 Bug Fixes
