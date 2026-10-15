@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.8](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.7...v0.8.8) (2026-10-15)
+
+### 🐛 Bug Fixes
+
+- **import:** decode bank exports, block unchecked imports, stop double matches ([dc214ae](https://github.com/aaronjoeldev/cashlytics-ai/commit/dc214ae5010ce7dd3cba2372daf2739a0abfa2c6))
+
 ## [0.8.7](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.6...v0.8.7) (2026-10-15)
 
 ### 🐛 Bug Fixes
