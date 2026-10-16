@@ -65,7 +65,11 @@ export async function reserves() {
   check("BahnCard rate is amount ÷ 12", text.includes("20,33 €/Mo"));
   check(
     "pot shows the seeded balance and account",
-    euro(text, "Im Topf") === 250 && text.includes("Rücklagenkonto: Rücklagen")
+    euro(text, "Im Topf") === 250 && text.includes("Gesammelt auf: Rücklagen")
+  );
+  check(
+    "rows name the paying account and the filter says what it filters",
+    text.includes("abgebucht von Hauptkonto") && text.includes("Abgebucht von:")
   );
   const target = euro(text, "Soll-Stand heute");
   check(
@@ -109,7 +113,7 @@ export async function reserves() {
   await goto(page, "/reserves");
   // Pick the option by typeahead; retry once if the click came before hydration
   for (let attempt = 0; attempt < 2; attempt++) {
-    await page.click('[aria-label="Nach Konto filtern"]');
+    await page.click('[aria-label="Nach Abbuchungskonto filtern"]');
     await page.waitForSelector('[role="option"]', { timeout: 3000 }).catch(() => {});
     // Radix ignores typeahead until the list has finished positioning
     await sleep(500);
@@ -119,7 +123,7 @@ export async function reserves() {
       .waitForFunction(
         () =>
           document
-            .querySelector('[aria-label="Nach Konto filtern"]')
+            .querySelector('[aria-label="Nach Abbuchungskonto filtern"]')
             ?.innerText.includes("Notgroschen"),
         { timeout: 3000 }
       )

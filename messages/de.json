@@ -125,7 +125,7 @@
     "targetTotal": "Soll-Stand heute",
     "targetTotalHint": "So viel sollte für diese Rechnungen jetzt im Topf liegen.",
     "potBalance": "Im Topf",
-    "potAccount": "Rücklagenkonto: {name}",
+    "potAccount": "Gesammelt auf: {name}",
     "noPotHint": "Lege fest, auf welchem Konto du die Rücklagen sammelst.",
     "correctBalance": "Stand korrigieren",
     "setUpPot": "Rücklagenkonto festlegen",
@@ -153,7 +153,7 @@
     "howPot": "Topf: der Stand, den du festgelegt hast, plus alle geplanten Transfers auf das Rücklagenkonto seitdem, minus alle seitdem fälligen seltenen Rechnungen. Transfers vom Rücklagenkonto weg zählen nicht, weil sie meist das Geld für eine dieser Rechnungen bewegen. Weicht der Topf von deinem echten Kontostand ab, korrigiere ihn.",
     "potSaved": "Rücklagentopf gespeichert",
     "dialogDescription": "Der Stand gilt ab heute. Danach rechnet die App geplante Transfers auf dieses Konto dazu und zieht fällige seltene Rechnungen ab.",
-    "potAccountLabel": "Rücklagenkonto",
+    "potAccountLabel": "Konto, auf dem du die Rücklagen sammelst",
     "chooseAccount": "Konto auswählen",
     "balanceLabel": "Aktueller Stand der Rücklagen ({currency})",
     "balanceHint": "Nur der Teil des Kontos, der für seltene Rechnungen gedacht ist.",
@@ -166,10 +166,12 @@
       "noBills": "Keine seltenen Rechnungen erfasst.",
       "open": "Zum Rücklagen-Plan"
     },
-    "accountFilter": "Nach Konto filtern",
+    "accountFilter": "Nach Abbuchungskonto filtern",
     "filteredPotNote": "Der Abgleich mit dem Topf gilt für die Rechnungen aller Konten. Wähle „Alle Konten“, um ihn zu sehen.",
-    "noBillsForAccount": "Für dieses Konto gibt es keine seltenen Rechnungen.",
-    "editBill": "{name} bearbeiten"
+    "noBillsForAccount": "Von diesem Konto werden keine seltenen Rechnungen abgebucht.",
+    "editBill": "{name} bearbeiten",
+    "paidFrom": "Abgebucht von:",
+    "paidFromAccount": "abgebucht von {name}"
   },
   "accounts": {
     "title": "Konten",

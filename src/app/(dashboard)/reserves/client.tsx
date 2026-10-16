@@ -116,7 +116,8 @@ export function ReservesClient({ plan, accounts, categories, loadFailed }: Reser
         </div>
         {accounts.length > 1 && (
           <Select value={accountFilter} onValueChange={setAccountFilter}>
-            <SelectTrigger className="w-[200px]" aria-label={t("accountFilter")}>
+            <SelectTrigger className="w-[240px]" aria-label={t("accountFilter")}>
+              <span className="text-muted-foreground">{t("paidFrom")}</span>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -264,7 +265,7 @@ export function ReservesClient({ plan, accounts, categories, loadFailed }: Reser
                       <p className="text-muted-foreground text-xs">
                         {formatCurrency(item.amount)} · {recurrenceLabel(item)}
                         {!filtered && accountName(item.accountId) && (
-                          <> · {accountName(item.accountId)}</>
+                          <> · {t("paidFromAccount", { name: accountName(item.accountId)! })}</>
                         )}
                       </p>
                       <p className="text-muted-foreground flex items-center gap-1 text-xs">
