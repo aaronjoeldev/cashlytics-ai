@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  e2e:
+    name: End-to-end (Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # The suites compare dates the way a user in Germany sees them
+      TZ: Europe/Berlin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # Builds the production image from this commit and starts it with Postgres, Mailpit and a fake OpenAI API
+      - run: npm run e2e:up
+
+      # Uses the runner's preinstalled Google Chrome
+      - run: npm run test:e2e
+
+      - name: Container logs
+        if: failure()
+        run: docker compose -f e2e/docker-compose.yml logs --no-color --tail 300

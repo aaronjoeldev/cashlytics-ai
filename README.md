@@ -71,7 +71,7 @@ Upload a CSV export from your bank under **CSV-Import**. Column names are recogn
 
 ## Development
 
-Requires Node 24 and Docker (for PostgreSQL).
+Requires Node 24, Docker (for PostgreSQL) and Git 2.32 or newer (for the pre-commit hook).
 
 ```bash
 git clone https://github.com/aaronjoeldev/cashlytics-ai.git
@@ -84,12 +84,18 @@ cp .env.example .env
 
 `npm run db:migrate` applies migrations; after a schema change in `src/lib/db/schema.ts` create one with `npm run db:generate`. Demo data: `psql "$DATABASE_URL" -f scripts/seed-demo.sql` **deletes all data** and creates the demo user `demo@cashlytics.online` / `admin123456789`.
 
-| Command                              | Purpose                     |
-| ------------------------------------ | --------------------------- |
-| `npm run dev`                        | Development server          |
-| `npm test`                           | Unit tests (`node:test`)    |
-| `npm run typecheck` / `npm run lint` | TypeScript and ESLint       |
-| `npm run build` / `npm start`        | Production build and server |
+| Command                               | Purpose                      |
+| ------------------------------------- | ---------------------------- |
+| `npm run dev`                         | Development server           |
+| `npm test`                            | Unit tests (`node:test`)     |
+| `npm run typecheck` / `npm run lint`  | TypeScript and ESLint        |
+| `npm run build` / `npm start`         | Production build and server  |
+| `npm run e2e:up` / `npm run e2e:down` | Start / remove the e2e stack |
+| `npm run test:e2e`                    | End-to-end tests             |
+
+### End-to-end tests
+
+`npm run e2e:up` builds the production image from your checkout and starts it with PostgreSQL, [Mailpit](https://mailpit.axllent.org) and a fake OpenAI API (`e2e/fake-openai.mjs`) on ports 3100, 55432, 18025 and 14011. `npm run test:e2e` then **resets the stack's database to the demo data** and drives the app with Chrome (`CHROME_PATH` if it is not found); `npm run test:e2e -- auth forms` runs single suites. After code changes run `npm run e2e:up` again to rebuild. CI runs the unit and end-to-end tests on every pull request.
 
 ### Project structure
 
@@ -104,6 +110,7 @@ src/
 messages/       Translations (de, en)
 drizzle/        SQL migrations
 scripts/        dev.sh, demo seed
+e2e/            End-to-end suites, Docker stack, fake OpenAI API
 docs/api/       REST API v1 for integrations (Home Assistant)
 docs/audit/     Open findings from the code audit
 ```

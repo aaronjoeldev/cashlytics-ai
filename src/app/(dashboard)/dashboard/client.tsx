@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useSettings } from "@/lib/settings-context";
 import { formatCalendarDate } from "@/lib/format-date";
+import { getCalendarDayInTimeZone } from "@/lib/recurrence";
 import type { DailyExpenseWithDetails } from "@/types/database";
 
 interface DashboardStats {
@@ -173,7 +174,7 @@ export function DashboardClient({
     year: "numeric",
   });
   // Payment dates are calendar days stored as UTC midnight; compare them with today's day
-  const todayDay = Date.parse(new Intl.DateTimeFormat("en-CA", { timeZone }).format(now));
+  const todayDay = getCalendarDayInTimeZone(timeZone, now).getTime();
 
   function formatRelativeDate(date: Date): string {
     const diffDays = Math.round((date.getTime() - todayDay) / (1000 * 60 * 60 * 24));

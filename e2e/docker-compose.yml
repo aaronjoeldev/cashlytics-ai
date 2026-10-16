@@ -1,0 +1,93 @@
+# End-to-end stack: the production image with Postgres, a mail catcher and a fake OpenAI API.
+# Started by `npm run e2e:up`, which also writes the secrets to e2e/.env.
+name: cashlytics-e2e
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: cashlytics-e2e-app
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    environment:
+      DATABASE_URL: postgresql://cashlytics:cashlytics_secret@postgres:5432/cashlytics
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
+      APP_URL: http://localhost:3100
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_TRUST_HOST: "true"
+      SINGLE_USER_MODE: "false"
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USER: e2e
+      SMTP_PASS: e2e
+      # Mailpit uses a self-signed certificate for STARTTLS (test setup only)
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      SMTP_FROM: Cashlytics <noreply@cashlytics.test>
+      OPENAI_API_KEY: sk-e2e
+      OPENAI_BASE_URL: http://fake-openai:4011/v1
+      CRON_SECRET: ${CRON_SECRET}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  cashlytics-cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+      APP_URL: http://app:3000
+      NOTIFICATION_SCHEDULE: "0 8 * * *"
+      INSIGHTS_SCHEDULE: "0 6 * * *"
+    depends_on:
+      app:
+        condition: service_healthy
+    command: >
+      sh -c "apk add --no-cache curl --quiet &&
+             printf '%s\\n' \"$$NOTIFICATION_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/upcoming-payments >> /var/log/cron.log 2>&1\" \"$$INSIGHTS_SCHEDULE curl -s -H 'Authorization: Bearer $$CRON_SECRET' $$APP_URL/api/cron/insights >> /var/log/cron.log 2>&1\" | crontab - &&
+             crond -f -l 2"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cashlytics
+      POSTGRES_PASSWORD: cashlytics_secret
+      POSTGRES_DB: cashlytics
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashlytics -d cashlytics"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:v1.31.6
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_TLS_CERT: sans:mailpit
+      MP_SMTP_TLS_KEY: sans:mailpit
+    ports:
+      - "18025:8025"
+
+  fake-openai:
+    image: node:24-alpine
+    restart: unless-stopped
+    working_dir: /fake
+    volumes:
+      - ./fake-openai.mjs:/fake/fake-openai.mjs:ro
+    command: ["node", "fake-openai.mjs"]
+    ports:
+      - "14011:4011"

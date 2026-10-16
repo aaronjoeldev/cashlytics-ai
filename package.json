@@ -15,7 +15,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "e2e:up": "node e2e/up.mjs",
+    "e2e:down": "docker compose -f e2e/docker-compose.yml down -v",
+    "test:e2e": "node e2e/run.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs}": [
@@ -82,6 +85,7 @@
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
+    "puppeteer-core": "^25.13.0",
     "semantic-release": "^25.0.9",
     "shadcn": "^4.21.4",
     "tailwindcss": "^4.3.3",

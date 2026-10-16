@@ -1,6 +1,6 @@
 "use client";
 
-import { getLocalCalendarDay, getNextOccurrence, normalizeToMonthly } from "@/lib/recurrence";
+import { getCalendarDayInTimeZone, getNextOccurrence, normalizeToMonthly } from "@/lib/recurrence";
 import { useState, useSyncExternalStore } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/lib/settings-context";
 import { formatCalendarDate } from "@/lib/format-date";
 import { currencySymbols, type Currency } from "@/lib/currency";
-import { useTranslations } from "next-intl";
+import { useNow, useTimeZone, useTranslations } from "next-intl";
 import type {
   Account,
   Category,
@@ -43,10 +43,10 @@ function formatNextPayment(
     recurrenceInterval: number | null;
     endDate?: Date | string | null;
   },
+  today: Date,
   t: (key: string, params?: Record<string, number>) => string,
   locale: string
 ): string | null {
-  const today = getLocalCalendarDay();
   const nextDate = getNextOccurrence(expense, today);
   if (!nextDate) return null;
 
@@ -68,6 +68,10 @@ export function ExpensesClient({
   const { toast } = useToast();
   const { formatCurrency: fmt, currency: baseCurrency, locale, convert } = useSettings();
   const formatDate = (date: Date | string) => formatCalendarDate(date, locale);
+  // "Today" in the configured time zone, so server and browser render the same relative dates
+  const now = useNow();
+  const timeZone = useTimeZone() ?? "Europe/Berlin";
+  const today = getCalendarDayInTimeZone(timeZone, now);
   const t = useTranslations("expenses");
   const tCommon = useTranslations("common");
   const tRecurrence = useTranslations("recurrence");
@@ -260,7 +264,7 @@ export function ExpensesClient({
     const isMonthly = expense.recurrenceType === "monthly";
     const isOnce = expense.recurrenceType === "once";
     const debitLabel = !isOnce ? getDebitLabel(expense) : null;
-    const nextPaymentLabel = !isOnce ? formatNextPayment(expense, tCommon, locale) : null;
+    const nextPaymentLabel = !isOnce ? formatNextPayment(expense, today, tCommon, locale) : null;
 
     return (
       <div className="hover:bg-accent/30 flex items-start gap-3 rounded-xl p-4 transition-colors duration-200 dark:hover:bg-white/5">
