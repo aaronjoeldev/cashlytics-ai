@@ -162,6 +162,13 @@
       "when": 1792143607895,
       "tag": "0022_reserve_pots",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792152263327,
+      "tag": "0023_plan_settings",
+      "breakpoints": true
     }
   ]
 }
