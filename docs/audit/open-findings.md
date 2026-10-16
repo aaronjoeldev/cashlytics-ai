@@ -228,9 +228,13 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       milestone copy and the outdated notes) and the per-file docs under `docs/` (api, components,
       pages, architecture), which described code that no longer exists. The README covers setup
       and structure.
-- [ ] **Noisy build log**: `next build` prints 16 `[ERROR] ... Dynamic server usage` lines. The
-      actions' `catch` blocks log Next's own signal that a page renders dynamically; the build
-      succeeds and the pages work, but the log looks like failures.
-- [ ] **Test coverage**: nothing covers auth, the server actions, the chat route or the import edge
-      cases above. CI runs no tests.
-- [ ] **Local tooling**: the pre-commit hook needs Git 2.32 or newer.
+- [x] **Noisy build log**: the dashboard segment is marked dynamic, so `next build` no longer
+      prerenders pages that need a session (16 `[ERROR] ... Dynamic server usage` lines), and the
+      missing `DATABASE_URL` is not reported by every build worker of the Docker build.
+- [x] **Test coverage**: `e2e/` runs the production image with PostgreSQL, Mailpit and a fake
+      OpenAI API and checks auth, user isolation of the server actions, forms, currencies and
+      rates, insights, the CSV import, the chat route, the receipt scanner, the UI and the offline
+      copies. CI (`.github/workflows/ci.yml`) runs typecheck, lint, unit and e2e tests on every
+      pull request. Not covered: real push delivery and real OpenAI responses.
+- [x] **Local tooling**: the pre-commit hook (lint-staged) needs Git 2.32 or newer; the README
+      lists it under the development requirements.

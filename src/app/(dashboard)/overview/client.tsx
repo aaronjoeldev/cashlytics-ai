@@ -1,8 +1,8 @@
 "use client";
 
-import { getLocalCalendarDay, getNextOccurrence } from "@/lib/recurrence";
+import { getCalendarDayInTimeZone, getNextOccurrence } from "@/lib/recurrence";
 import { useState, useCallback, useRef } from "react";
-import { useTranslations } from "next-intl";
+import { useNow, useTimeZone, useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -114,6 +114,11 @@ export function OverviewClient({
     [tRecurrence]
   );
 
+  // "Today" in the configured time zone, so server and browser render the same relative dates
+  const now = useNow();
+  const timeZone = useTimeZone() ?? "Europe/Berlin";
+  const todayTime = getCalendarDayInTimeZone(timeZone, now).getTime();
+
   const formatNextPayment = useCallback(
     (expense: {
       recurrenceType: string;
@@ -121,11 +126,10 @@ export function OverviewClient({
       recurrenceInterval: number | null;
       endDate?: Date | string | null;
     }): string | null => {
-      const today = getLocalCalendarDay();
-      const nextDate = getNextOccurrence(expense, today);
+      const nextDate = getNextOccurrence(expense, new Date(todayTime));
       if (!nextDate) return null;
 
-      const diffDays = Math.round((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const diffDays = Math.round((nextDate.getTime() - todayTime) / (1000 * 60 * 60 * 24));
 
       if (diffDays === 0) return tCommon("today");
       if (diffDays === 1) return tCommon("tomorrow");
@@ -137,7 +141,7 @@ export function OverviewClient({
         timeZone: "UTC",
       }).format(nextDate);
     },
-    [tCommon, locale]
+    [tCommon, locale, todayTime]
   );
 
   // Only the latest navigation may update the calendar; slower earlier answers are dropped
@@ -369,7 +373,8 @@ export function OverviewClient({
                 <div className="grid grid-cols-7 gap-1">
                   {calendarDays.map((day: CalendarDay, i: number) => {
                     const hasPayments = day.payments.length > 0;
-                    const isToday = day.date.toDateString() === new Date().toDateString();
+                    // Calendar days are UTC midnight; toDateString() would shift them west of UTC
+                    const isToday = new Date(day.date).getTime() === todayTime;
 
                     return (
                       <div

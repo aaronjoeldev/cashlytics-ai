@@ -31,6 +31,15 @@ export function getLocalCalendarDay(date: Date = new Date()): Date {
   return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
 }
 
+/**
+ * The calendar day in `timeZone`, as a UTC-midnight date. Server and browser get the same day, so
+ * use it for "today" in anything that is rendered on the server.
+ */
+export function getCalendarDayInTimeZone(timeZone: string, date: Date = new Date()): Date {
+  // en-CA formats as YYYY-MM-DD, which Date.parse reads as UTC midnight
+  return new Date(Date.parse(new Intl.DateTimeFormat("en-CA", { timeZone }).format(date)));
+}
+
 /** Number of months between two occurrences, or null for types that are not month-based. */
 function getMonthStep(item: RecurringItem): number | null {
   switch (item.recurrenceType) {

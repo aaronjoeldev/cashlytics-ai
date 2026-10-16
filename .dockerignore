@@ -41,6 +41,7 @@ docs/
 scripts/
 
 # Test files
+e2e/
 coverage
 .nyc_output
 

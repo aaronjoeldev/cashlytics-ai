@@ -8,6 +8,10 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { OfflineCacheOwner } from "@/components/pwa/offline-cache-owner";
 
+// Every page here needs the session. Without this, `next build` tries to prerender them and the
+// actions' catch blocks log Next's "Dynamic server usage" signal as errors.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // The proxy only checks that the cookie decodes; the server may have ended the session
   const session = await auth();

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getCalendarDayInTimeZone,
   countOccurrencesInMonth,
   getBudgetedAmountForMonth,
   getDueAmountForMonth,
@@ -177,4 +178,22 @@ test("due amount multiplies by the number of due dates", () => {
   assert.equal(getDueAmountForMonth(weekly, 10, 2026, 10), 50);
   assert.equal(getDueAmountForMonth(yearly, 600, 2026, 11), 600);
   assert.equal(getDueAmountForMonth(yearly, 600, 2026, 10), 0);
+});
+
+test("calendar day in a time zone does not depend on the runtime's zone", () => {
+  // 06:45 UTC on 16 October: still the 15th in Los Angeles, already the 16th in Berlin
+  const instant = new Date("2026-10-16T06:45:00Z");
+  assert.equal(
+    getCalendarDayInTimeZone("Europe/Berlin", instant).toISOString(),
+    "2026-10-16T00:00:00.000Z"
+  );
+  assert.equal(
+    getCalendarDayInTimeZone("America/Los_Angeles", instant).toISOString(),
+    "2026-10-15T00:00:00.000Z"
+  );
+  // 23:30 UTC on 31 December is already New Year in Berlin
+  assert.equal(
+    getCalendarDayInTimeZone("Europe/Berlin", new Date("2026-12-31T23:30:00Z")).toISOString(),
+    "2027-01-01T00:00:00.000Z"
+  );
 });
