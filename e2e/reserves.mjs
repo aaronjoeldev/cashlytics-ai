@@ -102,7 +102,86 @@ export async function reserves() {
   );
   psql("delete from expenses where id = 'e0000000-0000-0000-0000-0000000000e2'");
 
-  // 3. Correct the balance in the dialog
+  // 3. Filter by account: only that account's bills, totals for them, no pot comparison
+  psql(
+    "update expenses set account_id = 'a0000000-0000-0000-0000-000000000002' where id = 'e0000000-0000-0000-0000-000000000014'"
+  );
+  await goto(page, "/reserves");
+  // Pick the option by typeahead; retry once if the click came before hydration
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.click('[aria-label="Nach Konto filtern"]');
+    await page.waitForSelector('[role="option"]', { timeout: 3000 }).catch(() => {});
+    // Radix ignores typeahead until the list has finished positioning
+    await sleep(500);
+    await page.keyboard.type("Notgroschen");
+    await page.keyboard.press("Enter");
+    const picked = await page
+      .waitForFunction(
+        () =>
+          document
+            .querySelector('[aria-label="Nach Konto filtern"]')
+            ?.innerText.includes("Notgroschen"),
+        { timeout: 3000 }
+      )
+      .then(
+        () => true,
+        () => false
+      );
+    if (picked) break;
+    await page.keyboard.press("Escape");
+  }
+  await sleep(400);
+  text = await pageText(page);
+  check(
+    "account filter shows only that account's bills",
+    text.includes("Zahnzusatzversicherung") &&
+      !text.includes("Kfz-Steuer") &&
+      !text.includes("BahnCard 50")
+  );
+  check(
+    "filtered monthly total is that bill's rate (20,00 €)",
+    euro(text, "Monatlich zurücklegen") === 20,
+    euro(text, "Monatlich zurücklegen")
+  );
+  check(
+    "filtered view explains that the pot covers all accounts",
+    text.includes("gilt für die Rechnungen aller Konten") && !text.includes("Einmalig fehlen")
+  );
+  psql(
+    "update expenses set account_id = 'a0000000-0000-0000-0000-000000000001' where id = 'e0000000-0000-0000-0000-000000000014'"
+  );
+
+  // 4. Edit a bill from the plan: the expense form opens with its values, the plan updates
+  await goto(page, "/reserves");
+  await page.click('button[aria-label="BahnCard 50 bearbeiten"]');
+  await page.waitForSelector('[role="dialog"] input[name="amount"]');
+  const prefilled = await page.$eval('[role="dialog"] input[name="name"]', (e) => e.value);
+  check("edit opens the expense form with the bill", prefilled === "BahnCard 50", prefilled);
+  await page.$eval('[role="dialog"] input[name="amount"]', (e) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(e, "");
+    e.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.type('[role="dialog"] input[name="amount"]', "300");
+  const submits = await page.$$('[role="dialog"] button[type="submit"]');
+  await submits.at(-1).click();
+  await page
+    .waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: 10000 })
+    .catch(() => {});
+  await sleep(1500);
+  text = await pageText(page);
+  check(
+    "edited amount is stored",
+    psql("select amount from expenses where id = 'e0000000-0000-0000-0000-000000000015'") ===
+      "300.00"
+  );
+  check(
+    "plan shows the new rate (300 ÷ 12 = 25,00 €)",
+    text.includes("25,00 €/Mo"),
+    text.match(/BahnCard 50[\s\S]{0,120}/)?.[0]
+  );
+  psql("update expenses set amount = 244 where id = 'e0000000-0000-0000-0000-000000000015'");
+
+  // 5. Correct the balance in the dialog
   await goto(page, "/reserves");
   await clickText(page, "button", "Stand korrigieren");
   await page.waitForSelector("#reserve-balance");
@@ -126,7 +205,7 @@ export async function reserves() {
   );
   check("balance is stored with today as a calendar day", stored === "2000.00|00:00|true", stored);
 
-  // 4. Dashboard card
+  // 6. Dashboard card
   await goto(page, "/dashboard");
   text = await pageText(page);
   check(
@@ -138,7 +217,7 @@ export async function reserves() {
     /Nächste seltene Rechnung\s*\S/.test(text)
   );
 
-  // 5. Server checks: invalid input and another user's account are refused
+  // 7. Server checks: invalid input and another user's account are refused
   const cookie = await cookieHeader(page);
   const bad = await callAction(
     cookie,
@@ -168,7 +247,7 @@ export async function reserves() {
   );
   await erika.context.close();
 
-  // 6. Deleting the pot account asks for a new one
+  // 8. Deleting the pot account asks for a new one
   psql(`update reserve_pots set account_id = null where user_id = '${userId}'`);
   await goto(page, "/reserves");
   check(

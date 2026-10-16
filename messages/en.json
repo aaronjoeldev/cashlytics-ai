@@ -165,7 +165,11 @@
       "nextBill": "Next infrequent bill",
       "noBills": "No infrequent bills yet.",
       "open": "Open reserve plan"
-    }
+    },
+    "accountFilter": "Filter by account",
+    "filteredPotNote": "The pot is compared with the bills of all accounts. Choose “All accounts” to see it.",
+    "noBillsForAccount": "This account has no infrequent bills.",
+    "editBill": "Edit {name}"
   },
   "accounts": {
     "title": "Accounts",

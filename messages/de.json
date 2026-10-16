@@ -165,7 +165,11 @@
       "nextBill": "Nächste seltene Rechnung",
       "noBills": "Keine seltenen Rechnungen erfasst.",
       "open": "Zum Rücklagen-Plan"
-    }
+    },
+    "accountFilter": "Nach Konto filtern",
+    "filteredPotNote": "Der Abgleich mit dem Topf gilt für die Rechnungen aller Konten. Wähle „Alle Konten“, um ihn zu sehen.",
+    "noBillsForAccount": "Für dieses Konto gibt es keine seltenen Rechnungen.",
+    "editBill": "{name} bearbeiten"
   },
   "accounts": {
     "title": "Konten",

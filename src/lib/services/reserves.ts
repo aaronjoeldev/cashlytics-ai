@@ -1,5 +1,12 @@
 import { db } from "@/lib/db";
-import { accounts, categories, expenses, reservePots, transfers } from "@/lib/db/schema";
+import {
+  accounts,
+  categories,
+  expenses,
+  reservePots,
+  transfers,
+  type Expense,
+} from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { safeParseFloat } from "@/lib/safe-parse";
 import { toBaseCurrency as toBase } from "@/lib/currency";
@@ -9,6 +16,9 @@ import type { FinanceContext } from "@/lib/services/context";
 
 export type ReserveItem = {
   id: string;
+  accountId: string | null;
+  /** The stored row, for editing it in the expense form. */
+  expense: Expense;
   name: string;
   /** Bill amount in the base currency. */
   amount: number;
@@ -69,6 +79,8 @@ export async function computeReservePlan(
     withdrawals.push({ item: expense, amount });
     items.push({
       id: expense.id,
+      accountId: expense.accountId,
+      expense,
       name: expense.name,
       amount,
       recurrenceType: expense.recurrenceType,

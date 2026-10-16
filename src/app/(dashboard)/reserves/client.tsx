@@ -15,16 +15,26 @@ import { getCalendarDayInTimeZone } from "@/lib/recurrence";
 import { potStatus } from "@/lib/reserves";
 import type { ReservePlan, ReserveItem } from "@/lib/services/reserves";
 import { ReservePotDialog } from "@/components/organisms/reserve-pot-dialog";
+import { ExpenseForm } from "@/components/organisms/expense-form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Account, Category, Expense } from "@/types/database";
 
 interface ReservesClientProps {
   plan: ReservePlan;
-  accounts: Array<{ id: string; name: string }>;
+  accounts: Account[];
+  categories: Category[];
   loadFailed: boolean;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientProps) {
+export function ReservesClient({ plan, accounts, categories, loadFailed }: ReservesClientProps) {
   const t = useTranslations("reserves");
   const tCommon = useTranslations("common");
   const tRecurrence = useTranslations("recurrence");
@@ -32,21 +42,36 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
   const router = useRouter();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [editing, setEditing] = useState<Expense | null>(null);
 
   // "Today" in the configured time zone, so server and browser render the same relative dates
   const now = useNow();
   const timeZone = useTimeZone() ?? "Europe/Berlin";
   const todayTime = getCalendarDayInTimeZone(timeZone, now).getTime();
 
-  const { items, monthlyTotal, targetTotal, pot } = plan;
+  const { pot } = plan;
+  const filtered = accountFilter !== "all";
+  const items = filtered
+    ? plan.items.filter((item) => item.accountId === accountFilter)
+    : plan.items;
+  const monthlyTotal = filtered
+    ? items.reduce((sum, item) => sum + item.monthlyRate, 0)
+    : plan.monthlyTotal;
+  const targetTotal = filtered
+    ? items.reduce((sum, item) => sum + item.target, 0)
+    : plan.targetTotal;
+  // The pot holds the reserves of all accounts, so it is only compared with the full plan
   const status = pot
     ? potStatus({
-        targetTotal,
-        monthlyTotal,
+        targetTotal: plan.targetTotal,
+        monthlyTotal: plan.monthlyTotal,
         balance: pot.balance,
         plannedMonthlyDeposit: pot.plannedMonthlyDeposit,
       })
     : null;
+
+  const accountName = (id: string | null) => accounts.find((a) => a.id === id)?.name;
 
   const recurrenceLabel = (item: ReserveItem) => {
     switch (item.recurrenceType) {
@@ -89,6 +114,21 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
           </h2>
           <p className="text-muted-foreground/60 mt-1.5 text-sm">{t("description")}</p>
         </div>
+        {accounts.length > 1 && (
+          <Select value={accountFilter} onValueChange={setAccountFilter}>
+            <SelectTrigger className="w-[200px]" aria-label={t("accountFilter")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{tCommon("allAccounts")}</SelectItem>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {loadFailed && <p className="text-destructive text-sm">{t("loadFailed")}</p>}
@@ -142,14 +182,18 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
         </Card>
       </div>
 
-      {pot && status && items.length > 0 && (
+      {filtered && pot && plan.items.length > 0 && (
+        <p className="text-muted-foreground text-sm">{t("filteredPotNote")}</p>
+      )}
+
+      {!filtered && pot && status && plan.items.length > 0 && (
         <div className="grid gap-3 md:grid-cols-2">
           {status.shortfall > 0 ? (
             <StatusNote
               tone="warn"
               title={t("shortfall", { amount: formatCurrency(status.shortfall) })}
             >
-              {t("shortfallHint", { rate: formatCurrency(monthlyTotal) })}
+              {t("shortfallHint", { rate: formatCurrency(plan.monthlyTotal) })}
             </StatusNote>
           ) : (
             <StatusNote tone="good" title={t("onTrack")}>
@@ -166,7 +210,7 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
               {t("depositGapHint", {
                 planned: formatCurrency(pot.plannedMonthlyDeposit),
                 name: pot.accountName,
-                needed: formatCurrency(monthlyTotal),
+                needed: formatCurrency(plan.monthlyTotal),
               })}{" "}
               <Link href="/transfers" className="text-foreground underline underline-offset-2">
                 {t("toTransfers")}
@@ -192,7 +236,9 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
           {items.length === 0 ? (
             <div className="py-10 text-center">
               <PiggyBank className="text-muted-foreground/50 mx-auto mb-3 h-8 w-8" />
-              <p className="text-muted-foreground text-sm">{t("noBills")}</p>
+              <p className="text-muted-foreground text-sm">
+                {filtered ? t("noBillsForAccount") : t("noBills")}
+              </p>
               <Button asChild variant="outline" size="sm" className="mt-4">
                 <Link href="/expenses">{t("toExpenses")}</Link>
               </Button>
@@ -217,6 +263,9 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
                       <p className="truncate text-sm font-medium">{item.name}</p>
                       <p className="text-muted-foreground text-xs">
                         {formatCurrency(item.amount)} · {recurrenceLabel(item)}
+                        {!filtered && accountName(item.accountId) && (
+                          <> · {accountName(item.accountId)}</>
+                        )}
                       </p>
                       <p className="text-muted-foreground flex items-center gap-1 text-xs">
                         <CalendarClock className="h-3 w-3" />
@@ -224,23 +273,35 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
                       </p>
                     </div>
                   </div>
-                  <div className="w-full sm:w-56">
-                    <div className="flex items-baseline justify-between gap-2 text-sm">
-                      <span className="font-semibold tabular-nums">
-                        {formatCurrency(item.monthlyRate)}
-                        <span className="text-muted-foreground text-xs font-normal">
-                          {t("perMonth")}
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
+                    <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="font-semibold tabular-nums">
+                          {formatCurrency(item.monthlyRate)}
+                          <span className="text-muted-foreground text-xs font-normal">
+                            {t("perMonth")}
+                          </span>
                         </span>
-                      </span>
-                      <span className="text-muted-foreground text-xs tabular-nums">
-                        {t("targetToday", { amount: formatCurrency(item.target) })}
-                      </span>
+                        <span className="text-muted-foreground text-xs tabular-nums">
+                          {t("targetToday", { amount: formatCurrency(item.target) })}
+                        </span>
+                      </div>
+                      <Progress
+                        value={item.amount > 0 ? (item.target / item.amount) * 100 : 0}
+                        className="mt-1.5 h-1.5"
+                        aria-label={t("progressLabel", { name: item.name })}
+                      />
                     </div>
-                    <Progress
-                      value={item.amount > 0 ? (item.target / item.amount) * 100 : 0}
-                      className="mt-1.5 h-1.5"
-                      aria-label={t("progressLabel", { name: item.name })}
-                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => setEditing(item.expense)}
+                      aria-label={t("editBill", { name: item.name })}
+                      title={t("editBill", { name: item.name })}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                   </div>
                 </li>
               ))}
@@ -259,6 +320,18 @@ export function ReservesClient({ plan, accounts, loadFailed }: ReservesClientPro
           <p>{t("howPot")}</p>
         </CardContent>
       </Card>
+
+      <ExpenseForm
+        accounts={accounts}
+        categories={categories}
+        editExpense={editing}
+        open={editing !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        // Rate, target and pot depend on the edited bill, so the plan is computed again
+        onSuccess={() => router.refresh()}
+      />
 
       {dialogOpen && (
         <ReservePotDialog
