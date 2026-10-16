@@ -20,7 +20,9 @@ const asLocale = (value: string | undefined | null): Locale | undefined =>
   value && locales.includes(value as Locale) ? (value as Locale) : undefined;
 
 /** Stored settings of a user, or null when they never saved any. */
-async function loadStoredPreferences(userId: string): Promise<Partial<UserPreferences> | null> {
+export async function loadStoredPreferences(
+  userId: string
+): Promise<Partial<UserPreferences> | null> {
   const [row] = await db
     .select({ baseCurrency: userSettings.baseCurrency, locale: userSettings.locale })
     .from(userSettings)
