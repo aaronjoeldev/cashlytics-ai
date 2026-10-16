@@ -48,14 +48,15 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
       `src/lib/email/transporter.ts` also logs the recipient on every send.
 - [x] **Document upload does not check ownership of the linked expense**
       (`src/actions/document-actions.ts`).
-- [ ] **`POST /api/documents` validates UUIDs as integers**, so it rejects every valid id; the
-      route has no caller and can be deleted.
+- [x] **`POST /api/documents` validated UUIDs as integers**, so it rejected every valid id. The
+      route had no caller and was removed; uploads go through the `uploadDocument` server action.
 - [x] **`/api/chat` relied on the proxy only** and accepted `system`-role messages of any length.
       It now checks the session, the roles and the request size.
 - [x] **Proxy matcher skips paths ending in `.png`, `.svg`, `.ico`, `.webmanifest`** (`src/proxy.ts`),
       so such paths reach route handlers without a session. Confirmed for `/api/documents/x.png`.
-- [ ] **Push endpoint is not validated as a push-service URL** (`api/push/subscribe`): blind SSRF
-      through the reminder job.
+- [x] **Push endpoint was not validated as a push-service URL** (`api/push/subscribe`): blind SSRF
+      through the reminder job. Endpoints must now be https URLs of a known push service
+      (`src/lib/push-endpoint.ts`); stored subscriptions with other endpoints are deleted before sending.
 - [x] **`generateInsights(userId)` was exported from a `"use server"` file without an auth check**
       and was registered as a server action. Moved to `src/lib/insights/generate-insights.ts`.
 - [x] **Password length was inconsistent** between sign-in, registration and reset.
@@ -71,8 +72,11 @@ Findings marked _(unverified)_ were inferred from reading the code and not repro
 - [ ] **`SINGLE_USER_MODE` count and insert are not atomic**: two concurrent registrations on a
       fresh instance can both succeed.
 - [x] **Cron secret compared with `!==`** in both cron routes (not constant-time).
-- [ ] **Prompt injection surface**: `sanitizeForPrompt` in `api/chat/route.ts` keeps newlines, and
-      bank text from CSV imports and receipt OCR is placed in the system prompt.
+- [x] **Prompt injection surface**: `sanitizeForPrompt` in `api/chat/route.ts` kept newlines, and
+      bank text from CSV imports and receipt OCR is placed in the system prompt. The sanitizer
+      (`src/lib/ai/sanitize-for-prompt.ts`) now returns single-line, length-limited text without
+      control, zero-width or bidi characters; the chat, receipt and CSV prompts mark user data as
+      untrusted. This mitigates, not prevents, injection; write tools still need user approval.
 
 ## 2. Calculations and currency
 

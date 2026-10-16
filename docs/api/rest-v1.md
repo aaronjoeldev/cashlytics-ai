@@ -16,6 +16,8 @@ Authorization: Bearer csk_…
 - Tokens belong to one user and only read that user's data. Their scope is `read`.
 - Revoking a token in the settings takes effect on the next request.
 - Tokens can expire after 30, 90 or 365 days, or never.
+- A missing, malformed, unknown or expired token gets `401` with a
+  `WWW-Authenticate: Bearer realm="cashlytics"` header.
 - Every token may make 120 requests per minute. Beyond that the API answers `429` with a
   `Retry-After` header (seconds).
 
@@ -35,22 +37,23 @@ token itself (`withApiToken` in `src/lib/api/v1.ts`).
   { "error": { "code": "unauthorized", "message": "Missing, invalid or expired API token" } }
   ```
 
-  | Status | `code`            | When                                    |
-  | ------ | ----------------- | --------------------------------------- |
-  | 400    | `invalid_request` | A query parameter is missing or invalid |
-  | 401    | `unauthorized`    | Missing, unknown or expired token       |
-  | 404    | `not_found`       | The token's user no longer exists       |
-  | 429    | `rate_limited`    | More than 120 requests per minute       |
-  | 500    | `internal_error`  | Unexpected server error                 |
+  | Status | `code`            | When                                                                                     |
+  | ------ | ----------------- | ---------------------------------------------------------------------------------------- |
+  | 400    | `invalid_request` | A query parameter is missing or invalid; `message` names the first one (`field: reason`) |
+  | 401    | `unauthorized`    | Missing, unknown or expired token                                                        |
+  | 404    | `not_found`       | The token's user no longer exists                                                        |
+  | 429    | `rate_limited`    | More than 120 requests per minute                                                        |
+  | 500    | `internal_error`  | Unexpected server error                                                                  |
 
 ## Endpoints
 
 ### `GET /api/v1/health`
 
-Public, no token. Used to check that an URL points to Cashlytics.
+Public, no token, not rate limited. Used to check that an URL points to Cashlytics. `version` is
+the version of the running app (the value below is only an example); `apiVersion` is the API version.
 
 ```json
-{ "status": "ok", "version": "0.8.13", "apiVersion": 1 }
+{ "status": "ok", "version": "0.10.0", "apiVersion": 1 }
 ```
 
 ### `GET /api/v1/me`
@@ -64,7 +67,7 @@ The token owner. `userId` is stable and suitable as an integration's unique id.
   "email": "demo@cashlytics.online",
   "baseCurrency": "EUR",
   "locale": "de",
-  "version": "0.8.13",
+  "version": "0.10.0",
   "apiVersion": 1
 }
 ```
@@ -147,6 +150,9 @@ Everything an integration polls in one request.
 - `upcoming` lists the next due date of each recurring expense and planned daily expenses. Incomes
   are not included.
 - `forecast` uses the reserve view, like the analytics page.
+- `insights` counts the unread, unexpired insights, capped at 50; `bySeverity` and `byType` only
+  contain keys that occur.
+- `upcoming.next` is `null` when nothing is due; `category` is `null` for entries without one.
 
 ### `GET /api/v1/accounts`
 
@@ -167,7 +173,7 @@ Everything an integration polls in one request.
       "balanceInBaseCurrency": 12500,
       "createdAt": "2026-01-01T00:00:00.000Z",
       "forecast": {
-        "months": 2,
+        "months": 3,
         "isCumulative": true,
         "projectedBalance": 13100,
         "monthly": [
@@ -198,10 +204,13 @@ Everything an integration polls in one request.
 
 Every due date of expenses, daily expenses and incomes in a range, e.g. for a calendar.
 
-| Parameter | Required | Meaning                                      |
-| --------- | -------- | -------------------------------------------- |
-| `start`   | yes      | First day, `YYYY-MM-DD`                      |
-| `end`     | yes      | Last day (inclusive), at most 366 days later |
+| Parameter | Required | Meaning                                                                                                           |
+| --------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| `start`   | yes      | First day, `YYYY-MM-DD`                                                                                           |
+| `end`     | yes      | Last day (inclusive); must not be before `start` and must be less than 366 days after it (at most 365 days apart) |
+
+Both must be real calendar days in `YYYY-MM-DD`. A missing or malformed value, a day that does not
+exist (e.g. `2026-02-30`), `end` before `start` or a longer range answers `400 invalid_request`.
 
 ```json
 {
@@ -230,7 +239,8 @@ appears once per due date.
 
 ### `GET /api/v1/insights`
 
-Unread, unexpired insights (at most 50). Titles and messages are stored in German; use `type`,
+Unread, unexpired insights, newest first (at most 50). `expiresAt` is `null` for insights that do
+not expire; `metadata` is `null` when none is stored. Titles and messages are stored in German; use `type`,
 `severity` and `metadata` for anything language independent.
 
 ```json
