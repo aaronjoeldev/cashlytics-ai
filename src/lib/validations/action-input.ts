@@ -206,6 +206,13 @@ export const createTransferInput = transferFields
     path: ["targetAccountId"],
   });
 
+// --- Reserve pot ---------------------------------------------------------------
+
+export const setReservePotInput = z.object({
+  accountId: id,
+  balance: signedAmount,
+});
+
 // --- API tokens ---------------------------------------------------------------
 
 export const apiTokenExpiryDays = [30, 90, 365] as const;

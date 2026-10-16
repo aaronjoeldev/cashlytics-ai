@@ -2,6 +2,7 @@
 
 import { getCalendarDayInTimeZone, getNextOccurrence } from "@/lib/recurrence";
 import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useNow, useTimeZone, useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -801,7 +802,15 @@ export function OverviewClient({
               <PiggyBank className="h-4 w-4 text-violet-500" />
             </div>
             <div>
-              <CardTitle>{t("periodicReserves")}</CardTitle>
+              <CardTitle className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {t("periodicReserves")}
+                <Link
+                  href="/reserves"
+                  className="text-muted-foreground hover:text-foreground text-xs font-normal underline underline-offset-2"
+                >
+                  {t("openReservePlan")}
+                </Link>
+              </CardTitle>
               <CardDescription>
                 {periodicReserves.length > 0 ? (
                   <>

@@ -21,6 +21,7 @@ const all = [
   "forms",
   "currency",
   "rates",
+  "reserves",
   "insights",
   "imports",
   "assistant",

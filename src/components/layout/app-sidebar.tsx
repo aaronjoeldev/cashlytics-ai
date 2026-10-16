@@ -18,6 +18,7 @@ import {
   FileUp,
   ScanLine,
   LogOut,
+  PiggyBank,
 } from "lucide-react";
 
 import {
@@ -51,6 +52,7 @@ interface NavItem {
 const baseMainNavItems: NavItem[] = [
   { titleKey: "dashboard", url: "/dashboard", icon: LayoutDashboard },
   { titleKey: "overview", url: "/overview", icon: PieChart },
+  { titleKey: "reserves", url: "/reserves", icon: PiggyBank },
   { titleKey: "expenses", url: "/expenses", icon: Wallet },
   { titleKey: "income", url: "/income", icon: TrendingUp },
   { titleKey: "transfers", url: "/transfers", icon: ArrowRightLeft },

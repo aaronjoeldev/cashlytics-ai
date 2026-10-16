@@ -152,6 +152,21 @@ export const apiTokens = pgTable(
   (t) => [index("api_tokens_user_id_idx").on(t.userId)]
 );
 
+// Reserve pot for bills due less often than monthly. The app keeps its balance itself: planned
+// transfers into the account add to the balance set on balance_date, due reserve bills take out.
+export const reservePots = pgTable("reserve_pots", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // null after the account was deleted; the plan then asks for a new one
+  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
+  balance: decimal("balance", { precision: 12, scale: 2 }).notNull().default("0"),
+  currency: text("currency").notNull(),
+  // Calendar day (UTC midnight) the balance was set; movements after it are added
+  balanceDate: timestamp("balance_date").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
   user: one(users, {
     fields: [apiTokens.userId],
@@ -815,4 +830,5 @@ export type MerchantCategory = typeof merchantCategories.$inferSelect;
 export type NewMerchantCategory = typeof merchantCategories.$inferInsert;
 export type Insight = typeof insights.$inferSelect;
 export type ApiToken = typeof apiTokens.$inferSelect;
+export type ReservePot = typeof reservePots.$inferSelect;
 export type NewInsight = typeof insights.$inferInsert;

@@ -4,15 +4,18 @@ import {
   getRecentTransactions,
   getUpcomingPayments,
 } from "@/actions/dashboard-actions";
+import { getReservePlan } from "@/actions/reserve-actions";
 import { DashboardClient } from "./client";
 
 export default async function DashboardPage() {
-  const [statsResult, breakdownResult, transactionsResult, upcomingResult] = await Promise.all([
-    getDashboardStats(),
-    getCategoryBreakdown(),
-    getRecentTransactions(5),
-    getUpcomingPayments(14),
-  ]);
+  const [statsResult, breakdownResult, transactionsResult, upcomingResult, reserveResult] =
+    await Promise.all([
+      getDashboardStats(),
+      getCategoryBreakdown(),
+      getRecentTransactions(5),
+      getUpcomingPayments(14),
+      getReservePlan(),
+    ]);
 
   const stats = statsResult.success
     ? statsResult.data
@@ -45,6 +48,7 @@ export default async function DashboardPage() {
       categoryBreakdown={breakdown}
       recentTransactions={transactions}
       upcomingPayments={upcomingPayments}
+      reservePlan={reserveResult.success ? reserveResult.data : null}
     />
   );
 }
