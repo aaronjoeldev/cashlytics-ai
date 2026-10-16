@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.9.0...v0.10.0) (2026-10-16)
+
+### ✨ Features
+
+- **reserves:** collapse the "So rechnet der Plan" explanation ([304c73a](https://github.com/aaronjoeldev/cashlytics-ai/commit/304c73adf3f7db18a5877e2f31587f6412f60826))
+- **reserves:** edit bills and filter by account on the reserve plan ([857f47c](https://github.com/aaronjoeldev/cashlytics-ai/commit/857f47cdec4449303140a0762223c1b5b7d16215))
+- **reserves:** reserve plan for bills due less often than monthly ([d8d1545](https://github.com/aaronjoeldev/cashlytics-ai/commit/d8d1545b274a3b148153f85d3c1bf0b1ca464879))
+
+### 🐛 Bug Fixes
+
+- **reserves:** tell the paying account and the pot account apart ([4a0a475](https://github.com/aaronjoeldev/cashlytics-ai/commit/4a0a4755747d2c945b74a8f9a232f3f8ec9aea85))
+
 ## [0.9.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.13...v0.9.0) (2026-10-16)
 
 ### ✨ Features
