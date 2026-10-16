@@ -5,9 +5,10 @@ import { and, eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { auth } from "@/auth";
 import { z } from "zod";
+import { isAllowedPushEndpoint } from "@/lib/push-endpoint";
 
 const subscribeSchema = z.object({
-  endpoint: z.string().min(1),
+  endpoint: z.string().min(1).refine(isAllowedPushEndpoint, "Ungültiger Push-Endpoint"),
   p256dh: z.string().min(1),
   auth: z.string().min(1),
 });
