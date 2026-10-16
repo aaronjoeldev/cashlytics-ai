@@ -51,7 +51,8 @@ ON CONFLICT (email) DO NOTHING;
 INSERT INTO accounts (id, user_id, name, type, balance, currency, created_at) VALUES
   ('a0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Hauptkonto',        'checking',  3245.80,  'EUR', NOW() - INTERVAL '180 days'),
   ('a0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Notgroschen',       'savings',  12500.00,  'EUR', NOW() - INTERVAL '180 days'),
-  ('a0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Weltportfolio ETF', 'etf',       8750.25,  'EUR', NOW() - INTERVAL '180 days');
+  ('a0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Weltportfolio ETF', 'etf',       8750.25,  'EUR', NOW() - INTERVAL '180 days'),
+  ('a0000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Rücklagen',         'savings',    250.00,  'EUR', NOW() - INTERVAL '180 days');
 
 
 -- ==============================================================
@@ -94,6 +95,17 @@ VALUES
   ('e0000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000012', 'Haftpflichtversicherung',   12.50, 'monthly', NOW() - INTERVAL '180 days', false, NOW() - INTERVAL '180 days'),
   ('e0000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000003', 'KFZ-Versicherung',          95.00, 'monthly', NOW() - INTERVAL '180 days', false, NOW() - INTERVAL '180 days');
 
+-- Bills due less often than monthly, for the reserve plan. Start dates are relative to today, so
+-- the next due dates are always 1 to 11 months ahead.
+INSERT INTO expenses
+  (id, user_id, account_id, category_id, name, amount, recurrence_type, start_date, is_subscription, created_at)
+VALUES
+  ('e0000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000003', 'Kfz-Steuer',               186.00, 'yearly',     date_trunc('day', NOW()) - INTERVAL '10 months', false, NOW() - INTERVAL '180 days'),
+  ('e0000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000012', 'Rundfunkbeitrag',           55.08, 'quarterly',  date_trunc('day', NOW()) - INTERVAL '2 months',  false, NOW() - INTERVAL '180 days'),
+  ('e0000000-0000-0000-0000-000000000013', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'Hausratversicherung',       89.90, 'yearly',     date_trunc('day', NOW()) - INTERVAL '3 months',  false, NOW() - INTERVAL '180 days'),
+  ('e0000000-0000-0000-0000-000000000014', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000005', 'Zahnzusatzversicherung',   120.00, 'semiannual', date_trunc('day', NOW()) - INTERVAL '4 months',  false, NOW() - INTERVAL '180 days'),
+  ('e0000000-0000-0000-0000-000000000015', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000003', 'BahnCard 50',              244.00, 'yearly',     date_trunc('day', NOW()) - INTERVAL '1 month',   false, NOW() - INTERVAL '180 days');
+
 
 -- ==============================================================
 -- INCOMES
@@ -113,7 +125,15 @@ INSERT INTO transfers
   (id, user_id, source_account_id, target_account_id, amount, description, recurrence_type, start_date, created_at)
 VALUES
   ('d0000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 300.00, 'Monatliche Sparrate', 'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
-  ('d0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 200.00, 'ETF Sparplan',        'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days');
+  ('d0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 200.00, 'ETF Sparplan',        'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days'),
+  ('d0000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000004',  75.00, 'Rücklagen',           'monthly', NOW() - INTERVAL '180 days', NOW() - INTERVAL '180 days');
+
+
+-- ==============================================================
+-- RESERVE POT (the app adds the planned transfers above and takes out due bills from today on)
+-- ==============================================================
+INSERT INTO reserve_pots (user_id, account_id, balance, currency, balance_date) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000004', 250.00, 'EUR', date_trunc('day', NOW()));
 
 
 -- ==============================================================

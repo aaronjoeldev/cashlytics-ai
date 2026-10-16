@@ -23,7 +23,8 @@
 ## Features
 
 - **Accounts, income, expenses, transfers** with recurring schedules (monthly, quarterly, yearly, custom intervals, …)
-- **Dashboard, overview and analytics** with payment calendar, reserves for non-monthly costs and forecasts
+- **Reserve plan** for bills that come less often than monthly: a fixed monthly amount per bill, what should be set aside by today, and a reserve pot the app keeps up to date from your planned transfers
+- **Dashboard, overview and analytics** with payment calendar and forecasts
 - **Multi-currency**: entries keep their own currency, totals are converted with daily exchange rates
 - **AI assistant** that answers questions and books entries after your approval _(OpenAI key)_
 - **Receipt scanner** that reads merchant, amount, date and category from a photo _(OpenAI key)_

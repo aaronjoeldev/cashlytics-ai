@@ -17,6 +17,8 @@ import {
 import { useSettings } from "@/lib/settings-context";
 import { formatCalendarDate } from "@/lib/format-date";
 import { getCalendarDayInTimeZone } from "@/lib/recurrence";
+import type { ReservePlan } from "@/lib/services/reserves";
+import { ReserveStatusCard } from "@/components/organisms/reserve-status-card";
 import type { DailyExpenseWithDetails } from "@/types/database";
 
 interface DashboardStats {
@@ -66,6 +68,7 @@ interface DashboardClientProps {
   categoryBreakdown: CategoryBreakdown[];
   recentTransactions: DailyExpenseWithDetails[];
   upcomingPayments: UpcomingPayment[];
+  reservePlan: ReservePlan | null;
 }
 
 interface KpiCardProps {
@@ -152,6 +155,7 @@ export function DashboardClient({
   categoryBreakdown,
   recentTransactions,
   upcomingPayments,
+  reservePlan,
 }: DashboardClientProps) {
   const t = useTranslations("dashboard");
   const tCommon = useTranslations("common");
@@ -318,6 +322,8 @@ export function DashboardClient({
           }
         />
       </div>
+
+      {reservePlan && <ReserveStatusCard plan={reservePlan} />}
 
       {hasUpcoming && (
         <Card>
