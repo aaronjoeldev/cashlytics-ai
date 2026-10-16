@@ -73,7 +73,7 @@ export const currencySymbols: Record<Currency, string> = {
   DKK: "kr",
 };
 
-export const currencyLocales: Record<Currency, string> = {
+const currencyLocales: Record<Currency, string> = {
   EUR: "de-DE",
   USD: "en-US",
   JPY: "ja-JP",
@@ -168,19 +168,4 @@ export function formatCurrency(
     style: "currency",
     currency,
   }).format(convertedAmount);
-}
-
-export function formatNumber(
-  amount: number,
-  locale: string = "de-DE",
-  options?: Intl.NumberFormatOptions
-): string {
-  return new Intl.NumberFormat(locale, options).format(amount);
-}
-
-export function parseCurrencyInput(value: string, locale: string = "de-DE"): number {
-  if (locale.startsWith("de") || locale.startsWith("fr") || locale.startsWith("da")) {
-    return parseFloat(value.replace(/\./g, "").replace(",", "."));
-  }
-  return parseFloat(value.replace(/,/g, ""));
 }

@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const reconciliationActionSchema = z.enum(["match_existing", "create_new", "skip", "needs_review"]);
-
 const matchedDecisionSchema = z
   .object({
     csvRowId: z.string().min(1),
@@ -22,12 +20,12 @@ const unmatchedDecisionSchema = z
   })
   .strict();
 
-export const csvReconciliationDecisionSchema = z.discriminatedUnion("action", [
+const csvReconciliationDecisionSchema = z.discriminatedUnion("action", [
   matchedDecisionSchema,
   unmatchedDecisionSchema,
 ]);
 
-export const csvReconciliationOutputSchema = z
+const csvReconciliationOutputSchema = z
   .object({
     decisions: z.array(csvReconciliationDecisionSchema),
     summary: z
@@ -179,9 +177,3 @@ export function parseAndValidateCsvReconciliationOutput(
 
   return validateCsvReconciliationOutput(parsedJson);
 }
-
-export const csvReconciliationSchemas = {
-  action: reconciliationActionSchema,
-  decision: csvReconciliationDecisionSchema,
-  output: csvReconciliationOutputSchema,
-};

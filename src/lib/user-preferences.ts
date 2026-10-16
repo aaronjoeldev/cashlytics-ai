@@ -8,8 +8,8 @@ import { logger } from "@/lib/logger";
 import { currencies, defaultCurrency, type Currency } from "@/lib/currency";
 import { defaultLocale, locales, type Locale } from "@/i18n/config";
 
-export const LOCALE_COOKIE = "locale";
-export const CURRENCY_COOKIE = "currency";
+const LOCALE_COOKIE = "locale";
+const CURRENCY_COOKIE = "currency";
 
 export type UserPreferences = { currency: Currency; locale: Locale };
 

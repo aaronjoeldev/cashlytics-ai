@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
-import { User, Bot } from 'lucide-react';
-import type { UIMessage } from 'ai';
-import { isTextUIPart, isToolUIPart, getToolName } from 'ai';
-import { ToolConfirmationCard } from '@/components/molecules/tool-confirmation-card';
+import { cn } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+import { User, Bot } from "lucide-react";
+import type { UIMessage } from "ai";
+import { isTextUIPart, isToolUIPart, getToolName } from "ai";
+import { ToolConfirmationCard } from "@/components/molecules/tool-confirmation-card";
 
 interface ChatMessageProps {
   message: UIMessage;
@@ -13,21 +13,18 @@ interface ChatMessageProps {
   onDeny?: (approvalId: string) => void;
 }
 
-interface ChatMessageSimpleProps {
-  role: 'user' | 'assistant';
-  content: string;
-  isLoading?: boolean;
-}
-
 function getTextContent(message: UIMessage): string {
-  return message.parts.filter(isTextUIPart).map((part) => part.text).join('');
+  return message.parts
+    .filter(isTextUIPart)
+    .map((part) => part.text)
+    .join("");
 }
 
 function formatMarkdown(text: string): React.ReactNode {
-  const lines = text.split('\n');
+  const lines = text.split("\n");
 
   return lines.map((line, lineIndex) => {
-    if (line.startsWith('• ') || line.startsWith('- ')) {
+    if (line.startsWith("• ") || line.startsWith("- ")) {
       return (
         <div key={lineIndex} className="flex gap-2">
           <span>•</span>
@@ -36,7 +33,7 @@ function formatMarkdown(text: string): React.ReactNode {
       );
     }
 
-    if (line.startsWith('**') && line.endsWith('**')) {
+    if (line.startsWith("**") && line.endsWith("**")) {
       return (
         <p key={lineIndex} className="font-semibold">
           {line.slice(2, -2)}
@@ -76,20 +73,20 @@ function formatInlineMarkdown(text: string): React.ReactNode {
 }
 
 export function ChatMessage({ message, onApprove, onDeny }: ChatMessageProps) {
-  const isUser = message.role === 'user';
+  const isUser = message.role === "user";
   const textContent = getTextContent(message);
 
   // Collect all renderable parts
   const textPart = textContent ? (
     <Card
       className={cn(
-        'rounded-2xl px-4 py-2.5 text-sm shadow-sm',
+        "rounded-2xl px-4 py-2.5 text-sm shadow-sm",
         isUser
-          ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 rounded-tr-md'
-          : 'bg-card rounded-tl-md'
+          ? "rounded-tr-md bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900"
+          : "bg-card rounded-tl-md"
       )}
     >
-      <div className="whitespace-pre-wrap break-words leading-relaxed">
+      <div className="leading-relaxed break-words whitespace-pre-wrap">
         {isUser ? textContent : formatMarkdown(textContent)}
       </div>
     </Card>
@@ -98,7 +95,7 @@ export function ChatMessage({ message, onApprove, onDeny }: ChatMessageProps) {
   // Tool confirmation cards for pending approvals
   const toolParts = message.parts
     .filter(isToolUIPart)
-    .filter((part) => part.state === 'approval-requested' && part.approval?.id != null)
+    .filter((part) => part.state === "approval-requested" && part.approval?.id != null)
     .map((part) => (
       <ToolConfirmationCard
         key={part.toolCallId}
@@ -113,13 +110,13 @@ export function ChatMessage({ message, onApprove, onDeny }: ChatMessageProps) {
   if (!textPart && toolParts.length === 0) return null;
 
   return (
-    <div
-      className={cn('flex gap-3 px-4 py-3', isUser ? 'flex-row-reverse' : 'flex-row')}
-    >
+    <div className={cn("flex gap-3 px-4 py-3", isUser ? "flex-row-reverse" : "flex-row")}>
       <div
         className={cn(
-          'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-gray-900' : 'bg-gradient-to-br from-white/10 to-white/5 dark:text-muted-foreground text-muted-foreground'
+          "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",
+          isUser
+            ? "bg-gradient-to-br from-amber-400 to-amber-500 text-gray-900"
+            : "dark:text-muted-foreground text-muted-foreground bg-gradient-to-br from-white/10 to-white/5"
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -127,8 +124,8 @@ export function ChatMessage({ message, onApprove, onDeny }: ChatMessageProps) {
 
       <div
         className={cn(
-          'max-w-[80%] space-y-2',
-          isUser ? 'flex items-end flex-col' : 'flex items-start flex-col'
+          "max-w-[80%] space-y-2",
+          isUser ? "flex flex-col items-end" : "flex flex-col items-start"
         )}
       >
         {textPart}
@@ -138,73 +135,17 @@ export function ChatMessage({ message, onApprove, onDeny }: ChatMessageProps) {
   );
 }
 
-export function ChatMessageSimple({ role, content, isLoading }: ChatMessageSimpleProps) {
-  const isUser = role === 'user';
-
-  if (isLoading) {
-    return (
-      <div className="flex gap-3 px-4 py-3">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <Bot className="h-4 w-4" />
-        </div>
-        <Card className="rounded-2xl rounded-tl-md bg-card px-4 py-2.5 text-sm shadow-sm">
-          <div className="flex gap-1">
-            <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
-            <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
-            <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn('flex gap-3 px-4 py-3', isUser ? 'flex-row-reverse' : 'flex-row')}
-    >
-      <div
-        className={cn(
-          'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-gray-900' : 'bg-gradient-to-br from-white/10 to-white/5 dark:text-muted-foreground text-muted-foreground'
-        )}
-      >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-      </div>
-
-      <div
-        className={cn(
-          'max-w-[80%] space-y-1',
-          isUser ? 'flex items-end' : 'flex items-start'
-        )}
-      >
-        <Card
-          className={cn(
-            'rounded-2xl px-4 py-2.5 text-sm shadow-sm',
-            isUser
-              ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-gray-900 rounded-tr-md'
-              : 'bg-card rounded-tl-md'
-          )}
-        >
-          <div className="whitespace-pre-wrap break-words leading-relaxed">
-            {isUser ? content : formatMarkdown(content)}
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
 export function ChatMessageLoading() {
   return (
     <div className="flex gap-3 px-4 py-3">
-      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <div className="bg-muted text-muted-foreground flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full">
         <Bot className="h-4 w-4" />
       </div>
-      <Card className="rounded-2xl rounded-tl-md bg-card px-4 py-2.5 text-sm shadow-sm">
+      <Card className="bg-card rounded-2xl rounded-tl-md px-4 py-2.5 text-sm shadow-sm">
         <div className="flex gap-1">
-          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:0ms]" />
-          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:150ms]" />
-          <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/50 [animation-delay:300ms]" />
+          <span className="bg-muted-foreground/50 h-2 w-2 animate-bounce rounded-full [animation-delay:0ms]" />
+          <span className="bg-muted-foreground/50 h-2 w-2 animate-bounce rounded-full [animation-delay:150ms]" />
+          <span className="bg-muted-foreground/50 h-2 w-2 animate-bounce rounded-full [animation-delay:300ms]" />
         </div>
       </Card>
     </div>

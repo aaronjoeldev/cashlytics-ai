@@ -98,39 +98,6 @@ export async function createConversation(title?: string): Promise<ApiResponse<Co
   }
 }
 
-export async function updateConversationTitle(
-  id: string,
-  title: string
-): Promise<ApiResponse<Conversation>> {
-  try {
-    const authResult = await requireAuth();
-    if (authResult.error) {
-      return { success: false, error: "Unauthorized" };
-    }
-    const { userId } = authResult;
-
-    const trimmed = typeof title === "string" ? title.trim().slice(0, MAX_TITLE_LENGTH) : "";
-    if (!trimmed) {
-      return { success: false, error: "Titel ist erforderlich." };
-    }
-
-    const [conversation] = await db
-      .update(conversations)
-      .set({ title: trimmed, updatedAt: new Date() })
-      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
-      .returning();
-
-    if (!conversation) {
-      return { success: false, error: "Conversation not found" };
-    }
-    revalidatePath("/assistant");
-    return { success: true, data: conversation };
-  } catch (error) {
-    logger.error("Failed to update conversation", "updateConversationTitle", error);
-    return { success: false, error: "Failed to update conversation" };
-  }
-}
-
 export async function deleteConversation(id: string): Promise<ApiResponse<void>> {
   try {
     const authResult = await requireAuth();
@@ -197,7 +164,11 @@ export async function saveMessage(
   }
 }
 
-export async function getMessages(conversationId: string): Promise<ApiResponse<Message[]>> {
+/** Names a conversation after its first user message (first 50 characters). */
+export async function updateConversationTitleFromFirstMessage(
+  conversationId: string,
+  firstMessage: string
+): Promise<ApiResponse<Conversation>> {
   try {
     const authResult = await requireAuth();
     if (authResult.error) {
@@ -205,32 +176,25 @@ export async function getMessages(conversationId: string): Promise<ApiResponse<M
     }
     const { userId } = authResult;
 
-    // Verify conversation ownership before fetching messages
-    const [ownedConv] = await db
-      .select({ id: conversations.id })
-      .from(conversations)
-      .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
-      .limit(1);
-    if (!ownedConv) {
-      return { success: false, error: "Unauthorized" };
+    const text = typeof firstMessage === "string" ? firstMessage.trim() : "";
+    const title = (text.length > 50 ? `${text.slice(0, 50)}...` : text).slice(0, MAX_TITLE_LENGTH);
+    if (!title) {
+      return { success: false, error: "Titel ist erforderlich." };
     }
 
-    const conversationMessages = await db
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, conversationId))
-      .orderBy(messages.createdAt);
-    return { success: true, data: conversationMessages };
-  } catch (error) {
-    logger.error("Failed to fetch messages", "getMessages", error);
-    return { success: false, error: "Failed to fetch messages" };
-  }
-}
+    const [conversation] = await db
+      .update(conversations)
+      .set({ title, updatedAt: new Date() })
+      .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+      .returning();
 
-export async function updateConversationTitleFromFirstMessage(
-  conversationId: string,
-  firstMessage: string
-): Promise<ApiResponse<Conversation>> {
-  const title = firstMessage.slice(0, 50) + (firstMessage.length > 50 ? "..." : "");
-  return updateConversationTitle(conversationId, title);
+    if (!conversation) {
+      return { success: false, error: "Conversation not found" };
+    }
+    revalidatePath("/assistant");
+    return { success: true, data: conversation };
+  } catch (error) {
+    logger.error("Failed to update conversation", "updateConversationTitleFromFirstMessage", error);
+    return { success: false, error: "Failed to update conversation" };
+  }
 }

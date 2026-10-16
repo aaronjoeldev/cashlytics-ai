@@ -1,9 +1,9 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { accounts, expenses, dailyExpenses, categories } from "@/lib/db/schema";
+import { expenses, dailyExpenses, categories } from "@/lib/db/schema";
 import { and, gte, lt, sql, desc, eq } from "drizzle-orm";
-import type { ApiResponse, Account, DailyExpenseWithDetails } from "@/types/database";
+import type { ApiResponse, DailyExpenseWithDetails } from "@/types/database";
 import { safeParseFloat } from "@/lib/safe-parse";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/auth/require-auth";
@@ -192,24 +192,6 @@ export async function getRecentTransactions(
   } catch (error) {
     logger.error("Failed to fetch recent transactions", "getRecentTransactions", error);
     return { success: false, error: "Failed to fetch recent transactions" };
-  }
-}
-
-export async function getAccounts(): Promise<ApiResponse<Account[]>> {
-  const auth = await requireAuth();
-  if (auth.error) return { success: false, error: "Unauthorized" };
-  const { userId } = auth;
-
-  try {
-    const allAccounts = await db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.userId, userId))
-      .orderBy(accounts.name);
-    return { success: true, data: allAccounts };
-  } catch (error) {
-    logger.error("Failed to fetch accounts", "getAccounts", error);
-    return { success: false, error: "Failed to fetch accounts" };
   }
 }
 

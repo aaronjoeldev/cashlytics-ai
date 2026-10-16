@@ -691,7 +691,7 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
   }),
 }));
 
-// Exchange rate cache (for Phase 2 — Live-Rate-Cache)
+// Exchange rate cache (base EUR) for src/lib/exchange-rates.ts
 export const exchangeRates = pgTable(
   "exchange_rates",
   {

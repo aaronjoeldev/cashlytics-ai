@@ -224,7 +224,6 @@ async function applyRow(
   // Resolve currency: row currency takes precedence, fallback to account currency
   const rowCurrency = row.currency || session.accountCurrency;
   const originalAmount = row.currency && row.currency !== session.accountCurrency ? amount : null;
-  // exchangeRate: null — TODO: Phase 2 — getExchangeRate(row.currency, session.accountCurrency)
 
   const decision = rowResolution?.decision ?? "keep_both";
 
@@ -530,7 +529,6 @@ function createTxStore(tx: TransactionClient): ImportCommitDataStore {
           amount: params.amount,
           currency: params.currency,
           originalAmount: params.originalAmount ?? null,
-          // exchangeRate: null, // TODO: Phase 2 — getExchangeRate(row.currency, account.currency)
           date: params.date,
           info: params.info,
         }))

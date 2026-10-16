@@ -3,11 +3,6 @@ import * as React from "react";
 import { ResetPasswordEmail } from "./reset-password";
 import { WelcomeEmail } from "./welcome";
 
-// Re-export components for direct use
-export { BaseEmail, VAULT_COLORS } from "./base-template";
-export { ResetPasswordEmail } from "./reset-password";
-export { WelcomeEmail } from "./welcome";
-
 /**
  * Renders the reset password email in both HTML and plaintext formats.
  *
