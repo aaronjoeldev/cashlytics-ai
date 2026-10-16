@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.13...v0.9.0) (2026-10-16)
+
+### ✨ Features
+
+- **api:** add token-authenticated read-only REST API for integrations ([06de74e](https://github.com/aaronjoeldev/cashlytics-ai/commit/06de74e366ce9d887478ea41960ce6c5b6b62fb0))
+
 ## [0.8.13](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.8.12...v0.8.13) (2026-10-15)
 
 ### 🐛 Bug Fixes

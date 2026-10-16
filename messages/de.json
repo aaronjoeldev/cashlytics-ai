@@ -475,6 +475,38 @@
         "unsupported": "Dein Browser unterstützt keine Push-Benachrichtigungen. <strong>iPhone/iPad:</strong> Öffne Cashlytics in Safari, tippe auf den Teilen-Button und wähle „Zum Home-Bildschirm“. Dann die App von dort starten und Benachrichtigungen hier aktivieren. Außerdem ist HTTPS erforderlich. <strong>Desktop:</strong> Bitte verwende Chrome, Edge oder Firefox.",
         "notConfigured": "Push-Benachrichtigungen sind auf diesem Server nicht eingerichtet. Der Betreiber muss VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY und VAPID_SUBJECT setzen."
       }
+    },
+    "apiTokens": {
+      "title": "API-Tokens & Integrationen",
+      "description": "Mit einem persönlichen API-Token können Integrationen wie Home Assistant deine Finanzdaten lesend abrufen. Gib in der Integration die Adresse dieser Cashlytics-Instanz und den Token an.",
+      "nameLabel": "Name",
+      "namePlaceholder": "z. B. Home Assistant",
+      "expiryLabel": "Gültigkeit",
+      "expiry": {
+        "30": "30 Tage",
+        "90": "90 Tage",
+        "365": "1 Jahr",
+        "never": "Unbegrenzt"
+      },
+      "create": "Token erstellen",
+      "createdTitle": "Dein neuer Token",
+      "createdHint": "Kopiere den Token jetzt. Er wird nur einmal angezeigt und lässt sich später nicht wieder abrufen.",
+      "copy": "Token kopieren",
+      "empty": "Noch keine API-Tokens erstellt.",
+      "createdAt": "Erstellt am {date}",
+      "lastUsedAt": "zuletzt genutzt am {date}",
+      "neverUsed": "noch nie genutzt",
+      "expiresAt": "gültig bis {date}",
+      "expiredAt": "abgelaufen am {date}",
+      "noExpiry": "unbegrenzt gültig",
+      "delete": "Token widerrufen",
+      "deleteConfirm": "Token widerrufen?",
+      "deleteConfirmDesc": "Integrationen, die den Token „{name}“ nutzen, verlieren sofort den Zugriff. Das lässt sich nicht rückgängig machen.",
+      "toasts": {
+        "created": "API-Token erstellt.",
+        "deleted": "API-Token widerrufen.",
+        "copyFailed": "Kopieren fehlgeschlagen. Bitte markiere den Token manuell."
+      }
     }
   },
   "receiptScan": {

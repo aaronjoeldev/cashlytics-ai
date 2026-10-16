@@ -206,6 +206,24 @@ export const createTransferInput = transferFields
     path: ["targetAccountId"],
   });
 
+// --- API tokens ---------------------------------------------------------------
+
+export const apiTokenExpiryDays = [30, 90, 365] as const;
+
+export const createApiTokenInput = z.object({
+  name: text(100, "Name"),
+  // null: the token does not expire
+  expiresInDays: z
+    .union(
+      apiTokenExpiryDays.map((days) => z.literal(days)),
+      {
+        message: "Ungültige Gültigkeitsdauer",
+      }
+    )
+    .nullable()
+    .optional(),
+});
+
 // --- Helper -------------------------------------------------------------------
 
 export type ParsedInput<T> = { success: true; data: T } | { success: false; error: string };

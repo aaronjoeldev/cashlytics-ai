@@ -101,7 +101,7 @@ cp .env.example .env
 
 ```
 src/
-  app/          Next.js routes: (auth) pages, (dashboard) pages, api/ (chat, cron, push, …)
+  app/          Next.js routes: (auth) pages, (dashboard) pages, api/ (chat, cron, push, v1, …)
   actions/      Server actions, one file per domain; every export is a public endpoint
   components/   ui/ (shadcn), molecules/, organisms/, layout/
   lib/          Domain logic: recurrence, currency and rates, import pipeline, AI tools,
@@ -111,6 +111,7 @@ messages/       Translations (de, en)
 drizzle/        SQL migrations
 scripts/        dev.sh, demo seed
 e2e/            End-to-end suites, Docker stack, fake OpenAI API
+docs/api/       REST API v1 for integrations (Home Assistant)
 docs/audit/     Open findings from the code audit
 ```
 

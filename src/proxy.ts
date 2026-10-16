@@ -23,6 +23,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow the REST API (secured per route via personal API tokens, not session)
+  if (pathname.startsWith("/api/v1/")) {
+    return NextResponse.next();
+  }
+
   // Allow static assets
   if (
     pathname.startsWith("/_next") ||

@@ -33,7 +33,7 @@ function generateResetToken(): { raw: string; hash: string } {
  * @param raw - The raw token string to hash
  * @returns The SHA-256 hash as a 64-character hex string
  */
-function hashToken(raw: string): string {
+export function hashToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 
