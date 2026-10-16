@@ -24,6 +24,7 @@
 
 - **Accounts, income, expenses, transfers** with recurring schedules (monthly, quarterly, yearly, custom intervals, …)
 - **Reserve plan** for bills that come less often than monthly: a fixed monthly amount per bill, what should be set aside by today, and a reserve pot the app keeps up to date from your planned transfers
+- **Salary plan** that splits your monthly income into fixed costs, reserves, an everyday budget, savings and what is left, and lists the transfers to make on payday
 - **Dashboard, overview and analytics** with payment calendar and forecasts
 - **Multi-currency**: entries keep their own currency, totals are converted with daily exchange rates
 - **AI assistant** that answers questions and books entries after your approval _(OpenAI key)_

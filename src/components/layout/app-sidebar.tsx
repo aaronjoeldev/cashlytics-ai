@@ -19,6 +19,7 @@ import {
   ScanLine,
   LogOut,
   PiggyBank,
+  HandCoins,
 } from "lucide-react";
 
 import {
@@ -53,6 +54,7 @@ const baseMainNavItems: NavItem[] = [
   { titleKey: "dashboard", url: "/dashboard", icon: LayoutDashboard },
   { titleKey: "overview", url: "/overview", icon: PieChart },
   { titleKey: "reserves", url: "/reserves", icon: PiggyBank },
+  { titleKey: "salaryPlan", url: "/salary-plan", icon: HandCoins },
   { titleKey: "expenses", url: "/expenses", icon: Wallet },
   { titleKey: "income", url: "/income", icon: TrendingUp },
   { titleKey: "transfers", url: "/transfers", icon: ArrowRightLeft },

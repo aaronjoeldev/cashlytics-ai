@@ -167,6 +167,17 @@ export const reservePots = pgTable("reserve_pots", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Salary plan settings. A null everyday budget means: use the average of the last three months.
+export const planSettings = pgTable("plan_settings", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  everydayBudget: decimal("everyday_budget", { precision: 12, scale: 2 }),
+  // Currency of everyday_budget (the base currency when it was set)
+  currency: text("currency"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
   user: one(users, {
     fields: [apiTokens.userId],
@@ -831,4 +842,5 @@ export type NewMerchantCategory = typeof merchantCategories.$inferInsert;
 export type Insight = typeof insights.$inferSelect;
 export type ApiToken = typeof apiTokens.$inferSelect;
 export type ReservePot = typeof reservePots.$inferSelect;
+export type PlanSettings = typeof planSettings.$inferSelect;
 export type NewInsight = typeof insights.$inferInsert;

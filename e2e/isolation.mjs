@@ -44,8 +44,9 @@ export async function isolation() {
     const t = await bodyText(erika.page);
     check(
       `second user sees no demo entries on ${path}`,
-      !/Miete|Rewe|Gehalt|Hauptkonto|demo-beleg/.test(t),
-      t.match(/.{0,40}(Miete|Rewe|Gehalt|Hauptkonto|demo-beleg).{0,20}/)?.[0]
+      // \b: the sidebar item "Gehaltsplan" is not the demo income "Gehalt"
+      !/Miete|Rewe|\bGehalt\b|Hauptkonto|demo-beleg/.test(t),
+      t.match(/.{0,40}(Miete|Rewe|\bGehalt\b|Hauptkonto|demo-beleg).{0,20}/)?.[0]
     );
   }
   const search = await callAction(erikaCookie, "globalSearch", ["Rewe"]);

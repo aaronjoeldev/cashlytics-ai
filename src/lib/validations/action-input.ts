@@ -213,6 +213,12 @@ export const setReservePotInput = z.object({
   balance: signedAmount,
 });
 
+// --- Salary plan ----------------------------------------------------------------
+
+export const setEverydayBudgetInput = z.object({
+  amount: decimal({ min: 0, max: MAX_AMOUNT, scale: 2, label: "Alltagsbudget" }).nullable(),
+});
+
 // --- API tokens ---------------------------------------------------------------
 
 export const apiTokenExpiryDays = [30, 90, 365] as const;
