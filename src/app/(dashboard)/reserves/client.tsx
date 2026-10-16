@@ -4,7 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useNow, useTimeZone, useTranslations } from "next-intl";
-import { AlertTriangle, CheckCircle2, PiggyBank, Pencil, CalendarClock } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  PiggyBank,
+  Pencil,
+  CalendarClock,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -311,15 +318,19 @@ export function ReservesClient({ plan, accounts, categories, loadFailed }: Reser
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("howTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent className="text-muted-foreground space-y-2 text-sm">
-          <p>{t("howRate")}</p>
-          <p>{t("howTarget")}</p>
-          <p>{t("howPot")}</p>
-        </CardContent>
+      {/* Collapsed by default: the explanation is for reference, not for every visit */}
+      <Card className="py-0">
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 text-base font-semibold [&::-webkit-details-marker]:hidden">
+            {t("howTitle")}
+            <ChevronDown className="text-muted-foreground h-4 w-4 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="text-muted-foreground space-y-2 px-6 pb-5 text-sm">
+            <p>{t("howRate")}</p>
+            <p>{t("howTarget")}</p>
+            <p>{t("howPot")}</p>
+          </div>
+        </details>
       </Card>
 
       <ExpenseForm

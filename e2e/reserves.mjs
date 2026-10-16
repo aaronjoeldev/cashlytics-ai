@@ -71,6 +71,16 @@ export async function reserves() {
     "rows name the paying account and the filter says what it filters",
     text.includes("abgebucht von Hauptkonto") && text.includes("Abgebucht von:")
   );
+  check(
+    "explanation is collapsed by default",
+    text.includes("So rechnet der Plan") && !text.includes("Monatsrate: Betrag geteilt")
+  );
+  await clickText(page, "summary", "So rechnet der Plan");
+  await sleep(300);
+  check(
+    "explanation opens on click",
+    (await pageText(page)).includes("Monatsrate: Betrag geteilt")
+  );
   const target = euro(text, "Soll-Stand heute");
   check(
     "target today is above zero and below the sum of the bills",
