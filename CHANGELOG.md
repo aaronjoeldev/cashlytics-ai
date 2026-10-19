@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.4](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.11.3...v0.11.4) (2026-10-19)
+
+### 🐛 Bug Fixes
+
+- **demo:** daily reset missed user settings and failed silently ([0488e9e](https://github.com/aaronjoeldev/cashlytics-ai/commit/0488e9eb5bb2010ab9e1075b6cf8ec979e37870a))
+
 ## [0.11.3](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.11.2...v0.11.3) (2026-10-19)
 
 ### 🐛 Bug Fixes
