@@ -202,7 +202,7 @@ async function buildSystemPrompt(timeZone: string | undefined): Promise<string> 
     ? `### Budget-Status (aktueller Monat):
   - Einnahmen: ${Math.round(dashboardResult.data.reserveView.monthlyIncome * 100) / 100}
   - Ausgaben: ${Math.round(dashboardResult.data.reserveView.monthlyExpenses * 100) / 100}
-  - Sparrate: ${Math.round(dashboardResult.data.reserveView.savingsRate * 100) / 100}
+  - Bilanz (Einnahmen minus Ausgaben): ${Math.round(dashboardResult.data.reserveView.savingsRate * 100) / 100}
   - Gesamtvermögen: ${Math.round(dashboardResult.data.totalAssets * 100) / 100}
   - Einnahmen-Trend: ${dashboardResult.data.reserveView.incomeTrend > 0 ? "+" : ""}${Math.round(dashboardResult.data.reserveView.incomeTrend * 100) / 100}%
   - Ausgaben-Trend: ${dashboardResult.data.reserveView.expenseTrend > 0 ? "+" : ""}${Math.round(dashboardResult.data.reserveView.expenseTrend * 100) / 100}%`

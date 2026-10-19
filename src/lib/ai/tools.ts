@@ -481,7 +481,7 @@ export const tools = {
 
   getMonthlyOverview: tool({
     description:
-      "Gibt eine kompakte Übersicht über Einnahmen, Ausgaben und Saldo für einen bestimmten Monat. Nutze immer den aktuellen Monat/Jahr aus dem Kontext, wenn kein anderer Monat genannt wird.",
+      "Gibt eine kompakte Übersicht über Einnahmen, Ausgaben und Bilanz (Einnahmen minus Ausgaben) für einen bestimmten Monat. Nutze immer den aktuellen Monat/Jahr aus dem Kontext, wenn kein anderer Monat genannt wird.",
     inputSchema: z.object({
       month: z.number().int().min(1).max(12).describe("Monat (1-12)"),
       year: z.number().int().min(2020).max(2100).describe("Jahr"),
@@ -655,7 +655,7 @@ export const tools = {
 
   compareMonths: tool({
     description:
-      "Vergleicht zwei Monate miteinander: Einnahmen, Ausgaben, Saldo und Veränderung in Prozent. Nutze dies bei Fragen wie 'Vergleiche Mai mit April' oder 'Gebe ich mehr aus als letzten Monat?'",
+      "Vergleicht zwei Monate miteinander: Einnahmen, Ausgaben, Bilanz und Veränderung in Prozent. Nutze dies bei Fragen wie 'Vergleiche Mai mit April' oder 'Gebe ich mehr aus als letzten Monat?'",
     inputSchema: z.object({
       month1: z.number().int().min(1).max(12).describe("Erster Monat (1-12)"),
       year1: z.number().int().min(2020).max(2100).describe("Jahr des ersten Monats"),

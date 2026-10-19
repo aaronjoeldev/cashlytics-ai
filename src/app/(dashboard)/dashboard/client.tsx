@@ -305,7 +305,7 @@ export function DashboardClient({
         />
 
         <KpiCard
-          title={t("savingsRate")}
+          title={t("viewBalance", { view: t(`viewModes.${viewMode}`) })}
           value={formatCurrency(activeStats.savingsRate)}
           subtitle={activeStats.savingsRate >= 0 ? t("surplusThisMonth") : t("deficitThisMonth")}
           icon={<PiggyBank className="h-4 w-4 text-amber-600 dark:text-amber-400" />}

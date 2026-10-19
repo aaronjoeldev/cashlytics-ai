@@ -173,7 +173,8 @@ export function ForecastClient({ accountId, currentBalance }: ForecastClientProp
           <CardHeader className="pb-2">
             <CardTitle className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
               <TrendingUp className="h-4 w-4" />
-              {t("endBalance")}
+              {/* Checking accounts are not projected cumulatively: the value is the last month's net */}
+              {forecast.isCumulativeAccount ? t("endBalance") : t("lastMonthNet")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -248,7 +249,7 @@ export function ForecastClient({ accountId, currentBalance }: ForecastClientProp
 
                   <div className="min-w-[100px] text-right">
                     <p className="text-muted-foreground text-xs">
-                      {forecast.isCumulativeAccount ? t("cumulative") : t("balance")}
+                      {forecast.isCumulativeAccount ? t("balance") : t("net")}
                     </p>
                     <div
                       className={`text-sm font-bold ${(forecast.isCumulativeAccount ? month.cumulativeBalance : month.balance) >= 0 ? "text-emerald-500" : "text-red-500"}`}
