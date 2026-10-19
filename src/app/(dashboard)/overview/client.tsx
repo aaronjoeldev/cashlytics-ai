@@ -1,8 +1,9 @@
 "use client";
 
 import { getCalendarDayInTimeZone, getNextOccurrence } from "@/lib/recurrence";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useTransition } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useNow, useTimeZone, useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -56,6 +57,8 @@ interface OverviewClientProps {
   subscriptions: Array<{ expense: ExpenseWithDetails; monthlyAmount: number }>;
   initialCalendarDays: CalendarDay[];
   accounts: Account[];
+  /** Account the page is filtered by, null for all accounts */
+  accountId: string | null;
 }
 
 export function OverviewClient({
@@ -68,6 +71,7 @@ export function OverviewClient({
   subscriptions,
   initialCalendarDays,
   accounts,
+  accountId,
 }: OverviewClientProps) {
   const t = useTranslations("overview");
   const tCommon = useTranslations("common");
@@ -80,7 +84,18 @@ export function OverviewClient({
   const [calendarYear, setCalendarYear] = useState(year);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>(initialCalendarDays);
   const [calendarLoading, setCalendarLoading] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>("all");
+  const router = useRouter();
+  const pathname = usePathname();
+  const [filterPending, startFilter] = useTransition();
+  const selectedAccountId = accountId ?? "all";
+
+  // The filter lives in the URL, so the server loads every section for the chosen account
+  const selectAccount = (value: string) =>
+    startFilter(() =>
+      router.replace(value === "all" ? pathname : `${pathname}?account=${value}`, {
+        scroll: false,
+      })
+    );
 
   const getMonthName = useCallback(
     (m: number): string => {
@@ -163,7 +178,7 @@ export function OverviewClient({
 
       setCalendarLoading(true);
       try {
-        const result = await getMonthlyPaymentsCalendar(y, m);
+        const result = await getMonthlyPaymentsCalendar(y, m, accountId ?? undefined);
         if (request !== calendarRequestRef.current) return;
         if (result.success) {
           setCalendarDays(result.data);
@@ -181,7 +196,7 @@ export function OverviewClient({
         if (request === calendarRequestRef.current) setCalendarLoading(false);
       }
     },
-    [initialCalendarDays, month, year, t]
+    [initialCalendarDays, month, year, t, accountId]
   );
 
   const goToPrevMonth = () =>
@@ -273,8 +288,9 @@ export function OverviewClient({
           </p>
         </div>
         {accounts.length > 1 && (
-          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-            <SelectTrigger className="w-[180px]">
+          <Select value={selectedAccountId} onValueChange={selectAccount}>
+            <SelectTrigger className="w-[180px]" aria-busy={filterPending}>
+              {filterPending && <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

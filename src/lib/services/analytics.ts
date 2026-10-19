@@ -126,11 +126,15 @@ export async function computeMonthlyOverview(
   };
 }
 
-/** Income, expenses and balance of the current month and the `months - 1` following ones. */
+/**
+ * Income, expenses and net of the current month and the `months - 1` following ones; only the
+ * entries of one account when `accountId` is given.
+ */
 export async function computeForecast(
   ctx: FinanceContext,
   months: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  accountId?: string
 ): Promise<Forecast> {
   const monthTargets = Array.from({ length: months }, (_, i) => {
     const targetDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -138,7 +142,7 @@ export async function computeForecast(
   });
 
   const overviews = await Promise.all(
-    monthTargets.map(({ month, year }) => computeMonthlyOverview(ctx, month, year))
+    monthTargets.map(({ month, year }) => computeMonthlyOverview(ctx, month, year, accountId))
   );
 
   let totalProjectedIncome = 0;
@@ -228,12 +232,13 @@ export interface ScheduledPayment {
 
 /**
  * Every due date of expenses, daily expenses and incomes between two calendar days (inclusive,
- * UTC midnight), sorted by date.
+ * UTC midnight), sorted by date; only those of one account when `accountId` is given.
  */
 export async function listScheduledPayments(
   { userId, baseCurrency, rates }: FinanceContext,
   rangeStart: Date,
-  rangeEnd: Date
+  rangeEnd: Date,
+  accountId?: string
 ): Promise<ScheduledPayment[]> {
   const rangeEndOfDay = new Date(
     Date.UTC(
@@ -259,7 +264,8 @@ export async function listScheduledPayments(
         and(
           eq(expenses.userId, userId),
           lte(expenses.startDate, rangeEndOfDay),
-          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${rangeStart.toISOString()})`
+          sql`(${expenses.endDate} IS NULL OR ${expenses.endDate} >= ${rangeStart.toISOString()})`,
+          accountId ? eq(expenses.accountId, accountId) : undefined
         )
       ),
     db
@@ -273,7 +279,8 @@ export async function listScheduledPayments(
         and(
           eq(dailyExpenses.userId, userId),
           gte(dailyExpenses.date, rangeStart),
-          lte(dailyExpenses.date, rangeEndOfDay)
+          lte(dailyExpenses.date, rangeEndOfDay),
+          accountId ? eq(dailyExpenses.accountId, accountId) : undefined
         )
       ),
     db
@@ -285,7 +292,8 @@ export async function listScheduledPayments(
         and(
           eq(incomes.userId, userId),
           lte(incomes.startDate, rangeEndOfDay),
-          sql`(${incomes.endDate} IS NULL OR ${incomes.endDate} >= ${rangeStart.toISOString()})`
+          sql`(${incomes.endDate} IS NULL OR ${incomes.endDate} >= ${rangeStart.toISOString()})`,
+          accountId ? eq(incomes.accountId, accountId) : undefined
         )
       ),
   ]);
