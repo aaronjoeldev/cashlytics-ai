@@ -23,6 +23,7 @@ const all = [
   "rates",
   "reserves",
   "salary",
+  "overview",
   "insights",
   "imports",
   "assistant",

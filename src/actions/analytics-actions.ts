@@ -24,6 +24,7 @@ import {
   listNormalizedExpenses,
   listScheduledPayments,
 } from "@/lib/services/analytics";
+import { accountFilterInput } from "@/lib/validations/action-input";
 
 /** Session user with base currency and rates, or null when signed out. */
 async function getSessionContext(): Promise<FinanceContext | null> {
@@ -40,21 +41,28 @@ export async function getMonthlyOverview(
 ): Promise<ApiResponse<MonthlyOverview>> {
   const ctx = await getSessionContext();
   if (!ctx) return { success: false, error: "Unauthorized" };
+  const account = accountFilterInput.safeParse(accountId);
+  if (!account.success) return { success: false, error: "Ungültige ID" };
 
   try {
-    return { success: true, data: await computeMonthlyOverview(ctx, month, year, accountId) };
+    return { success: true, data: await computeMonthlyOverview(ctx, month, year, account.data) };
   } catch (error) {
     logger.error("Failed to get monthly overview", "getMonthlyOverview", error);
     return { success: false, error: "Monatsübersicht konnte nicht geladen werden." };
   }
 }
 
-export async function getForecast(months: number): Promise<ApiResponse<Forecast>> {
+export async function getForecast(
+  months: number,
+  accountId?: string
+): Promise<ApiResponse<Forecast>> {
   const ctx = await getSessionContext();
   if (!ctx) return { success: false, error: "Unauthorized" };
+  const account = accountFilterInput.safeParse(accountId);
+  if (!account.success) return { success: false, error: "Ungültige ID" };
 
   try {
-    return { success: true, data: await computeForecast(ctx, months) };
+    return { success: true, data: await computeForecast(ctx, months, new Date(), account.data) };
   } catch (error) {
     logger.error("Failed to get forecast", "getForecast", error);
     return { success: false, error: "Prognose konnte nicht erstellt werden." };
@@ -68,6 +76,8 @@ export async function getCategoryBreakdown(
 ): Promise<ApiResponse<CategoryBreakdown[]>> {
   const auth = await requireAuth();
   if (auth.error) return { success: false, error: "Unauthorized" };
+  const account = accountFilterInput.safeParse(accountId);
+  if (!account.success) return { success: false, error: "Ungültige ID" };
   const { userId } = auth;
 
   try {
@@ -240,10 +250,13 @@ export interface CalendarDay {
 
 export async function getMonthlyPaymentsCalendar(
   year: number,
-  month: number
+  month: number,
+  accountId?: string
 ): Promise<ApiResponse<CalendarDay[]>> {
   const ctx = await getSessionContext();
   if (!ctx) return { success: false, error: "Unauthorized" };
+  const account = accountFilterInput.safeParse(accountId);
+  if (!account.success) return { success: false, error: "Ungültige ID" };
 
   try {
     const monthStart = new Date(Date.UTC(year, month - 1, 1));
@@ -259,7 +272,7 @@ export async function getMonthlyPaymentsCalendar(
     const calendarDays: CalendarDay[] = [];
 
     const paymentsByDay = new Map<number, CalendarPayment[]>();
-    for (const payment of await listScheduledPayments(ctx, monthStart, monthEnd)) {
+    for (const payment of await listScheduledPayments(ctx, monthStart, monthEnd, account.data)) {
       const day = payment.date.getUTCDate();
       paymentsByDay.set(day, [
         ...(paymentsByDay.get(day) ?? []),

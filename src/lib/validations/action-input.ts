@@ -251,3 +251,9 @@ export function parseInput<S extends z.ZodType>(
   const issue = result.error.issues[0];
   return { success: false, error: issue?.message ?? "Ungültige Eingabe" };
 }
+
+/**
+ * Optional account filter of the read actions; a malformed id would otherwise fail in Postgres.
+ * Parse it with `safeParse`: `parseInput` reads a missing value as {}.
+ */
+export const accountFilterInput = id.optional();
