@@ -8,30 +8,22 @@
 BEGIN;
 
 -- --------------------------------------------------------------
--- TRUNCATE (CASCADE handles all dependent tables automatically)
--- Note: users table is truncated last to maintain FK integrity
+-- TRUNCATE every table in the public schema except the exchange rate cache.
+-- A fixed list missed tables without a foreign key to users (user_settings), so a visitor who
+-- switched the currency or language changed it for every later visitor, across resets.
+-- New tables are covered automatically. Drizzle's migration table lives in the drizzle schema.
 -- --------------------------------------------------------------
-TRUNCATE TABLE
-  messages,
-  conversations,
-  documents,
-  daily_expenses,
-  transfers,
-  expenses,
-  incomes,
-  categories,
-  accounts
-CASCADE;
-
--- Also reset auth tables (for clean demo)
-TRUNCATE TABLE
-  auth_verification_tokens,
-  auth_sessions,
-  auth_accounts
-CASCADE;
-
--- Finally truncate users (after all dependent data is gone)
-TRUNCATE TABLE users CASCADE;
+DO $$
+DECLARE
+  tables text;
+BEGIN
+  SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+    INTO tables
+    FROM pg_tables
+   WHERE schemaname = 'public'
+     AND tablename NOT IN ('exchange_rates');
+  EXECUTE 'TRUNCATE TABLE ' || tables || ' CASCADE';
+END $$;
 
 
 -- ==============================================================
