@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.10.0...v0.11.0) (2026-10-19)
+
+### ✨ Features
+
+- **salary-plan:** split the monthly income and list the payday transfers ([5a6d3f0](https://github.com/aaronjoeldev/cashlytics-ai/commit/5a6d3f0da12cf70d7b03e0ce634b245fc408d150))
+
 ## [0.10.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.9.0...v0.10.0) (2026-10-16)
 
 ### ✨ Features
