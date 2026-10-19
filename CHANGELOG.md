@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.3](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.11.2...v0.11.3) (2026-10-19)
+
+### 🐛 Bug Fixes
+
+- **overview:** the account filter applies to every section ([66ceb5b](https://github.com/aaronjoeldev/cashlytics-ai/commit/66ceb5b2c43516f4c6301773e4dcee768ad8f7ba))
+
 ## [0.11.2](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.11.1...v0.11.2) (2026-10-19)
 
 ### 🐛 Bug Fixes
