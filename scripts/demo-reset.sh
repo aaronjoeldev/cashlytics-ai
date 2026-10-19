@@ -6,6 +6,9 @@
 # 2. Waits for the app to run its migrations (schema must exist)
 # 3. Runs the initial seed
 # 4. Resets the database every day at midnight UTC
+#
+# A failed seed is retried every RETRY_SECS until it succeeds. The seed runs in one
+# transaction, so a failure leaves the previous data untouched.
 # ==============================================================
 set -e
 
@@ -13,15 +16,30 @@ POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-cashlytics}"
 POSTGRES_DB="${POSTGRES_DB:-cashlytics}"
 SEED_FILE="/scripts/seed-demo.sql"
+RETRY_SECS="${RETRY_SECS:-300}"
 
 log() {
   echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"
 }
 
+# Without ON_ERROR_STOP psql reports success even when a statement fails: the transaction is
+# rolled back, nothing is reset, and the log still said "complete".
 run_seed() {
   log "Starting demo data reset..."
-  psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$SEED_FILE"
-  log "Demo data reset complete."
+  if psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+    -v ON_ERROR_STOP=1 -q -f "$SEED_FILE"; then
+    log "Demo data reset complete."
+    return 0
+  fi
+  log "ERROR: demo data reset failed, the database was NOT reset. Does seed-demo.sql match the app version?"
+  return 1
+}
+
+seed_until_success() {
+  until run_seed; do
+    log "Retrying in ${RETRY_SECS} seconds..."
+    sleep "$RETRY_SECS"
+  done
 }
 
 # --------------------------------------------------------------
@@ -49,7 +67,7 @@ log "Schema is ready."
 # --------------------------------------------------------------
 # Initial seed on startup
 # --------------------------------------------------------------
-run_seed
+seed_until_success
 
 # --------------------------------------------------------------
 # Daily reset loop — resets at midnight UTC every day
@@ -60,5 +78,5 @@ while true; do
   SLEEP_SECS=$(( MIDNIGHT - NOW ))
   log "Next reset in ${SLEEP_SECS} seconds (at midnight UTC)"
   sleep "$SLEEP_SECS"
-  run_seed
+  seed_until_success
 done

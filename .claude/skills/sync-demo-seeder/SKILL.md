@@ -22,11 +22,10 @@ Read all of the following files completely before making any changes:
 Compare the schema to what the seed currently does. Identify every discrepancy:
 
 **Tables:**
-- Is every table that holds user data present in the `TRUNCATE` statement?
-  - Excluded tables (never seed): `conversations`, `messages`, `documents`
-  - The TRUNCATE must list all remaining user-data tables
+- The `DO $$ ... TRUNCATE` block at the top empties every table in the `public` schema except `exchange_rates`, so new tables are reset automatically. Only touch its exclusion list when a new table holds shared, non-user data that must survive the reset (like the exchange rate cache).
+  - Tables that are never seeded: `conversations`, `messages`, `documents`
 - Is there a new table that needs demo rows?
-- Is a table removed? Remove its TRUNCATE entry and INSERT block.
+- Is a table removed? Remove its INSERT block.
 
 **Columns:**
 - Are the column names in each `INSERT` statement still correct?
@@ -46,7 +45,7 @@ Before editing, write out a concise list of every change you are about to make, 
 accounts       — no changes
 expenses       — add new column `budget_id` (nullable, use NULL in all rows)
 categories     — enum 'shopping' renamed to 'retail', update 3 rows
-budget_groups  — NEW TABLE: add TRUNCATE entry + INSERT block with 2 demo rows
+budget_groups  — NEW TABLE: add INSERT block with 2 demo rows
 ```
 
 If no changes are required, say so explicitly and stop.
@@ -69,7 +68,7 @@ Use the existing naming convention:
 
 **Transaction:** The entire file must remain wrapped in `BEGIN; ... COMMIT;`.
 
-**TRUNCATE:** Keep all truncated tables in a single `TRUNCATE TABLE ... CASCADE;` statement at the top.
+**TRUNCATE:** Keep the dynamic `DO $$ ... TRUNCATE` block at the top. Do not replace it with a fixed table list: a fixed list missed `user_settings` (no foreign key to `users`), so visitor settings survived every reset.
 
 **Column order:** Match the column order in each INSERT to what's defined in the schema for readability.
 
@@ -84,7 +83,8 @@ After editing, re-read the updated `scripts/seed-demo.sql` and confirm:
 - [ ] All hardcoded UUIDs contain only valid hex characters
 - [ ] No enum value is used that isn't declared in the schema
 - [ ] The file starts with `BEGIN;` and ends with `COMMIT;`
-- [ ] The TRUNCATE covers all user-data tables
+- [ ] The dynamic TRUNCATE block is unchanged, or its exclusion list only names shared, non-user tables
+- [ ] `psql -v ON_ERROR_STOP=1 -f scripts/seed-demo.sql` succeeds against a freshly migrated database
 
 Report the final checklist result to the user.
 
@@ -95,5 +95,5 @@ Report the final checklist result to the user.
   Example: `accountId: uuid('account_id')` → INSERT uses `account_id`, not `accountId`.
 - **Migrations live in** `drizzle/` — each `.sql` file represents one schema version.
 - **The seed resets all user data daily** via `scripts/demo-reset.sh` in the demo Docker stack.
-- **Do not touch** `conversations`, `messages`, `documents` — these are excluded from seeding by design (AI chat history is ephemeral, documents are large binary blobs).
+- **Do not seed** `conversations`, `messages`, `documents` — they are emptied by the reset but get no demo rows by design (AI chat history is ephemeral, documents are large binary blobs).
 - **Do not change** the reset logic in `scripts/demo-reset.sh` unless explicitly asked.

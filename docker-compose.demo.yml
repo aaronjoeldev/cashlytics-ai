@@ -13,6 +13,14 @@
 #   AUTH_SECRET       Auth.js secret for JWT encryption  (default: demo_secret_change_in_production)
 #   OPENAI_API_KEY    For the AI assistant feature       (default: empty, feature disabled)
 #
+# Updating: the seeder reads scripts/seed-demo.sql and scripts/demo-reset.sh from this checkout,
+# the app comes from the image. Both must be the same version, so always update them together:
+#   git pull
+#   docker compose -f docker-compose.demo.yml pull
+#   docker compose -f docker-compose.demo.yml up -d --force-recreate app demo-seeder
+# Recreating the seeder resets the data right away. Check it with:
+#   docker logs cashlytics-demo-seeder   (expect "Demo data reset complete.")
+#
 # Registration is closed: the seed leaves only the demo user, and single-user mode
 # blocks further sign-ups. Log in as demo@cashlytics.online / admin123456789.
 #
