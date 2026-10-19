@@ -106,15 +106,15 @@ export async function isolation() {
   );
 
   // Push subscription moves to the user who subscribed last in the browser
-  const endpoint = "https://push.example.test/sub/e2e-shared";
+  const endpoint = "https://fcm.googleapis.com/fcm/send/e2e-shared";
   const demo = await newPage();
   await login(demo.page);
   const demoCookie = await cookieHeader(demo.page);
-  const sub = (cookie) =>
+  const sub = (cookie, url = endpoint) =>
     fetch(`${B}/api/push/subscribe`, {
       method: "POST",
       headers: { Cookie: cookie, "content-type": "application/json" },
-      body: JSON.stringify({ endpoint, p256dh: "p", auth: "a" }),
+      body: JSON.stringify({ endpoint: url, p256dh: "p", auth: "a" }),
     });
   await sub(demoCookie);
   await sub(erikaCookie);
@@ -123,6 +123,16 @@ export async function isolation() {
     psql(`select user_id from push_subscriptions where endpoint='${endpoint}'`) === erikaId
   );
   psql(`delete from push_subscriptions where endpoint='${endpoint}'`);
+
+  // Only endpoints of known push services are accepted (no SSRF through the reminder job)
+  const internalEndpoint = "http://127.0.0.1:5432/e2e";
+  const rejected = await sub(demoCookie, internalEndpoint);
+  check(
+    "push subscription with a non push-service endpoint is rejected",
+    rejected.status === 400 &&
+      psql(`select count(*) from push_subscriptions where endpoint='${internalEndpoint}'`) === "0",
+    `status ${rejected.status}`
+  );
 
   // Validation of direct action calls (as the demo user)
   const reject = async (label, name, args, contains) => {

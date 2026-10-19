@@ -588,7 +588,7 @@
     "themeSystem": "System",
     "pushNotifications": {
       "title": "Push notifications",
-      "description": "Receive instant notifications about new transactions, budget alerts, and monthly summaries, even when Cashlytics is running in the background.",
+      "description": "Receive a reminder the day before a recurring expense is due, even when Cashlytics is running in the background.",
       "toggleLabel": "Receive notifications",
       "ariaLabel": "Toggle push notifications",
       "status": {

@@ -65,7 +65,14 @@ All variables are documented in [`.env.example`](.env.example). The important on
 | `VAPID_*`                                | Push notifications (`npx web-push generate-vapid-keys`)                       |
 | `CRON_SECRET`                            | Required for payment reminders and insights (`openssl rand -hex 32`)          |
 
-Language and base currency are chosen per user in the settings. Exchange rates come from the [Frankfurter API](https://frankfurter.dev) (ECB data) and are cached for a day; without network access the app falls back to built-in rates.
+Language and base currency are chosen per user in the settings. The fallback defaults `NEXT_PUBLIC_DEFAULT_LOCALE` and `NEXT_PUBLIC_DEFAULT_CURRENCY` are compiled into the bundle, so with a self-built image pass them as build args (`docker compose up --build` reads them from `.env`):
+
+```bash
+docker build --build-arg NEXT_PUBLIC_DEFAULT_LOCALE=en --build-arg NEXT_PUBLIC_DEFAULT_CURRENCY=USD -t cashlytics .
+```
+
+`EMAIL_TRANSPORT=sendmail` needs a `sendmail` binary inside the container, which the official image does not ship; use `smtp` (`SMTP_*`) with the Docker image.
+Exchange rates come from the [Frankfurter API](https://frankfurter.dev) (ECB data) and are cached for a day; without network access the app falls back to built-in rates.
 
 ### CSV import
 

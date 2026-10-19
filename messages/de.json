@@ -549,7 +549,7 @@
     "themeSystem": "System",
     "pushNotifications": {
       "title": "Push-Benachrichtigungen",
-      "description": "Erhalte sofortige Benachrichtigungen über neue Transaktionen, Budgetwarnungen und monatliche Zusammenfassungen, auch wenn Cashlytics im Hintergrund läuft.",
+      "description": "Erhalte am Vortag eine Erinnerung an fällige Ausgaben, auch wenn Cashlytics im Hintergrund läuft.",
       "toggleLabel": "Benachrichtigungen empfangen",
       "ariaLabel": "Push-Benachrichtigungen umschalten",
       "status": {

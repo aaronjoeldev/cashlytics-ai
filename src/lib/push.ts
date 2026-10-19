@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { db } from "@/lib/db";
 import { pushSubscriptions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isAllowedPushEndpoint } from "@/lib/push-endpoint";
 
 export interface PushPayload {
   title: string;
@@ -26,6 +27,11 @@ export async function sendPushNotification(userId: string, payload: PushPayload)
 
   const results = await Promise.allSettled(
     subscriptions.map(async (sub) => {
+      // Schutz vor SSRF: Nur bekannte Push-Dienste anfragen, ungültige Einträge ohne Request löschen.
+      if (!isAllowedPushEndpoint(sub.endpoint)) {
+        await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
+        return;
+      }
       try {
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
