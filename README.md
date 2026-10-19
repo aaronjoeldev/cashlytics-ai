@@ -54,16 +54,18 @@ Open <http://localhost:3000> and register. The stack runs the app (migrations ru
 
 All variables are documented in [`.env.example`](.env.example). The important ones:
 
-| Variable                                 | Purpose                                                                       |
-| ---------------------------------------- | ----------------------------------------------------------------------------- |
-| `DATABASE_URL`, `POSTGRES_PASSWORD`      | Database connection (required)                                                |
-| `AUTH_SECRET`                            | Session encryption (required)                                                 |
-| `NEXT_PUBLIC_APP_URL`, `AUTH_TRUST_HOST` | Public URL; keep `AUTH_TRUST_HOST=true` behind a proxy or on a server         |
-| `SINGLE_USER_MODE`                       | `true`: only the first account can register; `false`: open registration       |
-| `OPENAI_API_KEY`                         | Enables assistant, receipt scanner and CSV import; without it they are hidden |
-| `SMTP_*`, `EMAIL_TRANSPORT`, `APP_URL`   | E-mail for password reset and welcome mails                                   |
-| `VAPID_*`                                | Push notifications (`npx web-push generate-vapid-keys`)                       |
-| `CRON_SECRET`                            | Required for payment reminders and insights (`openssl rand -hex 32`)          |
+| Variable                                 | Purpose                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------ |
+| `DATABASE_URL`, `POSTGRES_PASSWORD`      | Database connection (required)                                                       |
+| `AUTH_SECRET`                            | Session encryption (required)                                                        |
+| `NEXT_PUBLIC_APP_URL`, `AUTH_TRUST_HOST` | Public URL; keep `AUTH_TRUST_HOST=true` behind a proxy or on a server                |
+| `SINGLE_USER_MODE`                       | `true`: only the first account can register; `false`: open registration              |
+| `OPENAI_API_KEY`                         | Enables assistant, receipt scanner and CSV import; without it they are hidden        |
+| `SMTP_*`, `EMAIL_TRANSPORT`, `APP_URL`   | E-mail for password reset and welcome mails                                          |
+| `VAPID_*`                                | Push notifications (`npx web-push generate-vapid-keys`)                              |
+| `CRON_SECRET`                            | Required for payment reminders and insights (`openssl rand -hex 32`)                 |
+| `BANK_SYNC_ENCRYPTION_KEY`               | Encrypts stored bank access; bank sync is off without it (`openssl rand -base64 32`) |
+| `BANK_SYNC_ALLOWED_HOSTS`                | SimpleFIN providers the server may call; defaults to `beta-bridge.simplefin.org`     |
 
 Language and base currency are chosen per user in the settings. The fallback defaults `NEXT_PUBLIC_DEFAULT_LOCALE` and `NEXT_PUBLIC_DEFAULT_CURRENCY` are compiled into the bundle, so with a self-built image pass them as build args (`docker compose up --build` reads them from `.env`):
 

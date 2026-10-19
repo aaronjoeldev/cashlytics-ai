@@ -31,6 +31,11 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
+/** Hides credentials inside URLs (e.g. SimpleFIN access URLs), wherever they appear in a line. */
+export function redactSecrets(text: string): string {
+  return text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1***@");
+}
+
 function log(level: LogLevel, message: string, context?: string, error?: unknown): void {
   const entry: LogEntry = {
     level,
@@ -42,7 +47,7 @@ function log(level: LogLevel, message: string, context?: string, error?: unknown
 
   const prefix = `[${entry.timestamp}] [${level.toUpperCase()}]${context ? ` [${context}]` : ""}`;
   const errorSuffix = error !== undefined ? ` | error=${formatError(error)}` : "";
-  const line = `${prefix} ${message}${errorSuffix}`;
+  const line = redactSecrets(`${prefix} ${message}${errorSuffix}`);
 
   switch (level) {
     case "error":
