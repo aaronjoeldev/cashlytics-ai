@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.11.0...v0.11.1) (2026-10-19)
+
+### 🐛 Bug Fixes
+
+- **ai:** harden prompts against injection from stored data ([3c4ace2](https://github.com/aaronjoeldev/cashlytics-ai/commit/3c4ace2820534b771b51076bed8ee2960f5123cb))
+- **push:** only accept endpoints of known push services ([cb21fab](https://github.com/aaronjoeldev/cashlytics-ai/commit/cb21fabd8918d78e7e2bec9bdab0ad59c7039c31))
+- remove broken document upload route, add docker build args ([6b9d475](https://github.com/aaronjoeldev/cashlytics-ai/commit/6b9d47552e6e87f6e8a65f722070efcb6b9476ca))
+
 ## [0.11.0](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.10.0...v0.11.0) (2026-10-19)
 
 ### ✨ Features
