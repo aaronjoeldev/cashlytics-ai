@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.2](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.11.1...v0.11.2) (2026-10-19)
+
+### 🐛 Bug Fixes
+
+- **i18n:** one term per meaning for balance, net and savings ([18b39cf](https://github.com/aaronjoeldev/cashlytics-ai/commit/18b39cf5def65ab914ca44336d3f32804e19271a))
+
 ## [0.11.1](https://github.com/aaronjoeldev/cashlytics-ai/compare/v0.11.0...v0.11.1) (2026-10-19)
 
 ### 🐛 Bug Fixes
