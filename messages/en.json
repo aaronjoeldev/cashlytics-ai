@@ -43,7 +43,6 @@
     "welcome": "Welcome back! Here's your financial overview.",
     "income": "Income",
     "expenses": "Expenses",
-    "savingsRate": "Savings Rate",
     "vsLastMonth": "vs. last month",
     "monthly": "monthly",
     "incomeVsExpenses": "Income vs. Expenses",
@@ -52,7 +51,7 @@
     "noTransactions": "No transactions yet. Add your first expense or income!",
     "monthlyIncome": "Monthly Income",
     "monthlyExpenses": "Monthly Expenses",
-    "monthlyBalance": "Monthly Balance",
+    "monthlyBalance": "Monthly Net",
     "categoriesCount": "{count, plural, one {# category} other {# categories}}",
     "noExpensesThisMonth": "No expenses this month yet",
     "yourRecentExpenses": "Your recent expenses",
@@ -72,7 +71,8 @@
     "viewExplanation": {
       "reserve": "Reserve: Non-monthly items are spread into a monthly amount.",
       "cashflow": "Cashflow: Shows payments that are actually due this month."
-    }
+    },
+    "viewBalance": "Net ({view})"
   },
   "overview": {
     "title": "Overview",
@@ -81,7 +81,7 @@
     "paymentCalendarDescription": "Planned income and expenses at a glance",
     "income": "Income",
     "expenses": "Expenses",
-    "balance": "Balance",
+    "balance": "Net",
     "monthlyIncome": "Monthly income",
     "fixedCosts": "Fixed costs + variable expenses",
     "surplusThisMonth": "Surplus this month",
@@ -108,10 +108,10 @@
     "reservesLabel": "Reserves",
     "totalPerMonth": "Total per month",
     "threeMonthForecast": "3-Month Forecast",
-    "projectedBalance": "Projected balance:",
+    "projectedBalance": "Net over 3 months:",
     "financialOutlook": "Financial outlook",
     "addDataForForecast": "Add income and expenses for a forecast",
-    "dayBalance": "Day's balance",
+    "dayBalance": "Net for the day",
     "paymentsCount": "{count, plural, one {# payment} other {# payments}}",
     "recurringTransfers": "recurring transfers",
     "calendarLoadFailed": "Could not load the payment calendar.",
@@ -242,7 +242,7 @@
     "created": "Created",
     "errorTitle": "Error",
     "error": "Something went wrong. Please try again.",
-    "initialBalanceLabel": "Initial Balance (€)",
+    "initialBalanceLabel": "Balance ({currency})",
     "createAccount": "Create Account",
     "creating": "Creating...",
     "createdDesc": "{name} was created successfully.",
@@ -270,12 +270,11 @@
     "months3": "3 months",
     "months6": "6 months",
     "months12": "12 months",
-    "change": "Change",
-    "endBalance": "End Balance",
+    "change": "Net over the period",
+    "endBalance": "Balance at the end",
     "monthlyProjection": "Monthly Projection",
-    "cumulative": "cumulative",
-    "cumulativeDevelopment": "Cumulative Development",
-    "monthlyBalance": "Monthly Balance",
+    "cumulativeDevelopment": "Balance over time",
+    "monthlyBalance": "Monthly Net",
     "viewModes": {
       "reserve": "Reserve",
       "cashflow": "Cashflow"
@@ -284,7 +283,9 @@
       "reserve": "Reserve: Recurring payments are distributed into monthly values.",
       "cashflow": "Cashflow: Shows transactions actually due in the selected month."
     },
-    "accountsCount": "{count, plural, one {# account} other {# accounts}}"
+    "accountsCount": "{count, plural, one {# account} other {# accounts}}",
+    "lastMonthNet": "Net in the last month",
+    "net": "Net"
   },
   "expenses": {
     "title": "Expenses",
@@ -499,7 +500,7 @@
     "title": "Analytics",
     "description": "Detailed insights into your finances.",
     "monthlyTrend": "Monthly Trend",
-    "monthlyTrendDescription": "Income, expenses and savings over time",
+    "monthlyTrendDescription": "Income, expenses and net over time",
     "incomeVsExpenses": "Income vs. Expenses",
     "incomeVsExpensesDescription": "Comparison of the last 6 months",
     "expensesByCategory": "Expenses by Category",
@@ -508,13 +509,13 @@
     "kpiIncomeDescription": "Income this month",
     "kpiExpenses": "Total Expenses",
     "kpiExpensesDescription": "Expenses this month",
-    "kpiSavings": "Money Saved",
-    "kpiSavingsDescription": "Savings this month",
+    "kpiSavings": "Net",
+    "kpiSavingsDescription": "Income minus expenses this month",
     "kpiSavingsRate": "Savings Rate",
-    "kpiSavingsRateDescription": "Percentage of income saved",
+    "kpiSavingsRateDescription": "Share of income left over",
     "income": "Income",
     "expenses": "Expenses",
-    "savings": "Savings",
+    "savings": "Net",
     "noDataChart": "No data available for this period"
   },
   "assistant": {

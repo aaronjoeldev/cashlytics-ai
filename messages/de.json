@@ -43,7 +43,6 @@
     "welcome": "Willkommen zurück! Hier ist deine Finanzübersicht.",
     "income": "Einnahmen",
     "expenses": "Ausgaben",
-    "savingsRate": "Sparrate",
     "vsLastMonth": "vs. letzten Monat",
     "monthly": "monatlich",
     "incomeVsExpenses": "Einnahmen vs. Ausgaben",
@@ -72,7 +71,8 @@
     "viewExplanation": {
       "reserve": "Rücklage: Nicht-monatliche Posten werden auf einen Monatswert verteilt.",
       "cashflow": "Cashflow: Es zählen die tatsächlich im Monat fälligen Abbuchungen/Zahlungen."
-    }
+    },
+    "viewBalance": "Bilanz ({view})"
   },
   "overview": {
     "title": "Übersicht",
@@ -108,10 +108,10 @@
     "reservesLabel": "Rücklagen",
     "totalPerMonth": "Gesamt pro Monat",
     "threeMonthForecast": "3-Monats-Prognose",
-    "projectedBalance": "Projizierte Bilanz:",
+    "projectedBalance": "Bilanz der 3 Monate:",
     "financialOutlook": "Finanzielle Vorausschau",
     "addDataForForecast": "Erfasse Einnahmen und Ausgaben für eine Prognose",
-    "dayBalance": "Saldo des Tages",
+    "dayBalance": "Bilanz des Tages",
     "paymentsCount": "{count, plural, one {# Zahlung} other {# Zahlungen}}",
     "recurringTransfers": "wiederkehrende Transfers",
     "calendarLoadFailed": "Zahlungskalender konnte nicht geladen werden.",
@@ -242,7 +242,7 @@
     "created": "Erstellt am",
     "errorTitle": "Fehler",
     "error": "Ein Fehler ist aufgetreten. Bitte versuche es erneut.",
-    "initialBalanceLabel": "Anfangssaldo (€)",
+    "initialBalanceLabel": "Kontostand ({currency})",
     "createAccount": "Konto erstellen",
     "creating": "Wird erstellt...",
     "createdDesc": "{name} wurde erfolgreich angelegt.",
@@ -270,11 +270,10 @@
     "months3": "3 Monate",
     "months6": "6 Monate",
     "months12": "12 Monate",
-    "change": "Änderung",
-    "endBalance": "Endsaldo",
+    "change": "Bilanz im Zeitraum",
+    "endBalance": "Kontostand am Ende",
     "monthlyProjection": "Monatliche Projektion",
-    "cumulative": "kumuliert",
-    "cumulativeDevelopment": "Kumulative Entwicklung",
+    "cumulativeDevelopment": "Entwicklung des Kontostands",
     "monthlyBalance": "Monatliche Bilanz",
     "viewModes": {
       "reserve": "Rücklage",
@@ -284,7 +283,9 @@
       "reserve": "Rücklage: Wiederkehrende Zahlungen werden auf einen Monatswert verteilt.",
       "cashflow": "Cashflow: Zeigt die im gewählten Monat tatsächlich fälligen Buchungen."
     },
-    "accountsCount": "{count, plural, one {# Konto} other {# Konten}}"
+    "accountsCount": "{count, plural, one {# Konto} other {# Konten}}",
+    "lastMonthNet": "Bilanz im letzten Monat",
+    "net": "Bilanz"
   },
   "expenses": {
     "title": "Ausgaben",
@@ -499,7 +500,7 @@
     "title": "Analysen",
     "description": "Detaillierte Einblicke in deine Finanzen.",
     "monthlyTrend": "Monatlicher Trend",
-    "monthlyTrendDescription": "Einnahmen, Ausgaben und Ersparnisse im Verlauf",
+    "monthlyTrendDescription": "Einnahmen, Ausgaben und Bilanz im Verlauf",
     "incomeVsExpenses": "Einnahmen vs. Ausgaben",
     "incomeVsExpensesDescription": "Vergleich der letzten 6 Monate",
     "expensesByCategory": "Ausgaben nach Kategorie",
@@ -508,13 +509,13 @@
     "kpiIncomeDescription": "Einnahmen diesen Monat",
     "kpiExpenses": "Gesamtausgaben",
     "kpiExpensesDescription": "Ausgaben diesen Monat",
-    "kpiSavings": "Gespartes Geld",
-    "kpiSavingsDescription": "Ersparnisse diesen Monat",
+    "kpiSavings": "Bilanz",
+    "kpiSavingsDescription": "Einnahmen minus Ausgaben diesen Monat",
     "kpiSavingsRate": "Sparrate",
-    "kpiSavingsRateDescription": "Prozentsatz des Einkommens gespart",
+    "kpiSavingsRateDescription": "Anteil der Einnahmen, der übrig bleibt",
     "income": "Einnahmen",
     "expenses": "Ausgaben",
-    "savings": "Ersparnisse",
+    "savings": "Bilanz",
     "noDataChart": "Keine Daten für diesen Zeitraum vorhanden"
   },
   "assistant": {
@@ -696,7 +697,7 @@
       "counterparty": "Gegenpartei",
       "senderAccount": "Absenderkonto",
       "receiverAccount": "Empfaengerkonto",
-      "balanceAfterBooking": "Saldo nach Buchung",
+      "balanceAfterBooking": "Kontostand nach Buchung",
       "reference": "Referenz"
     },
     "summary": {
@@ -745,7 +746,7 @@
       "counterparty": "Gegenpartei",
       "senderAccount": "Absenderkonto",
       "receiverAccount": "Empfaengerkonto",
-      "balanceAfterBooking": "Saldo nach Buchung",
+      "balanceAfterBooking": "Kontostand nach Buchung",
       "reference": "Referenz"
     },
     "confirm": {

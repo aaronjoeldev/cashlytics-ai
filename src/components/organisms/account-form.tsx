@@ -143,7 +143,7 @@ export function AccountForm({ onSuccess, open: controlledOpen, onOpenChange }: A
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="balance">{t("initialBalanceLabel")}</Label>
+              <Label htmlFor="balance">{t("initialBalanceLabel", { currency })}</Label>
               <Input
                 id="balance"
                 type="number"
